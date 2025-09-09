@@ -1,14 +1,16 @@
 [package]
 name = "jsonmodem-py"
-version = "0.1.0"
+# Pre-release so the Python distribution maps to 0.0.0a0 via maturin's SemVer→PEP440 mapping
+version = "0.0.0-alpha.0"
 edition = "2021"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
 description = "Python bindings for the jsonmodem Rust crate"
 
 [lib]
+name = "_jsonmodem"
 crate-type = ["cdylib"]
 
 [dependencies]
 jsonmodem = { path = "../jsonmodem" }
-pyo3 = { version = "0.25", features = ["extension-module"] }
+pyo3 = { version = "0.25", features = ["extension-module", "abi3-py39"] }

@@ -3,6 +3,25 @@
 actionlint
 
 /crates/jsonmodem-py/target/
+# jsonmodem-py (Python bindings) build artifacts
+/crates/jsonmodem-py/target/
+/crates/jsonmodem-py/.pytest_cache/
+/crates/jsonmodem-py/python/jsonmodem/_jsonmodem*.so
+/crates/jsonmodem-py/python/jsonmodem/_jsonmodem*.pyd
+/crates/jsonmodem-py/python/jsonmodem/__pycache__/
+
+# General Python data anywhere in the repo
+__pycache__/
+dist/
+*.py[cod]
 .venv
+
+# AGENTS metadata
 .agent/.setup_py_done
 .agent/.setup_done
+
+# Perf metadata
+/flamegraph.svg
+/perf.data
+/perf.data.old
+/recent.log

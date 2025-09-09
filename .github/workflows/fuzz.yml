@@ -8,7 +8,11 @@ on:
 jobs:
   fuzz:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [fuzz_jsonmodem, fuzz_jsonmodem_buffers, fuzz_jsonmodem_values]
 
     steps:
       - uses: actions/checkout@v4
@@ -19,36 +23,39 @@ jobs:
           toolchain: nightly
           components: llvm-tools
 
-      - name: Restore fuzz corpora and artifacts
+      - name: Restore fuzz caches (per-target)
         id: cache-fuzz-restore
         uses: actions/cache/restore@v4
         with:
           path: |
-            fuzz/corpus
-            fuzz/artifacts
-          key: ${{ runner.os }}-cargo-fuzz-${{ github.sha }}
+            fuzz/corpus/${{ matrix.target }}
+            fuzz/artifacts/${{ matrix.target }}
+          # Unique per job/run; avoids save conflicts across matrix jobs
+          key: ${{ runner.os }}-cargo-fuzz-${{ matrix.target }}-${{ github.job }}-${{ github.run_id }}
           restore-keys: |
-            ${{ runner.os }}-cargo-fuzz-
+            ${{ runner.os }}-cargo-fuzz-${{ matrix.target }}-
 
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz --locked
 
-      - name: Fuzz (5 000 runs ≈ 5 min on CI)
-        run: cargo fuzz run fuzz_parser -- -runs=5000
+      - name: Fuzz (5 000 runs per target)
+        run: cargo fuzz run ${{ matrix.target }} -- -runs=5000 -max_total_time=300
 
-      - name: Save updated corpora and artifacts
+      - name: Save fuzz caches (per-target)
         id: cache-fuzz-save
         if: always() && steps.cache-fuzz-restore.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: |
-            fuzz/corpus
-            fuzz/artifacts
+            fuzz/corpus/${{ matrix.target }}
+            fuzz/artifacts/${{ matrix.target }}
           key: ${{ steps.cache-fuzz-restore.outputs.cache-primary-key }}
 
       - name: Upload fuzz artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fuzz-artifacts
-          path: fuzz/artifacts
+          name: fuzz-artifacts-${{ matrix.target }}
+          path: fuzz/artifacts/${{ matrix.target }}
+          if-no-files-found: ignore
+          retention-days: 7
