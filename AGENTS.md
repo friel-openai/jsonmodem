@@ -154,3 +154,7 @@ workflow when adding or updating tests.
 
 Following these rules ensures that contributors can run and update snapshots
 consistently and that CI remains deterministic.
+
+# ExecPlans
+
+When writing complex features or significant refactors, use an ExecPlan (as described in .agent/PLANS.md) from design to implementation.
