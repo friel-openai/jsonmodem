@@ -157,4 +157,4 @@ consistently and that CI remains deterministic.
 
 # ExecPlans
 
-When writing complex features or significant refactors, use an ExecPlan (as described in .agent/PLANS.md) from design to implementation.
+When writing complex features or significant refactors, use an ExecPlan (as described in .agent/PLANS.md) from design to implementation. Write new plans to the .agent dir. Place any temporary research, clones, etc., in a .gitignored subdirectory of .agent.

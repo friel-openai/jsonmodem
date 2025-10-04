@@ -4,21 +4,23 @@ This document describes the requirements for an execution plan ("ExecPlan"), a d
 
 ## How to use ExecPlans and PLANS.md
 
-When authoring an executable specification (ExecPlan), follow PLANS.md _to the letter_. If it is not in your context, refresh your memory by reading the entire PLANS.md file. Be thorough in reading (and re-reading) source material to produce an accurate specification.
+When authoring an executable specification (ExecPlan), follow PLANS.md _to the letter_. If it is not in your context, refresh your memory by reading the entire PLANS.md file. Be thorough in reading (and re-reading) source material to produce an accurate specification. When creating a spec, start from the skeleton and flesh it out as you do your research.
 
 When implementing a executable specification (ExecPlan), do not promp the user for "next steps", simply proceed to the next milestone. Keep all sections sections up to date, add or split entries in the list at every stopping point to affirmatively state the progress made and next steps. Resolve ambiguities autonomously, and commit frequently.
 
 When discussing a executable specification (ExecPlan), record decisions in a log in the spec for posterity, it should be unambiguously clear why any change to the specification was made. ExecSpecs are living documents, and it should always be possible to restart from _only_ the ExecPlan and no other work.
 
+When researching a design with challenging requirements or significant unknowns, use milestones to implement proof of concepts, "toy implementations", etc., that allow validating whether the user's proposal is feasible. Read the source code of libraries by finding or acquiring them, research deeply, and include prototypes to guide a fuller implementation. 
+
 ## Requirements
 
 NON-NEGOTIABLE REQUIREMENTS:
 
-* EVERY EXECPLAN MUST BE FULLY SELF-CONTAINED. Self-contained means that in its current form it contains all knowledge and instructions needed for a novice to succeed.
-* EVERY EXECPLAN IS A LIVING DOCUMENT. Contributors are required to revise it as progress is made, as discoveries occur, and as design decisions are finalized. Each revision must remain fully self-contained.
-* EVERY EXECPLAN MUST ENABLE A COMPLETE NOVICE TO IMPLEMENT THE FEATURE END-TO-END WITHOUT PRIOR KNOWLEDGE OF THIS REPO.
-* EVERY EXECPLAN MUST PRODUCE A DEMONSTRABLY WORKING BEHAVIOR, NOT JUST CODE CHANGES THAT "MEET A DEFINITION".
-* DEFINE EVERY TERM OF ART IN PLAIN LANGUAGE OR DO NOT USE IT.
+* Every ExecPlan must be fully self-contained. Self-contained means that in its current form it contains all knowledge and instructions needed for a novice to succeed.
+* Every ExecPlan is a living document. Contributors are required to revise it as progress is made, as discoveries occur, and as design decisions are finalized. Each revision must remain fully self-contained.
+* Every ExecPlan must enable a complete novice to implement the feature end-to-end without prior knowledge of this repo.
+* Every ExecPlan must produce a demonstrably working behavior, not merely code changes to "meet a definition".
+* Every ExecPlan must define every term of art in plain language or do not use it.
 
 Purpose and intent come first. Begin by explaining, in a few sentences, why the work matters from a user's perspective: what someone can do after this change that they could not do before, and how to see it working. Then guide the reader through the exact steps to achieve that outcome, including what to edit, what to run, and what they should observe.
 
@@ -44,7 +46,7 @@ Specify repository context explicitly. Name files with full repository-relative 
 
 Be idempotent and safe. Write the steps so they can be run multiple times without causing damage or drift. If a step can fail halfway, include how to retry or adapt. If a migration or destructive operation is necessary, spell out backups or safe fallbacks. Prefer additive, testable changes that can be validated as you go.
 
-Validation is not optional. Include instructions to run tests, to start the system if applicable, and to observe it doing something useful. Include expected outputs and error messages so a novice can tell success from failure. Where possible, show how to prove that the change is effective beyond compilation (for example, through a small end-to-end scenario, a CLI invocation, or an HTTP request/response transcript). State the exact test commands appropriate to the project’s toolchain and how to interpret their results.
+Validation is not optional. Include instructions to run tests, to start the system if applicable, and to observe it doing something useful. Describe comprehensive testing for any new features or capabilities. Include expected outputs and error messages so a novice can tell success from failure. Where possible, show how to prove that the change is effective beyond compilation (for example, through a small end-to-end scenario, a CLI invocation, or an HTTP request/response transcript). State the exact test commands appropriate to the project’s toolchain and how to interpret their results.
 
 Capture evidence. When your steps produce terminal output, short diffs, or logs, include them inside the single fenced block as indented transcript examples so the agent knows what success looks like. If the output is long, include the most relevant lines and say what to look for. If you need to include a patch, prefer file-scoped diffs or small excerpts that a reader can recreate by following your instructions rather than pasting large blobs.
 
@@ -62,11 +64,15 @@ Each milestone must be independently verifiable and incrementally implement the 
 * If you change course mid-implementation, document why in the `Decision Log` and reflect the implications in `Progress`. Plans are guides for the next contributor as much as checklists for you.
 * At completion of a major task or the full plan, write an `Outcomes & Retrospective` entry summarizing what was achieved, what remains, and lessons learned.
 
-Prototyping milestones and parallel implementations.
+# Prototyping milestones and parallel implementations
 
-* It is acceptable—and often encouraged—to include explicit prototyping milestones when they de-risk a larger change. Examples: adding a low-level operator to a dependency to validate feasibility, or exploring two composition orders while measuring optimizer effects.
-* Keep prototypes additive and testable. Clearly label the scope as “prototyping”; describe how to run and observe results; and state the criteria for promoting or discarding the prototype.
-* Parallel implementations (e.g., keeping an adapter alongside an older path during migration) are fine when they reduce risk. Describe how to validate both paths and how to retire one safely with tests.
+It is acceptable—and often encouraged—to include explicit prototyping milestones when they de-risk a larger change. Examples: adding a low-level operator to a dependency to validate feasibility, or exploring two composition orders while measuring optimizer effects.
+
+Keep prototypes additive and testable. Clearly label the scope as “prototyping”; describe how to run and observe results; and state the criteria for promoting or discarding the prototype.
+
+Parallel implementations (e.g., keeping an adapter alongside an older path during migration) are fine when they reduce risk. Describe how to validate both paths and how to retire one safely with tests.
+
+When working with multiple new libraries or feature areas, consider creating spikes that evaluate the feasibility of these features _independently_ of one another.
 
 ---
 
@@ -85,9 +91,11 @@ Explain in a few sentences what someone gains after this change and how they can
 
 Use a list with checkboxes to summarize granular steps. Every stopping point must be documented here, even if it requires splitting a partially completed task into two (“done” vs. “remaining”). This section must always reflect the actual current state of the work.
 
-- [x] Example completed step.  
+- [x] (2025-10-01 13:00Z) Example completed step.  
 - [ ] Example incomplete step.  
 - [ ] Example partially completed step (completed: X; remaining: Y).  
+
+Use timestamps to measure rates of progress.
 
 ## Surprises & Discoveries
 
