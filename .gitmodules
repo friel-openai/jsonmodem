@@ -1,3 +1,6 @@
 [submodule "fn-stream"]
 	path = fn-stream
 	url = https://github.com/aaronfriel/fn-stream
+[submodule "submodules/facet-deserialize"]
+	path = submodules/facet-deserialize
+	url = https://github.com/facet-rs/facet-deserialize
