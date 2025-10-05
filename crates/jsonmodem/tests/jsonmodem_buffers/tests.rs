@@ -150,10 +150,7 @@ fn buffers_emit_string_value_only_when_complete() {
         } => {
             assert!(path.is_empty());
             assert_eq!(fragment.as_ref(), "ed");
-            assert!(
-                value.is_none(),
-                "std value assembler does not attach string values"
-            );
+            assert_eq!(value.as_deref(), Some("fragmented"));
             assert!(*is_final);
         }
         other => panic!("unexpected buffered event: {other:?}"),

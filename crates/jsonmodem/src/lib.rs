@@ -11,10 +11,10 @@
 //! Most users only need these three types plus `ParseEvent`, `Path`, and
 //! `Value`.
 
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
 
-#[cfg(any(test, fuzzing))]
+#[cfg(any(test, fuzzing, feature = "std"))]
 extern crate std;
 
 mod backend;
@@ -22,6 +22,8 @@ mod buffer_options;
 mod context;
 mod event;
 mod jsonmodem_buffers;
+#[cfg(feature = "facet")]
+mod jsonmodem_facet;
 mod jsonmodem_values;
 pub mod lending_iterator;
 mod parser;
@@ -40,6 +42,10 @@ pub use event::ParseEvent;
 #[allow(unused_imports)]
 pub use event::test_util;
 pub use jsonmodem_buffers::{BufferedEvent, JsonModemBuffers};
+#[cfg(feature = "facet")]
+pub use jsonmodem_facet::{
+    FacetResult, FacetSnapshot, JsonModemFacet, JsonModemFacetError, JsonModemFacetOptions,
+};
 pub use jsonmodem_values::{JsonModemValues, StreamingValue, ValuesOptions};
 #[doc(hidden)]
 pub use parser::JsonModem;

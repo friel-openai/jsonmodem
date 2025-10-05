@@ -196,7 +196,14 @@ impl ValueApplicator {
             }
         });
 
-        let buffered = None;
+        let buffered = if is_final {
+            match leaf {
+                Value::String(existing) => Some(existing.as_str()),
+                _ => None,
+            }
+        } else {
+            None
+        };
 
         AppliedRef::String {
             path,

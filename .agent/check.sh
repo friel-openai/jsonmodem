@@ -7,7 +7,7 @@ set -euo pipefail
 ###############################################################################
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 REPO_NAME="$(basename "${REPO_ROOT}")"
-FUZZ_CRATE="${REPO_NAME}-fuzz"        # convention: <repo>-fuzz
+FUZZ_CRATE="jsonmodem-fuzz"        # convention: <repo>-fuzz
 TIMING_LOG="$(mktemp -t pre-push.timings.XXXX)"
 trap 'rm -f "$TIMING_LOG"' EXIT
 

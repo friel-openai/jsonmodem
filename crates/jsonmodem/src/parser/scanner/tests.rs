@@ -402,12 +402,12 @@ fn alternate_consume_and_skip() {
     match s_by_peek.emit() {
         Capture::Owned(t) => assert_eq!(t, expected),
         Capture::Borrowed(b) => panic!("expected owned text, got borrowed: {b}"),
-        Capture::Raw(b) => panic!("expected owned text, got raw: {:?}", b),
+        Capture::Raw(b) => panic!("expected owned text, got raw: {b:?}"),
     }
     match s_by_scanner.emit() {
         Capture::Owned(t) => assert_eq!(t, expected),
         Capture::Borrowed(b) => panic!("expected owned text, got borrowed: {b}"),
-        Capture::Raw(b) => panic!("expected owned text, got raw: {:?}", b),
+        Capture::Raw(b) => panic!("expected owned text, got raw: {b:?}"),
     }
 }
 
@@ -441,12 +441,12 @@ fn alternate_skip_and_consume() {
     match s_by_peek.emit() {
         Capture::Owned(t) => assert_eq!(t, expected),
         Capture::Borrowed(b) => panic!("expected owned text, got borrowed: {b}"),
-        Capture::Raw(b) => panic!("expected owned text, got raw: {:?}", b),
+        Capture::Raw(b) => panic!("expected owned text, got raw: {b:?}"),
     }
     match s_by_scanner.emit() {
         Capture::Owned(t) => assert_eq!(t, expected),
         Capture::Borrowed(b) => panic!("expected owned text, got borrowed: {b}"),
-        Capture::Raw(b) => panic!("expected owned text, got raw: {:?}", b),
+        Capture::Raw(b) => panic!("expected owned text, got raw: {b:?}"),
     }
 }
 
@@ -474,12 +474,12 @@ fn peek_consume() {
     match s_by_peek.emit() {
         Capture::Owned(t) => panic!("expected borrowed text, got owned: {t}"),
         Capture::Borrowed(b) => assert_eq!(b, expected),
-        Capture::Raw(b) => panic!("expected owned text, got raw: {:?}", b),
+        Capture::Raw(b) => panic!("expected owned text, got raw: {b:?}"),
     }
     match s_by_scanner.emit() {
         Capture::Owned(t) => panic!("expected borrowed text, got owned: {t}"),
         Capture::Borrowed(b) => assert_eq!(b, expected),
-        Capture::Raw(b) => panic!("expected owned text, got raw: {:?}", b),
+        Capture::Raw(b) => panic!("expected owned text, got raw: {b:?}"),
     }
 }
 

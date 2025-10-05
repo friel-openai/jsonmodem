@@ -79,6 +79,37 @@ the user with minimal latency.
 
 ---
 
+## 🎭 Facet streaming (feature `facet`)
+
+Enable the optional `facet` feature to stream JSON directly into `facet::Facet` types without
+re‑allocating the root value. Feed arbitrarily chunked UTF‑8 and inspect a borrowed snapshot after
+each call to `feed()`:
+
+```rust
+use facet::Facet;
+use jsonmodem::{JsonModemFacet, ParserOptions};
+
+#[derive(Facet, Debug, Default, PartialEq)]
+struct Config {
+    host: String,
+    port: u16,
+    enabled: bool,
+}
+
+let mut facet = JsonModemFacet::<Config>::new(ParserOptions::default())?;
+for chunk in ["{\"host\":\"localhost\",", "\"port\":8080,", "\"enabled\":true}"] {
+    if let Some(snapshot) = facet.feed(chunk)? {
+        println!("bytes={} config={:?}", snapshot.bytes_consumed, snapshot.value);
+    }
+}
+let final_config = facet.finish()?;
+```
+
+Try it locally with `cargo run --example facet_stream --features facet`. The `facet` feature raises the
+MSRV to **1.87** to match the upstream facet crates.
+
+---
+
 ## 📊 Performance
 
 **Streaming‑JSON benchmark**

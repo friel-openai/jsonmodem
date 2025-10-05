@@ -29,7 +29,7 @@ fn jsonmodem_core_strings_are_fragments_only() {
 }
 
 #[test]
-fn jsonmodem_buffers_does_not_attach_string_values() {
+fn jsonmodem_buffers_attaches_full_string_on_completion() {
     let mut b = JsonModemBuffers::new(ParserOptions::default(), BufferOptions::default());
     // two chunks: expect no value until final; test iterator, too
     let out: Vec<_> = b.feed("\"hel").to_iter().map(Result::unwrap).collect();
@@ -54,7 +54,7 @@ fn jsonmodem_buffers_does_not_attach_string_values() {
         crate::BufferedEvent::String {
             value, is_final, ..
         } => {
-            assert!(value.is_none());
+            assert_eq!(value.as_deref(), Some("hello"));
             assert!(*is_final);
         }
         _ => panic!("expected string"),
