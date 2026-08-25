@@ -517,6 +517,8 @@ version = "0.0.0-alpha.0"
 dependencies = [
  "jsonmodem",
  "pyo3",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

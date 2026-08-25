@@ -143,3 +143,51 @@ Build wheels for release:
 ```
 maturin build -m crates/jsonmodem-py/Cargo.toml --release
 ```
+
+## orjson-compatible frontend
+
+`jsonmodem.loads` and `jsonmodem.dumps` implement the common `orjson` API:
+
+```python
+import jsonmodem as orjson
+
+document = orjson.dumps(
+    {"b": 1, "a": 2},
+    option=orjson.OPT_SORT_KEYS | orjson.OPT_APPEND_NEWLINE,
+)
+assert orjson.loads(document) == {"a": 2, "b": 1}
+```
+
+The frontend includes `JSONDecodeError`, `JSONEncodeError`, `Fragment`, a
+`default` callback, datetime/UUID/dataclass support, and the public `OPT_*`
+constants from orjson 3.11. Common output is byte-compatible. Unknown option
+bits fail instead of being ignored.
+
+The compatibility contract intentionally differs in two security-sensitive
+cases:
+
+- `loads` preserves every integer as a Python `int`; it never rounds an integer
+  larger than 64 bits through a float.
+- decoding and encoding reject documents nested beyond 256 containers.
+
+`loads` first performs a strict, allocation-free grammar pass. It then uses
+jsonmodem's lexeme-preserving parser to construct Python values. This rejects
+trailing commas, non-finite numbers, invalid UTF-8, and unpaired UTF-16
+surrogates. `dumps` rejects cycles, unsupported types, integers outside
+orjson's signed/unsigned 64-bit range, and non-callable defaults. Non-finite
+Python floats serialize as JSON `null`, matching orjson.
+
+The current serializer prepares values in Python before using CPython's JSON
+encoder. It prioritizes compatibility and bounded behavior, not parity with
+orjson's serialization throughput.
+
+## Benchmark
+
+Install `orjson`, build jsonmodem in release mode, and run:
+
+```bash
+python benchmarks/bench_orjson_compat.py
+```
+
+The benchmark reports median nanoseconds per operation for small and medium
+documents and verifies that both libraries produce equivalent JSON values.

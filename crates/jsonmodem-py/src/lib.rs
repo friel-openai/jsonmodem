@@ -9,10 +9,10 @@ use std::{
 
 use ::jsonmodem::{
     DecodeMode as CoreDecodeMode, JsonModem as CoreJsonModem,
-    JsonModemValues as CoreJsonModemValues, ParseEvent, ParserOptions as CoreParserOptions, Path,
-    PathItem, StdBackend, StreamingValue as CoreStreamingValue, Value as CoreValue,
-    ValuesError as CoreValuesError, ValuesOptions as CoreValuesOptions,
-    lending_iterator::LendingIterator as CoreLendingIterator,
+    JsonModemValues as CoreJsonModemValues, LexemeBackend, ParseEvent,
+    ParserOptions as CoreParserOptions, Path, PathItem, StdBackend,
+    StreamingValue as CoreStreamingValue, Value as CoreValue, ValuesError as CoreValuesError,
+    ValuesOptions as CoreValuesOptions, lending_iterator::LendingIterator as CoreLendingIterator,
 };
 use pyo3::{
     class::basic::CompareOp,
@@ -25,6 +25,7 @@ use pyo3::{
         PyTuple,
     },
 };
+use serde::Deserialize as _;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum DecodeMode {
@@ -46,6 +47,328 @@ impl DecodeMode {
 
 create_exception!(jsonmodem._jsonmodem, JsonModemSyntaxError, PyException);
 create_exception!(jsonmodem._jsonmodem, JsonModemStateError, PyException);
+
+const ORJSON_MAX_DEPTH: usize = 256;
+
+enum LoadContainerKind {
+    Array,
+    Object { pending_key: Option<String> },
+}
+
+struct LoadContainer {
+    value: PyObject,
+    kind: LoadContainerKind,
+}
+
+struct LoadState {
+    containers: Vec<LoadContainer>,
+    root: Option<PyObject>,
+    string: String,
+}
+
+impl LoadState {
+    fn new() -> Self {
+        Self {
+            containers: Vec::new(),
+            root: None,
+            string: String::new(),
+        }
+    }
+
+    fn attach(&mut self, py: Python<'_>, value: PyObject) -> PyResult<()> {
+        let Some(parent) = self.containers.last_mut() else {
+            if self.root.replace(value).is_some() {
+                return Err(PyTypeError::new_err("multiple top-level JSON values"));
+            }
+            return Ok(());
+        };
+
+        match &mut parent.kind {
+            LoadContainerKind::Array => parent.value.bind(py).downcast::<PyList>()?.append(value),
+            LoadContainerKind::Object { pending_key } => {
+                let key = pending_key
+                    .take()
+                    .ok_or_else(|| PyTypeError::new_err("object value has no key"))?;
+                parent
+                    .value
+                    .bind(py)
+                    .downcast::<PyDict>()?
+                    .set_item(key, value)
+            }
+        }
+    }
+
+    fn set_object_key(&mut self, path: &Path) {
+        let Some(LoadContainer {
+            kind: LoadContainerKind::Object { pending_key },
+            ..
+        }) = self.containers.last_mut()
+        else {
+            return;
+        };
+        if pending_key.is_none() {
+            if let Some(PathItem::Key(key)) = path.last() {
+                *pending_key = Some(key.to_string());
+            }
+        }
+    }
+
+    fn begin(&mut self, py: Python<'_>, kind: LoadContainerKind) -> PyResult<()> {
+        if self.containers.len() >= ORJSON_MAX_DEPTH {
+            return Err(PyTypeError::new_err(format!(
+                "recursion depth exceeded: maximum is {ORJSON_MAX_DEPTH}"
+            )));
+        }
+        let value = match kind {
+            LoadContainerKind::Array => PyList::empty(py).into_any().unbind(),
+            LoadContainerKind::Object { .. } => PyDict::new(py).into_any().unbind(),
+        };
+        self.containers.push(LoadContainer { value, kind });
+        Ok(())
+    }
+
+    fn end(&mut self, py: Python<'_>, object: bool) -> PyResult<()> {
+        let container = self
+            .containers
+            .pop()
+            .ok_or_else(|| PyTypeError::new_err("unbalanced container"))?;
+        let expected = matches!(container.kind, LoadContainerKind::Object { .. });
+        if expected != object {
+            return Err(PyTypeError::new_err("mismatched container"));
+        }
+        if matches!(
+            container.kind,
+            LoadContainerKind::Object {
+                pending_key: Some(_)
+            }
+        ) {
+            return Err(PyTypeError::new_err("object key has no value"));
+        }
+        self.attach(py, container.value)
+    }
+
+    fn string_fragment(
+        &mut self,
+        py: Python<'_>,
+        fragment: &str,
+        is_initial: bool,
+        is_final: bool,
+    ) -> PyResult<()> {
+        if is_initial {
+            self.string.clear();
+        }
+        self.string.push_str(fragment);
+        if !is_final {
+            return Ok(());
+        }
+
+        let value = PyString::new(py, &self.string).into_any().unbind();
+        self.string.clear();
+        self.attach(py, value)
+    }
+}
+
+fn json_decode_error(py: Python<'_>, message: &str, doc: &str, pos: usize) -> PyErr {
+    match py
+        .import("json")
+        .and_then(|module| module.getattr("JSONDecodeError"))
+        .and_then(|class| class.call1((message, doc, pos)))
+    {
+        Ok(error) => PyErr::from_value(error),
+        Err(error) => error,
+    }
+}
+
+fn error_position(doc: &str, line: usize, column: usize) -> usize {
+    let line_start = doc
+        .split_inclusive('\n')
+        .take(line.saturating_sub(1))
+        .map(str::len)
+        .sum::<usize>();
+    line_start
+        .saturating_add(column.saturating_sub(1))
+        .min(doc.len())
+}
+
+fn load_number(py: Python<'_>, lexeme: &str) -> PyResult<PyObject> {
+    let builtins = py.import("builtins")?;
+    let is_float = lexeme
+        .as_bytes()
+        .iter()
+        .any(|byte| matches!(byte, b'.' | b'e' | b'E'));
+    let constructor = if is_float {
+        builtins.getattr("float")?
+    } else {
+        builtins.getattr("int")?
+    };
+    if is_float && !lexeme.parse::<f64>().is_ok_and(f64::is_finite) {
+        return Err(PyTypeError::new_err(
+            "number is infinity when parsed as double",
+        ));
+    }
+    let number = constructor.call1((lexeme,))?;
+    Ok(number.into_any().unbind())
+}
+
+fn apply_load_event(
+    py: Python<'_>,
+    state: &mut LoadState,
+    event: ParseEvent<'_, &Path, LexemeBackend>,
+) -> PyResult<()> {
+    match event {
+        ParseEvent::Null { path } => {
+            state.set_object_key(path);
+            state.attach(py, py.None())
+        }
+        ParseEvent::Boolean { path, value } => {
+            state.set_object_key(path);
+            state.attach(py, PyBool::new(py, value).to_owned().into_any().unbind())
+        }
+        ParseEvent::Number { path, value } => {
+            state.set_object_key(path);
+            state.attach(py, load_number(py, value.as_ref())?)
+        }
+        ParseEvent::String {
+            path,
+            fragment,
+            is_initial,
+            is_final,
+        } => {
+            state.set_object_key(path);
+            state.string_fragment(py, fragment.as_ref(), is_initial, is_final)
+        }
+        ParseEvent::ArrayBegin { path } => {
+            state.set_object_key(path);
+            state.begin(py, LoadContainerKind::Array)
+        }
+        ParseEvent::ObjectBegin { path } => {
+            state.set_object_key(path);
+            state.begin(py, LoadContainerKind::Object { pending_key: None })
+        }
+        ParseEvent::ArrayEnd { .. } => state.end(py, false),
+        ParseEvent::ObjectEnd { .. } => state.end(py, true),
+    }
+}
+
+fn loads_text(py: Python<'_>, doc: &str) -> PyResult<PyObject> {
+    validate_json(py, doc)?;
+    let options = CoreParserOptions::new().with_decode_mode(CoreDecodeMode::StrictUnicode);
+    let mut parser = CoreJsonModem::<LexemeBackend>::new(options);
+    let mut state = LoadState::new();
+    let mut terminated = String::with_capacity(doc.len().saturating_add(1));
+    terminated.push_str(doc);
+    terminated.push(' ');
+
+    let mut events = parser.feed(&terminated);
+    while let Some(item) = CoreLendingIterator::next(&mut events) {
+        match item {
+            Ok(event) => apply_load_event(py, &mut state, event)
+                .map_err(|error| json_decode_error(py, &error.to_string(), doc, 0))?,
+            Err(error) => {
+                return Err(json_decode_error(
+                    py,
+                    &error.to_string(),
+                    doc,
+                    error_position(doc, error.line(), error.column()),
+                ));
+            }
+        }
+    }
+    drop(events);
+
+    let mut events = parser.finish();
+    while let Some(item) = CoreLendingIterator::next(&mut events) {
+        match item {
+            Ok(event) => apply_load_event(py, &mut state, event)
+                .map_err(|error| json_decode_error(py, &error.to_string(), doc, doc.len()))?,
+            Err(error) => {
+                return Err(json_decode_error(
+                    py,
+                    &error.to_string(),
+                    doc,
+                    error_position(doc, error.line(), error.column()),
+                ));
+            }
+        }
+    }
+
+    state
+        .root
+        .ok_or_else(|| json_decode_error(py, "unexpected end of data", doc, doc.len()))
+}
+
+fn validate_json(py: Python<'_>, doc: &str) -> PyResult<()> {
+    let mut depth = 0usize;
+    let mut in_string = false;
+    let mut escaped = false;
+    for (position, byte) in doc.bytes().enumerate() {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                in_string = false;
+            }
+            continue;
+        }
+        match byte {
+            b'"' => in_string = true,
+            b'[' | b'{' => {
+                depth += 1;
+                if depth > ORJSON_MAX_DEPTH {
+                    return Err(json_decode_error(
+                        py,
+                        &format!("recursion depth exceeded: maximum is {ORJSON_MAX_DEPTH}"),
+                        doc,
+                        position,
+                    ));
+                }
+            }
+            b']' | b'}' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+
+    let mut deserializer = serde_json::Deserializer::from_str(doc);
+    deserializer.disable_recursion_limit();
+    serde::de::IgnoredAny::deserialize(&mut deserializer)
+        .and_then(|_| deserializer.end())
+        .map_err(|error| {
+            json_decode_error(
+                py,
+                &error.to_string(),
+                doc,
+                error_position(doc, error.line(), error.column()),
+            )
+        })?;
+    Ok(())
+}
+
+/// Deserialize one RFC 8259 JSON document.
+#[pyfunction]
+fn loads(py: Python<'_>, input: Bound<'_, PyAny>) -> PyResult<PyObject> {
+    if let Ok(text) = input.downcast::<PyString>() {
+        let text = <Bound<'_, PyString> as PyStringMethods<'_>>::to_cow(text)?;
+        return loads_text(py, text.as_ref());
+    }
+    if let Ok(bytes) = input.downcast::<PyBytes>() {
+        return match core::str::from_utf8(bytes.as_bytes()) {
+            Ok(text) => loads_text(py, text),
+            Err(error) => Err(json_decode_error(
+                py,
+                "str is not valid UTF-8",
+                &String::from_utf8_lossy(bytes.as_bytes()),
+                error.valid_up_to(),
+            )),
+        };
+    }
+    with_buffer_text(py, &input, "loads()", |text| loads_text(py, text))?.unwrap_or_else(|| {
+        Err(PyTypeError::new_err(
+            "loads() expected str, bytes, bytearray, or memoryview",
+        ))
+    })
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 enum OwnedPathComponent {
@@ -3937,6 +4260,10 @@ fn jsonmodem(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
         ),
     )?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
+    m.add_function(wrap_pyfunction!(loads, m)?)?;
+    let json_decode_error = py.import("json")?.getattr("JSONDecodeError")?;
+    m.add("JSONDecodeError", json_decode_error)?;
+    m.add("JSONEncodeError", py.get_type::<PyTypeError>())?;
     m.add_class::<PyDecodeMode>()?;
     register_decode_mode_constants(py)?;
     m.add_class::<PyParserOptions>()?;

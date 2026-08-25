@@ -38,8 +38,8 @@ pub(crate) use zipper_transition::{ParserCursor, RootTransition};
 
 #[allow(unused_imports)]
 pub use self::std::{
-    StdBackend, StdBufferAssembler, StdPath, StdStringAssembler, StdValueAssembler, value,
-    value_applicator, value_tree,
+    LexemeBackend, StdBackend, StdBufferAssembler, StdPath, StdStringAssembler, StdValueAssembler,
+    value, value_applicator, value_tree,
 };
 #[allow(unused_imports)]
 pub use crate::context::{

@@ -76,6 +76,91 @@ impl StdBackend {
 
 pub type StdPath = Vec<PathItem>;
 
+/// Parser backend that preserves JSON number lexemes without converting them.
+///
+/// Consumers that need exact integer semantics can parse the borrowed number
+/// text themselves. Unlike [`StdBackend`], this backend never rounds a number
+/// through `f64` while parsing.
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct LexemeBackend;
+
+impl PathCtx for LexemeBackend {
+    type PathState = Vec<PathItem>;
+    type Path = StdPath;
+
+    fn frozen_new(&mut self) -> Self::PathState {
+        Vec::new()
+    }
+    fn thaw(&mut self, frozen: Self::PathState) -> Self::Path {
+        frozen
+    }
+    fn freeze(&mut self, thawed: Self::Path) -> Self::PathState {
+        thawed
+    }
+    fn push_key_from_str(&mut self, path: &mut Self::Path, key: &str) {
+        path.push(PathItem::Key(key.into()));
+    }
+    fn push_index_zero(&mut self, path: &mut Self::Path) {
+        path.push(PathItem::Index(0));
+    }
+    fn bump_last_index(&mut self, path: &mut Self::Path) -> Result<(), PathError> {
+        let Some(PathItem::Index(index)) = path.last_mut() else {
+            return Err(PathError::NotArrayFrame);
+        };
+        *index += 1;
+        Ok(())
+    }
+    fn pop_kind(&mut self, path: &mut Self::Path) -> Option<PathKind> {
+        path.pop().map(|item| match item {
+            PathItem::Key(_) => PathKind::Key,
+            PathItem::Index(_) => PathKind::Index,
+        })
+    }
+    fn last_kind(&self, path: &Self::Path) -> Option<PathKind> {
+        path.last().map(|item| match item {
+            PathItem::Key(_) => PathKind::Key,
+            PathItem::Index(_) => PathKind::Index,
+        })
+    }
+}
+
+impl ValueCtx for LexemeBackend {
+    type Null = ();
+    type Bool = bool;
+    type Num<'src> = Cow<'src, str>;
+    type Str<'src> = Cow<'src, str>;
+    type Value = ();
+}
+
+impl EventCtx for LexemeBackend {
+    type Error = core::convert::Infallible;
+
+    fn push_key_from_raw_str(&mut self, path: &mut Self::Path, key: &[u8]) {
+        path.push(PathItem::Key(String::from_utf8_lossy(key).into()));
+    }
+    fn new_null(&mut self) -> Result<Self::Null, Self::Error> {
+        Ok(())
+    }
+    fn new_bool(&mut self, value: bool) -> Result<Self::Bool, Self::Error> {
+        Ok(value)
+    }
+    fn new_number<'src>(&mut self, value: &'src str) -> Result<Self::Num<'src>, Self::Error> {
+        Ok(Cow::Borrowed(value))
+    }
+    fn new_number_owned<'a>(&mut self, value: String) -> Result<Self::Num<'a>, Self::Error> {
+        Ok(Cow::Owned(value))
+    }
+    fn new_str<'src>(&mut self, value: &'src str) -> Result<Self::Str<'src>, Self::Error> {
+        Ok(Cow::Borrowed(value))
+    }
+    fn new_str_owned<'a>(&mut self, value: String) -> Result<Self::Str<'a>, Self::Error> {
+        Ok(Cow::Owned(value))
+    }
+    fn new_str_raw_owned<'a>(&mut self, value: Vec<u8>) -> Result<Self::Str<'a>, Self::Error> {
+        Ok(Cow::Owned(String::from_utf8_lossy(&value).into_owned()))
+    }
+}
+
 impl PathCtx for StdBackend {
     type PathState = Vec<PathItem>;
     type Path = StdPath;
