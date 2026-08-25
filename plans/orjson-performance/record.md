@@ -1,5 +1,47 @@
 # Performance and security evidence
 
+## Result at 887f0ee
+
+CPython 3.12.13, orjson 3.11.9, AMD EPYC 7763, Linux x86_64, CPU 0.
+Release build with thin LTO and one codegen unit. Eleven alternating rounds,
+calibrated batches of at least 0.1 seconds for the slower implementation.
+Artifact: /tmp/jsonmodem-final-887f0ee.json. Ratios are medians of paired samples,
+not ratios of the two median columns.
+
+| Operation | Workload | jsonmodem ns | orjson ns | Ratio |
+| --- | --- | ---: | ---: | ---: |
+| loads | small | 550 | 438 | 1.26x |
+| dumps | small | 327 | 169 | 1.93x |
+| loads | medium | 424,718 | 242,186 | 1.75x |
+| dumps | medium | 156,457 | 88,987 | 1.76x |
+| loads | integers | 300,805 | 194,322 | 1.54x |
+| dumps | integers | 117,160 | 46,411 | 2.52x |
+| loads | floats | 527,947 | 283,973 | 1.86x |
+| dumps | floats | 450,777 | 302,339 | 1.49x |
+| loads | strings | 49,233 | 36,929 | 1.33x |
+| dumps | strings | 23,359 | 12,920 | 1.80x |
+| loads | escaped | 290,963 | 144,318 | 2.02x |
+| dumps | escaped | 87,449 | 41,424 | 2.08x |
+| loads | long_string | 39,071 | 71,188 | 0.55x |
+| dumps | long_string | 18,580 | 10,269 | 1.79x |
+
+Both original workloads meet the <=2x acceptance criterion. Integer-array dumps
+and escaped-string operations do not. The Python fallback for sorted dictionaries,
+default callbacks, datetime/dataclass/NumPy values, and Fragment is not covered by
+this performance claim. Float output is compared semantically; byte formatting
+can differ. No runtime calls to orjson are used.
+
+Reproduction from the repository root:
+
+    source .venv/bin/activate
+    maturin develop --uv -m crates/jsonmodem-py/Cargo.toml --release
+    python crates/jsonmodem-py/benchmarks/bench_orjson_compat.py --seconds 0.1 --output /tmp/jsonmodem-results.json
+
+Local validation: .agent/check.sh, .agent/check-py.sh, and Python binding Clippy
+passed. The final local suite has 100 passing Python tests. All 21 checks passed
+for 887f0ee, including CPython 3.9/3.13, Miri, fuzzing, and all benchmark jobs.
+Final-head CI is tracked in friel-openai/jsonmodem PR #1.
+
 ## 2026-08-25: baseline inspection
 
 Starting commit: e2978b1. CPython 3.12.13, orjson 3.11.9, Linux x86_64.

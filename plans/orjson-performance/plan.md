@@ -3,6 +3,10 @@
 This living plan follows PLANS.md and the plans-md skill. Keep Progress, Surprises & Discoveries,
 Decision Log, and Outcomes & Retrospective current.
 
+Status: completed. The original small/medium performance targets and security
+regressions are satisfied. Additional workload and compatibility limits remain
+documented rather than being included in the completion claim.
+
 ## Purpose / Big Picture
 
 Make jsonmodem.loads and jsonmodem.dumps take no more than twice the time of
@@ -39,7 +43,7 @@ repository convention keeps plans under plans/. No additional tracker is used.
 - [x] Add subprocess resource-limit tests and Python-binding fuzz/property coverage.
 - [x] Run differential, adversarial, and mutation/callback regression tests.
 - [x] Meet the two original workload targets; document other workloads.
-- [ ] Update documentation, publish, and verify required CI.
+- [x] Update documentation, publish, and verify required CI.
 
 ## Surprises & Discoveries
 
@@ -96,10 +100,15 @@ Date: 2026-08-25.
 
 ## Outcomes & Retrospective
 
-In progress. The third native benchmark meets the original small/medium targets:
-loads 1.03x/1.73x and dumps 1.52x/1.83x. Integer-array serialization remains 3.00x;
-escaped-string loads/dumps remain 2.04x/2.21x. Broader validation and publication
-are unfinished. Depth, numeric integrity, and EOF binding regressions now pass.
+Implementation and local validation are complete. Commit 887f0ee meets the original
+small/medium targets: loads 1.26x/1.75x and dumps 1.93x/1.76x. Integer-array dumps
+remain 2.52x; escaped-string loads/dumps remain 2.02x/2.08x. The record lists every
+workload rather than presenting a universal 2x result. Depth, numeric integrity,
+EOF, buffer ownership, long-key memory, and small-thread-stack regressions pass.
+The existing PR has been updated. All 21 checks passed for implementation commit
+887f0ee, including Python 3.9/3.13, Miri, fuzzing, and benchmarks. Final
+documentation and additional indentation/shared-container tests do not change
+the measured implementation. The goal supervisor verifies their final CI run.
 
 ## Context and Orientation
 

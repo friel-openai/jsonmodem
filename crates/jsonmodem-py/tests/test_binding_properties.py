@@ -108,3 +108,14 @@ def test_container_subclass_passthrough():
 def test_non_string_key_collisions_are_not_silently_discarded():
     with pytest.raises(jsonmodem.JSONEncodeError, match="collide"):
         jsonmodem.dumps({1: "a", "1": "b"}, option=jsonmodem.OPT_NON_STR_KEYS)
+
+
+@pytest.mark.parametrize("value", [{}, [], (), {"a": [1, {"b": ()}], "c": [True, None]}])
+def test_iterative_serializer_indentation(value):
+    expected = json.dumps(value, indent=2, ensure_ascii=False).encode()
+    assert jsonmodem.dumps(value, option=jsonmodem.OPT_INDENT_2) == expected
+
+
+def test_shared_container_is_not_a_cycle():
+    item = [1, {"x": 2}]
+    assert jsonmodem.loads(jsonmodem.dumps([item, item])) == [item, item]
