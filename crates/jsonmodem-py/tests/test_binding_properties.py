@@ -16,6 +16,11 @@ def finite_float(text):
     return value
 
 
+def compatible_integer(text):
+    value = int(text)
+    return value if -(2**63) <= value < 2**64 else finite_float(text)
+
+
 def tree(rng, depth=0):
     alphabet = 'abcXYZ012\x00\x1f\n\r\t"\\/\u00e9\u2603\U0001f642'
     choices = 5 if depth == 4 else 7
@@ -46,7 +51,7 @@ def test_generated_documents_and_mutations():
         position = rng.randrange(len(document))
         mutated = document[:position] + bytes([rng.randrange(256)]) + document[position + 1:]
         try:
-            expected = json.loads(mutated.decode('utf-8'), parse_float=finite_float)
+            expected = json.loads(mutated.decode('utf-8'), parse_float=finite_float, parse_int=compatible_integer)
             json.dumps(expected, ensure_ascii=False).encode('utf-8')
         except (ValueError, UnicodeError):
             with pytest.raises(jsonmodem.JSONDecodeError):
@@ -74,27 +79,39 @@ def test_strict_integer_boundaries(option):
         )
 
 
-def test_fragment_tampering_and_aggregate_depth():
+def test_fragment_is_immutable_raw_output():
     fragment = jsonmodem.Fragment(b'0')
     with pytest.raises(AttributeError):
         fragment.value = b'null'
-    fragment._value = b'0, "injected":true'
-    with pytest.raises(jsonmodem.JSONEncodeError):
-        jsonmodem.dumps({"x": fragment})
-    fragment = jsonmodem.Fragment(b'[' * 256 + b']' * 256)
-    with pytest.raises(jsonmodem.JSONEncodeError):
-        jsonmodem.dumps([fragment])
+    with pytest.raises(AttributeError):
+        fragment._value = b'0, "injected":true'
+    raw = b'[' * 1025 + b']' * 1025
+    assert jsonmodem.dumps([jsonmodem.Fragment(raw)]) == b'[' + raw + b']'
 
 
-def test_default_mutating_parent_is_a_python_error_not_native_iterator_panic():
+def test_fragment_contents_participate_in_cycle_collection():
+    import gc
+    import weakref
+
+    class Owner:
+        pass
+
+    owner = Owner()
+    owner.fragment = jsonmodem.Fragment(owner)
+    reference = weakref.ref(owner)
+    del owner
+    gc.collect()
+    assert reference() is None
+
+
+def test_default_mutating_parent_uses_owning_snapshot():
     value = {"x": object()}
 
     def default(_):
         value["new"] = 1
         return None
 
-    with pytest.raises(jsonmodem.JSONEncodeError):
-        jsonmodem.dumps(value, default=default)
+    assert jsonmodem.dumps(value, default=default) == b'{"x":null}'
 
 
 def test_container_subclass_passthrough():
@@ -106,8 +123,7 @@ def test_container_subclass_passthrough():
 
 
 def test_non_string_key_collisions_are_not_silently_discarded():
-    with pytest.raises(jsonmodem.JSONEncodeError, match="collide"):
-        jsonmodem.dumps({1: "a", "1": "b"}, option=jsonmodem.OPT_NON_STR_KEYS)
+    assert jsonmodem.dumps({1: "a", "1": "b"}, option=jsonmodem.OPT_NON_STR_KEYS) == b'{"1":"a","1":"b"}'
 
 
 @pytest.mark.parametrize("value", [{}, [], (), {"a": [1, {"b": ()}], "c": [True, None]}])

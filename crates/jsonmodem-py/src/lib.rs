@@ -1,4 +1,5 @@
 mod compat;
+mod numpy;
 
 use std::{
     borrow::Cow,
@@ -3967,6 +3968,9 @@ fn jsonmodem(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     m.add_function(wrap_pyfunction!(compat::loads, m)?)?;
     m.add_function(wrap_pyfunction!(compat::dumps, m)?)?;
+    m.add_function(wrap_pyfunction!(compat::_dumps_fields, m)?)?;
+    m.add_class::<compat::Fragment>()?;
+    m.add_function(wrap_pyfunction!(numpy::_numpy_dumps, m)?)?;
     let json_decode_error = py.import("json")?.getattr("JSONDecodeError")?;
     m.add("JSONDecodeError", json_decode_error)?;
     m.add("JSONEncodeError", py.get_type::<PyTypeError>())?;

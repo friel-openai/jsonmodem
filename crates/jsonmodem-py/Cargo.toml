@@ -15,4 +15,6 @@ crate-type = ["cdylib"]
 jsonmodem = { path = "../jsonmodem" }
 pyo3 = { version = "0.25", features = ["extension-module"] }
 itoa = "1"
-ryu = "1"
+zmij = "=1.0.21"
+half = "2.6"
+chrono = { version = "0.4", default-features = false, features = ["std"] }

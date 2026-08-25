@@ -7,6 +7,10 @@ Status: completed. The original small/medium performance targets and security
 regressions are satisfied. Additional workload and compatibility limits remain
 documented rather than being included in the completion claim.
 
+Follow-up: ../orjson-compatibility/plan.md now owns the user's request to remove
+those compatibility differences and reduce allocations. This completed plan
+remains the baseline measurement record, not the current compatibility contract.
+
 ## Purpose / Big Picture
 
 Make jsonmodem.loads and jsonmodem.dumps take no more than twice the time of

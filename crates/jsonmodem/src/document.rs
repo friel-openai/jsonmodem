@@ -151,7 +151,12 @@ impl<'a> DocumentReader<'a> {
                         char::from_u32(code).ok_or_else(|| self.error("invalid Unicode scalar"))?,
                     );
                 }
-                _ => return Err(self.error("invalid escape")),
+                _ => {
+                    return Err(DocumentError {
+                        message: "invalid escaped character in string",
+                        offset: self.offset - 1,
+                    });
+                }
             }
             start = self.offset;
         }

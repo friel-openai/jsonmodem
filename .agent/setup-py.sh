@@ -16,8 +16,8 @@ fi
 uv venv .venv
 source .venv/bin/activate
 
-# Install maturin and pytest
-uv pip install --upgrade maturin pytest
+# The oracle release requires Python 3.10; Python 3.9 still runs local regressions.
+uv pip install --upgrade maturin pytest numpy 'orjson==3.11.9; python_version >= "3.10"'
 
 # Build the Python extension into the venv
 maturin develop --uv -m crates/jsonmodem-py/Cargo.toml --release

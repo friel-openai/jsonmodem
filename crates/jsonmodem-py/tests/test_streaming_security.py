@@ -65,7 +65,7 @@ def test_arbitrary_buffer_exporters_are_not_borrowed(parser_type):
 
 def test_document_rejects_external_memoryview_owner():
     import array
-    with pytest.raises(TypeError):
+    with pytest.raises(jsonmodem.JSONDecodeError):
         jsonmodem.loads(memoryview(array.array("B", b"[1]")))
 
 
@@ -91,7 +91,8 @@ def test_complete_documents_on_small_thread_stacks(operation):
 import resource, threading, jsonmodem
 resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
 threading.stack_size(65536)
-document = '[' * 256 + '0' + ']' * 256
+depth = 1024 if {operation!r} == 'loads' else 254
+document = '[' * depth + '0' + ']' * depth
 value = jsonmodem.loads(document)
 results = []
 def run():

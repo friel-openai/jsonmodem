@@ -169,35 +169,57 @@ assert orjson.loads(document) == {"a": 2, "b": 1}
 
 The frontend includes `JSONDecodeError`, `JSONEncodeError`, `Fragment`, a
 `default` callback, datetime/UUID/dataclass support, and the public `OPT_*`
-constants from orjson 3.11. Unknown option bits fail instead of being ignored.
-This is compatibility for common operations, not a complete drop-in replacement.
-Float formatting, exception messages/types for unsupported inputs, NumPy handling,
-and uncommon object behavior can differ. Validate application-specific options
-before replacing orjson.
+constants from orjson 3.11.9, the release used for differential testing. Unknown
+option bits fail instead of being ignored. Integers from `-2**63` through
+`2**64 - 1` decode exactly; larger integer tokens decode as finite floats or
+raise `JSONDecodeError`, matching orjson. Decoding permits 1,024 containers;
+encoding permits 254 ordinary containers (255 for a dataclass leaf), with empty
+lists/tuples handled as scalar values.
 
-Intentional differences include:
+`Fragment` inserts bytes or text verbatim, including malformed JSON. Only use
+trusted content. Converted non-string dictionary keys may produce duplicate
+output keys, and decoding duplicate keys keeps the last value. There is no
+duplicate-rejection option or extra duplicate-tracking set.
 
-- `loads` preserves every integer as a Python `int`; it never rounds an integer
-  larger than 64 bits through a float.
-- decoding and encoding reject documents nested beyond 256 containers.
-- memoryviews with external buffer exporters are rejected.
-- `Fragment` content is validated, including after insertion into its container.
-- collisions after converting non-string dictionary keys raise an error rather
-  than dropping a value or emitting duplicate keys.
+The remaining deliberate restrictions are specific:
+
+- `loads(memoryview(...))` requires an exact built-in bytes, bytearray, or
+  BytesIO buffer owner. External exporters are rejected with `JSONDecodeError`.
+- NumPy datetime unit multipliers and unrepresentable dates raise `TypeError`;
+  the formatter uses checked arithmetic rather than reproducing native faults
+  or overflowing calendar calculations in the reference implementation.
+- Containers handled by the Python callback serializer are snapshotted before
+  callbacks. Mutating those containers from a callback does not change the
+  snapshot or invalidate a native iterator.
+- Mixed dataclass/container nesting cannot wrap the recursion counter to bypass
+  the depth limit. Such inputs raise `TypeError`.
+
+Package identity remains `jsonmodem`. Passing the public release tests does not
+prove equivalence for every Python object or malformed input; validate the
+options and types used by your application.
 
 `loads` uses jsonmodem's complete-document reader and constructs Python values
 directly. It does not call `feed()`, allocate events, clone paths, or run a second
 grammar parser. It validates grammar while constructing containers and rejects
 trailing commas, non-finite numbers, invalid UTF-8, and unpaired UTF-16
 surrogates. `dumps` rejects cycles, unsupported types, integers outside
-orjson's signed/unsigned 64-bit range, and non-callable defaults. Non-finite
+orjson's signed/unsigned 64-bit range. A non-callable default fails only if needed. Non-finite
 Python floats serialize as JSON `null`, matching orjson.
 
 `dumps` writes ordinary JSON types directly from Python objects to a Rust byte
 buffer. Both native operations use heap-backed container stacks. Cycle and depth
-checks run during serialization. Unsupported types and sorted dictionaries use
-a slower Python fallback; user callbacks run only after native iterators are
-released. This fallback does not have the native operations' throughput.
+checks run during serialization. Sorted dictionaries and Fragments are native.
+Datetimes, UUIDs, dataclasses, subclasses, sorted converted keys, and callbacks use a
+slower direct-output Python serializer, without copying the whole object graph
+or replacing Fragment placeholders. User callbacks run only after native
+iterators are released. This serializer does not have native throughput.
+Primitive non-string keys are written natively. Dataclass field snapshots also
+use the native writer when their values need no Python callback.
+
+With `OPT_SERIALIZE_NUMPY`, supported contiguous, native-endian NumPy arrays and
+scalars are formatted from immutable byte snapshots, preserving float16/float32
+precision without `tolist()` or a Python object per element. NumPy is optional.
+This assumes valid NumPy storage, not arrays forged from invalid foreign pointers.
 
 Wheels are interpreter-specific rather than `abi3-py39`. This lets PyO3 use
 CPython's public UTF-8 string access without an encoded copy on Python 3.9.
@@ -207,6 +229,13 @@ Tests exercise the compiled Python extension with generated documents, malformed
 bytes, numeric chunk splits, callback mutation, restricted buffers, resource
 limits, and small thread stacks. Miri covers the Rust core only; it does not prove
 the PyO3 binding or CPython FFI free of memory-safety bugs.
+
+To repeat the release tests, check out `ijl/orjson` tag `3.11.9` separately,
+install that checkout's test requirements into this development environment,
+and run `python crates/jsonmodem-py/benchmarks/check_orjson_release.py /path/to/orjson`
+from the repository root. The runner checks the release commit and excludes
+only four package identity assertions. Local differential tests use the pinned
+orjson wheel on Python 3.10 or later; Python 3.9 runs the remaining regressions.
 
 ## Benchmark
 
@@ -220,6 +249,12 @@ Run from the repository root. The benchmark pins a CPU where supported,
 alternates library order, calibrates batches, and reports median paired time
 ratios over 11 rounds. It checks semantic equality before timing and records
 exact-byte equality separately. The output JSON includes raw timing samples.
-See [the experiment record](../../plans/orjson-performance/record.md) for measured
+See [the compatibility experiment record](../../plans/orjson-compatibility/record.md) for measured
 results and workloads that exceed 2x. Measurements are not a guarantee for other
 inputs, options, machines, or Python versions.
+
+For NumPy, dataclass, Fragment, and option timings, install NumPy and run
+`benchmarks/bench_compat_objects.py --output /tmp/jsonmodem-objects.json` from
+this package directory. For allocation counts and peak live bytes, install
+Memray and run `benchmarks/bench_allocations.py --output /tmp/jsonmodem-alloc.json`.
+Repeat with `--module orjson`. Allocation profiling is separate from timing.
