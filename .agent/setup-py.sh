@@ -20,7 +20,7 @@ source .venv/bin/activate
 uv pip install --upgrade maturin pytest
 
 # Build the Python extension into the venv
-maturin develop -m crates/jsonmodem-py/Cargo.toml --release
+maturin develop --uv -m crates/jsonmodem-py/Cargo.toml --release
 
 touch "$SETUP_DONE_FILE"
 echo "✅ Python environment ready."

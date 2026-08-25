@@ -731,13 +731,18 @@ impl<'src> Scanner<'src> {
 
     pub fn consume_digits_ascii_fast(&mut self) -> usize {
         if !self.pending.is_empty() {
-            return 0;
+            let mut count = 0;
+            while self.peek().is_some_and(|unit| unit.ch.is_ascii_digit()) {
+                let _ = self.consume();
+                count += 1;
+            }
+            return count;
         }
 
         self.ensure_anchor_started();
 
-        let (anchor_owned, anchor_raw, anchor_source) = if let Some(anchor) = self.anchor.as_ref() {
-            (anchor.owned, anchor.raw, anchor.source)
+        let (anchor_raw, anchor_source) = if let Some(anchor) = self.anchor.as_ref() {
+            (anchor.raw, anchor.source)
         } else {
             return 0;
         };
@@ -765,9 +770,9 @@ impl<'src> Scanner<'src> {
         self.char_idx += ascii_limit;
         self.col += ascii_limit;
 
-        if anchor_owned {
-            self.push_ascii_to_scratch(slice);
-        }
+        // Match consume(): partial numeric captures must include fast digits
+        // when a subsequent feed or finish() switches to owned text.
+        self.push_ascii_to_scratch(slice);
 
         ascii_limit
     }

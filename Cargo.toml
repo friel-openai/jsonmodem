@@ -4,6 +4,8 @@ members = ["crates/*", "fuzz"]
 
 [profile.release]
 debug = "line-tables-only"
+lto = "thin"
+codegen-units = 1
 
 [profile.bench]
 debug = true

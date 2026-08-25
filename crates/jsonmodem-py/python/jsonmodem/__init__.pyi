@@ -1,8 +1,9 @@
-from typing import Any, ClassVar, Generic, Iterable, Iterator, Literal, Optional, Sequence, Tuple, TypedDict, TypeAlias, TypeVar, Union, overload
+from typing import Any, Callable, ClassVar, Generic, Iterable, Iterator, Literal, Optional, Sequence, Tuple, TypedDict, TypeAlias, TypeVar, Union, overload
+from json import JSONDecodeError as JSONDecodeError
 
 JSONInput: TypeAlias = Union[str, bytes, bytearray, memoryview]
 JSONByteInput: TypeAlias = Union[bytes, memoryview]
-JSONValue: TypeAlias = Union[None, bool, float, str, list["JSONValue"], dict[str, "JSONValue"]]
+JSONValue: TypeAlias = Union[None, bool, int, float, str, list["JSONValue"], dict[str, "JSONValue"]]
 PathPatterns: TypeAlias = Union[str, Sequence[str]]
 _ByteViews = TypeVar("_ByteViews", Literal[False], Literal[True])
 EventKind: TypeAlias = Literal[
@@ -28,7 +29,7 @@ class StringPayload:
     def as_dict(self) -> dict[str, object]: ...
     def __getitem__(self, key: str) -> object: ...
 
-Payload: TypeAlias = Union[None, bool, float, StringPayload]
+Payload: TypeAlias = Union[None, bool, int, float, StringPayload]
 
 class PathView:
     def __len__(self) -> int: ...
@@ -44,7 +45,7 @@ class ByteViewStringPayload(TypedDict):
     is_final: bool
     is_view: bool
 
-ByteViewPayload: TypeAlias = Union[None, bool, float, ByteViewStringPayload]
+ByteViewPayload: TypeAlias = Union[None, bool, int, float, ByteViewStringPayload]
 ByteViewEvent: TypeAlias = Tuple[EventKind, Path, ByteViewPayload]
 
 class DecodeMode:
@@ -142,5 +143,30 @@ class JsonModemValues:
 
 class JsonModemSyntaxError(Exception): ...
 class JsonModemStateError(Exception): ...
+
+JSONEncodeError = TypeError
+
+def loads(input: JSONInput) -> JSONValue: ...
+def dumps(obj: Any, /, default: Optional[Callable[[Any], Any]] = ..., option: Optional[int] = ...) -> bytes: ...
+
+class Fragment:
+    def __init__(self, value: JSONInput) -> None: ...
+    @property
+    def value(self) -> bytes: ...
+
+OPT_INDENT_2: int
+OPT_NAIVE_UTC: int
+OPT_NON_STR_KEYS: int
+OPT_OMIT_MICROSECONDS: int
+OPT_SERIALIZE_NUMPY: int
+OPT_SORT_KEYS: int
+OPT_STRICT_INTEGER: int
+OPT_UTC_Z: int
+OPT_PASSTHROUGH_SUBCLASS: int
+OPT_PASSTHROUGH_DATETIME: int
+OPT_APPEND_NEWLINE: int
+OPT_PASSTHROUGH_DATACLASS: int
+OPT_SERIALIZE_DATACLASS: int
+OPT_SERIALIZE_UUID: int
 
 __version__: str

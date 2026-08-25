@@ -19,7 +19,7 @@ run_step() {
   printf "%3ds  %s\n" "$sec" "$label" | tee -a "$TIMING_LOG"
 }
 
-run_step "build bindings" maturin develop -m crates/jsonmodem-py/Cargo.toml --release
+run_step "build bindings" maturin develop --uv -m crates/jsonmodem-py/Cargo.toml --release
 # Some maturin versions ignore `module-name`; create a compat symlink
 SITE_DIR="$(python -c 'import sysconfig, pathlib; print(pathlib.Path(sysconfig.get_paths()["purelib"]))')"
 if [[ -d "$SITE_DIR/jsonmodem_py" && ! -e "$SITE_DIR/jsonmodem" ]]; then

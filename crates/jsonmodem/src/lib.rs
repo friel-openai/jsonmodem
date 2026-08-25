@@ -20,6 +20,7 @@ extern crate std;
 mod backend;
 mod buffer_options;
 mod context;
+pub mod document;
 mod event;
 mod jsonmodem_buffers;
 mod jsonmodem_values;

@@ -129,11 +129,28 @@ impl ValueCtx for LexemeBackend {
     type Bool = bool;
     type Num<'src> = Cow<'src, str>;
     type Str<'src> = Cow<'src, str>;
-    type Value = ();
+    type Value = Value;
 }
 
+impl OwnedEventCtx for LexemeBackend {
+    type OwnedNum = String;
+    type OwnedStr = String;
+    fn num_into_owned(number: Self::Num<'_>) -> Self::OwnedNum {
+        number.into_owned()
+    }
+    fn str_into_owned(text: Self::Str<'_>) -> Self::OwnedStr {
+        text.into_owned()
+    }
+}
+
+/// A lexeme backend rejected a number that cannot be represented as a finite
+/// float.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("number is not a finite JSON float")]
+pub struct LexemeNumberError;
+
 impl EventCtx for LexemeBackend {
-    type Error = core::convert::Infallible;
+    type Error = LexemeNumberError;
 
     fn push_key_from_raw_str(&mut self, path: &mut Self::Path, key: &[u8]) {
         path.push(PathItem::Key(String::from_utf8_lossy(key).into()));
@@ -145,9 +162,15 @@ impl EventCtx for LexemeBackend {
         Ok(value)
     }
     fn new_number<'src>(&mut self, value: &'src str) -> Result<Self::Num<'src>, Self::Error> {
+        if value.bytes().any(|byte| matches!(byte, b'.' | b'e' | b'E'))
+            && !value.parse::<f64>().is_ok_and(f64::is_finite)
+        {
+            return Err(LexemeNumberError);
+        }
         Ok(Cow::Borrowed(value))
     }
     fn new_number_owned<'a>(&mut self, value: String) -> Result<Self::Num<'a>, Self::Error> {
+        self.new_number(&value)?;
         Ok(Cow::Owned(value))
     }
     fn new_str<'src>(&mut self, value: &'src str) -> Result<Self::Str<'src>, Self::Error> {
@@ -425,7 +448,7 @@ impl StdValueAssembler {
                 path,
                 value: *number,
             },
-            Value::String(_) | Value::Array(_) | Value::Object(_) => {
+            Value::String(_) | Value::Array(_) | Value::Object(_) | Value::NumberText(_) => {
                 unreachable!("scalar value expected")
             }
         }

@@ -13,6 +13,6 @@ crate-type = ["cdylib"]
 
 [dependencies]
 jsonmodem = { path = "../jsonmodem" }
-pyo3 = { version = "0.25", features = ["extension-module", "abi3-py39"] }
-serde = "1"
-serde_json = { version = "1", features = ["unbounded_depth"] }
+pyo3 = { version = "0.25", features = ["extension-module"] }
+itoa = "1"
+ryu = "1"

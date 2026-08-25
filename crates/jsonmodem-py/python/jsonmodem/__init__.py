@@ -1,4 +1,4 @@
-"""Fast, memory-safe JSON plus incremental parsing."""
+"""Complete-document JSON operations and incremental parsing."""
 
 from __future__ import annotations
 
@@ -61,14 +61,20 @@ _MAX_DEPTH = 256
 class Fragment:
     """A validated JSON value inserted without reformatting."""
 
-    __slots__ = ("value",)
+    __slots__ = ("_value",)
 
     def __init__(self, value: str | bytes | bytearray | memoryview) -> None:
         if not isinstance(value, (str, bytes, bytearray, memoryview)):
             raise JSONEncodeError("Fragment requires str or bytes-like input")
+        # Validate the snapshot, not an object whose conversion can change it.
         loads(value)
-        raw = value.encode() if isinstance(value, str) else bytes(value)
-        self.value = raw
+        raw = str.encode(value) if isinstance(value, str) else bytes(value)
+        loads(raw)
+        self._value = raw
+
+    @property
+    def value(self) -> bytes:
+        return self._value
 
 
 def _datetime_text(value: _datetime.date | _datetime.time, option: int) -> str:
@@ -111,7 +117,7 @@ def _prepare(
     if value is None or type(value) in (bool, str):
         return value
     if type(value) is int:
-        if option & OPT_STRICT_INTEGER and not -(2**53) + 1 < value < 2**53 - 1:
+        if option & OPT_STRICT_INTEGER and not -(2**53) + 1 <= value <= 2**53 - 1:
             raise JSONEncodeError("Integer exceeds 53-bit range")
         if not -(2**63) <= value < 2**64:
             raise JSONEncodeError("Integer exceeds 64-bit range")
@@ -119,11 +125,19 @@ def _prepare(
     if type(value) is float:
         return value if _math.isfinite(value) else None
     if isinstance(value, Fragment):
+        raw = value.value
+        if type(raw) is not bytes:
+            raise JSONEncodeError("Fragment value must be immutable bytes")
+        loads(raw)
         marker = f"__jsonmodem_fragment_{_secrets.token_hex(24)}__"
-        fragments.append((marker, value.value))
+        fragments.append((marker, raw))
         return marker
 
-    if option & OPT_PASSTHROUGH_SUBCLASS and isinstance(value, (str, int, float)):
+    if (
+        option & OPT_PASSTHROUGH_SUBCLASS
+        and type(value) not in (str, int, float, list, tuple, dict)
+        and isinstance(value, (str, int, float, list, tuple, dict))
+    ):
         return _use_default(value, option, default, fragments, active, depth)
     if isinstance(value, str):
         return str(value)
@@ -145,6 +159,8 @@ def _prepare(
                         if not option & OPT_NON_STR_KEYS:
                             raise JSONEncodeError("Dict key must be str")
                         key = _non_str_key(key)
+                    if key in result:
+                        raise JSONEncodeError("converted dictionary keys collide")
                     result[key] = _prepare(item, option, default, fragments, active, depth + 1)
                 return result
             return [_prepare(item, option, default, fragments, active, depth + 1) for item in value]
@@ -188,7 +204,7 @@ def _use_default(
     return _prepare(default(value), option, default, fragments, active, depth + 1)
 
 
-def dumps(
+def _dumps_fallback(
     obj: _Any,
     /,
     default: _Callable[[_Any], _Any] | None = None,
@@ -205,8 +221,8 @@ def dumps(
         raise JSONEncodeError("default must be callable")
 
     fragments: list[tuple[str, bytes]] = []
-    prepared = _prepare(obj, option, default, fragments, set(), 0)
     try:
+        prepared = _prepare(obj, option, default, fragments, set(), 0)
         text = _json.dumps(
             prepared,
             ensure_ascii=False,
@@ -215,16 +231,25 @@ def dumps(
             indent=2 if option & OPT_INDENT_2 else None,
             separators=None if option & OPT_INDENT_2 else (",", ":"),
         ).encode()
-    except (TypeError, ValueError, RecursionError) as error:
+    except Exception as error:
         raise JSONEncodeError(str(error)) from error
     for marker, fragment in fragments:
         encoded = _json.dumps(marker).encode()
         if text.count(encoded) != 1:
             raise JSONEncodeError("fragment placeholder collision")
         text = text.replace(encoded, fragment, 1)
+    if fragments:
+        # Fragments can combine into a document deeper than any one fragment.
+        # Recheck after substitution, including deliberately modified instances.
+        try:
+            loads(text)
+        except JSONDecodeError as error:
+            raise JSONEncodeError(str(error)) from error
     if option & OPT_APPEND_NEWLINE:
         text += b"\n"
     return text
+
+dumps = _native.dumps
 
 __all__ = [
     "JsonModem",
