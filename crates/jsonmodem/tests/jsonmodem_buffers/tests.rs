@@ -148,7 +148,7 @@ fn buffers_emit_string_value_only_when_complete() {
             is_final,
             ..
         } => {
-            assert!(path.is_empty());
+            assert_eq!(path.as_slice(), []);
             assert_eq!(fragment.as_ref(), "ed");
             assert!(
                 value.is_none(),
