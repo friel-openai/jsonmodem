@@ -26,7 +26,7 @@ project information or private datasets belong in any public artifact.
 - [x] Match loads integer, nesting, and exception behavior.
 - [x] Match Fragment, float output, dictionary-key, and object serialization.
 - [x] Match supported NumPy dtypes, shape/layout rules, and float precision.
-- [x] Profile and reduce allocations; rerun the original and expanded benchmarks.
+- [x] Confirm shallow-stack optimization: small dumps 1.80x, one fewer allocation; release unused output before Python callbacks.
 - [ ] Update documentation, publish to the existing PR, and verify CI.
 
 ## Surprises & Discoveries

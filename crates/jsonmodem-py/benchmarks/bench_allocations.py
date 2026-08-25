@@ -25,6 +25,7 @@ def main():
     parser.add_argument("--module", default="jsonmodem", choices=["jsonmodem", "orjson"])
     parser.add_argument("--output", required=True)
     parser.add_argument("--calls", type=int, default=100)
+    parser.add_argument("--workload", help="Profile only the named workload")
     args = parser.parse_args()
     module = importlib.import_module(args.module)
     if hasattr(os, "sched_getaffinity"):
@@ -40,7 +41,12 @@ def main():
         ("fragments_1000", module.dumps, [fragment] * 1000, {}),
         ("dataclasses_1000", module.dumps, [Record(i, f"item-{i}") for i in range(1000)], {}),
         ("numpy_float32", module.dumps, numpy.arange(100000, dtype=numpy.float32).reshape(25000, 4), {"option": module.OPT_SERIALIZE_NUMPY}),
+        ("late_default", module.dumps, ["x" * 4096] * 5000 + [object()], {"default": lambda _: None}),
     ]
+    if args.workload:
+        cases = [case for case in cases if case[0] == args.workload]
+        if not cases:
+            parser.error("unknown workload")
     result = {"python": platform.python_version(), "module": args.module,
               "version": module.__version__, "memray": memray.__version__,
               "numpy": numpy.__version__, "calls": args.calls, "cases": []}

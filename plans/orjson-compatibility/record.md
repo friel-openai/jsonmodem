@@ -106,18 +106,20 @@ not process RSS. Timing runs do not enable Memray.
 
 Baseline b84ba61 was built separately and imported from an extracted wheel,
 without replacing the current editable install. Raw profiles and JSON summaries:
-/tmp/jsonmodem-compat-alloc-{baseline,v1,v2,v3,orjson}.*. The checked-in
+/tmp/jsonmodem-compat-alloc-{baseline,v1,v2,v3,inline,orjson}.*. The checked-in
 bench_allocations.py reproduces the workloads and collection procedure.
+The table includes inline stacks; the subsequent unused-output release is
+measured separately below.
 
 | Workload | Baseline events/call | Current events/call | orjson events/call | Baseline peak bytes | Current peak bytes | orjson peak bytes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| loads medium | 4,532.1 | 4,529.1 | 4,498.1 | 289,927 | 289,916 | 928,870 |
-| dumps small | 5.2 | 5.2 | 3.2 | 552 | 552 | 1,129 |
-| dumps medium | 17.2 | 14.2 | 9.2 | 119,248 | 119,199 | 65,641 |
-| sorted medium | 64,098.6 | 1,016.2 | 1,011.2 | 303,022 | 122,823 | 69,305 |
-| 1,000 Fragments | 49,992.7 | 11.2 | 7.2 | 483,537 | 30,458 | 16,489 |
-| 1,000 dataclasses | 93,095.6 | 48,868.3 | 8.2 | 364,116 | 62,413 | 32,873 |
-| NumPy float32 25,000x4 | 1,852,898.5 | 52.3 | 25,034.2 | 7,224,208 | 2,293,101 | 4,073,865 |
+| loads medium | 4,532.1 | 4,528.1 | 4,498.1 | 289,927 | 289,852 | 928,870 |
+| dumps small | 5.2 | 4.2 | 3.2 | 552 | 388 | 1,129 |
+| dumps medium | 17.2 | 13.2 | 9.2 | 119,248 | 119,199 | 65,641 |
+| sorted medium | 64,098.6 | 1,015.2 | 1,011.2 | 303,022 | 122,823 | 69,305 |
+| 1,000 Fragments | 49,992.7 | 10.2 | 7.2 | 483,537 | 30,458 | 16,489 |
+| 1,000 dataclasses | 93,095.6 | 47,867.3 | 8.2 | 364,116 | 63,261 | 32,873 |
+| NumPy float32 25,000x4 | 1,852,898.5 | 52.3 | 25,034.2 | 7,224,208 | 2,292,773 | 4,073,865 |
 
 Borrowed decoder cache keys and encoder output ranges remove three allocations
 per medium call. Returning root NumPy bytes directly removes eight allocation
@@ -159,26 +161,26 @@ workload (2.08x before). This does not borrow an external buffer or add unsafe c
 Release build, CPython 3.12.13, orjson 3.11.9, AMD EPYC 7763, CPU 0.
 Eleven alternating rounds with calibrated 0.1-second batches. Reported ratios
 are medians of paired samples, not ratios of the two marginal medians.
-Raw data: /tmp/jsonmodem-compat-timings-v6.json. All output bytes matched.
+Raw data: /tmp/jsonmodem-compat-timings-inline.json. All output bytes matched.
 Earlier runs, including the rejected 2.17x small-dumps regression, remain in
 /tmp/jsonmodem-compat-timings-{v2,final,v5}.json.
 
 | Operation | Workload | jsonmodem ns | orjson ns | Ratio |
 | --- | --- | ---: | ---: | ---: |
-| loads | small | 550 | 423 | 1.30x |
-| dumps | small | 315 | 166 | 1.90x |
-| loads | medium | 411,758 | 243,423 | 1.68x |
-| dumps | medium | 166,005 | 88,257 | 1.88x |
-| loads | integers | 294,484 | 185,910 | 1.58x |
-| dumps | integers | 119,949 | 43,427 | 2.76x |
-| loads | floats | 559,004 | 281,151 | 1.98x |
-| dumps | floats | 320,909 | 298,115 | 1.08x |
-| loads | strings | 51,536 | 36,913 | 1.39x |
-| dumps | strings | 23,735 | 12,929 | 1.84x |
-| loads | escaped | 289,978 | 145,647 | 2.00x |
-| dumps | escaped | 95,889 | 41,226 | 2.32x |
-| loads | long string | 25,546 | 47,866 | 0.53x |
-| dumps | long string | 21,341 | 10,008 | 2.13x |
+| loads | small | 513 | 458 | 1.18x |
+| dumps | small | 295 | 164 | 1.80x |
+| loads | medium | 418,304 | 243,891 | 1.72x |
+| dumps | medium | 168,371 | 89,127 | 1.89x |
+| loads | integers | 303,705 | 184,935 | 1.64x |
+| dumps | integers | 120,203 | 43,528 | 2.76x |
+| loads | floats | 522,303 | 278,856 | 1.87x |
+| dumps | floats | 316,959 | 298,521 | 1.06x |
+| loads | strings | 49,823 | 36,470 | 1.36x |
+| dumps | strings | 23,401 | 12,817 | 1.81x |
+| loads | escaped | 284,754 | 143,093 | 1.99x |
+| dumps | escaped | 104,186 | 40,535 | 2.57x |
+| loads | long string | 23,521 | 49,443 | 0.47x |
+| dumps | long string | 21,234 | 10,043 | 2.16x |
 
 The original small/medium target is retained. Integer-array and string-heavy
 serialization still exceed 2x; these results do not establish universal parity
@@ -210,3 +212,28 @@ Final ownership review added a GC traversal hook for Fragment's retained Python
 object. This lets Python collect cycles through an invalid Fragment payload;
 the immutable object itself needs no mutable clear operation. The regression
 uses a weak reference to observe collection. Ordinary serialization is unchanged.
+
+## Shallow container stack experiment
+
+Published implementation cfc5da5 repeats at 1.26x/2.01x for small loads/dumps and
+1.69x/1.79x for medium loads/dumps. The small serializer has insufficient margin
+despite the previous 1.90x result. Raw data:
+/tmp/jsonmodem-compat-cfc5da5-confirmation.json. Do not discard this repeat.
+
+Replace the per-call container Vec allocation with SmallVec holding at most two
+inline frames, then spilling to the heap. SmallVec 1.15.1 is already in Cargo.lock
+through the benchmark dependency jiter. This is bounded native stack storage,
+not recursive parsing. Rerun timings and allocation counts and retain it only
+if small/medium improve or remain within 2x, with 64 KiB thread tests passing.
+
+The fallback call also retains Encoder.output even after native serialization
+returns unsupported. Measure a late default callback after 5,000 4 KiB strings
+with bench_allocations.py --workload late_default --calls 3. Then drop Encoder
+before entering Python. The decision metric is peak live bytes; no allocation
+count reduction is expected. Callback ownership and output tests must still pass.
+
+Retained both changes. Inline storage removes one allocation per shallow native
+call and brings small dumps to 1.80x; all 223 binding tests, including the 64 KiB
+stack tests, pass. The late-default peak drops from 76,243,699 to 42,672,883 bytes
+(44.0%) with exactly the same 254,786 events and 1,116,881,443 allocated bytes
+over three calls. Artifacts: /tmp/jsonmodem-compat-late-{before,after}.json.

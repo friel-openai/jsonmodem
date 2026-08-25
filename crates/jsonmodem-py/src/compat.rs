@@ -14,6 +14,7 @@ use pyo3::{
         iter::{BoundDictIterator, BoundListIterator, BoundTupleIterator},
     },
 };
+use smallvec::SmallVec;
 
 const MAX_DECODE_DEPTH: usize = 1024;
 const MAX_ENCODE_DEPTH: usize = 254;
@@ -52,8 +53,8 @@ struct Decoder<'py, 'src> {
     cache_keys: bool,
 }
 
-/// Unfinished containers live on the heap, independent of Python thread stack
-/// size.
+/// Unfinished containers use bounded inline storage, spilling to the heap
+/// without recursive calls.
 enum DecodeContainer<'py> {
     Array(Bound<'py, PyList>),
     Object(Bound<'py, PyDict>, Py<PyString>),
@@ -99,7 +100,7 @@ impl<'py, 'src> Decoder<'py, 'src> {
 
     fn value(&mut self) -> PyResult<PyObject> {
         let py = self.py;
-        let mut stack = Vec::new();
+        let mut stack: SmallVec<[DecodeContainer<'_>; 2]> = SmallVec::new();
         'next_value: loop {
             let mut value = match self.reader.peek() {
                 Some(b'[') => {
@@ -505,7 +506,7 @@ impl Encoder {
         if self.scalar(value)? {
             return Ok(true);
         }
-        let mut stack: Vec<EncodeContainer<'_>> = Vec::new();
+        let mut stack: SmallVec<[EncodeContainer<'_>; 2]> = SmallVec::new();
         let mut current = value.clone();
         'container: loop {
             if stack.len() + self.base_depth >= MAX_ENCODE_DEPTH
@@ -660,6 +661,7 @@ pub fn dumps(
         }
         return Ok(PyBytes::new(py, &encoder.output).into_any().unbind());
     }
+    drop(encoder);
     let fallback = py.import("jsonmodem")?.getattr("_dumps_fallback")?;
     let default_provided = default.is_some();
     Ok(fallback

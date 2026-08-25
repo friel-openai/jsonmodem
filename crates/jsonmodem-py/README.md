@@ -207,7 +207,8 @@ orjson's signed/unsigned 64-bit range. A non-callable default fails only if need
 Python floats serialize as JSON `null`, matching orjson.
 
 `dumps` writes ordinary JSON types directly from Python objects to a Rust byte
-buffer. Both native operations use heap-backed container stacks. Cycle and depth
+buffer. Both native operations keep two container frames inline and spill deeper
+stacks to the heap, without recursive calls. Cycle and depth
 checks run during serialization. Sorted dictionaries and Fragments are native.
 Datetimes, UUIDs, dataclasses, subclasses, sorted converted keys, and callbacks use a
 slower direct-output Python serializer, without copying the whole object graph
