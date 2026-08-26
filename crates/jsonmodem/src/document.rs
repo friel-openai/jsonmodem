@@ -126,7 +126,12 @@ impl<'a> DocumentReader<'a> {
     ) -> Result<Option<&'a str>, DocumentError> {
         self.expect(b'"')?;
         let start = self.offset;
-        self.offset += plain_string_prefix(&self.input.as_bytes()[start..]);
+        let remaining = &self.input.as_bytes()[start..];
+        self.offset += if remaining.len() < 8 {
+            scalar_string_prefix::<false>(remaining)
+        } else {
+            plain_string_prefix(remaining)
+        };
         match self.input.as_bytes().get(self.offset).copied() {
             Some(b'"') => {
                 let text = &self.input[start..self.offset];
@@ -545,6 +550,20 @@ mod tests {
                 DocumentReader::new(token).string_with_buffer(&mut buffer),
                 Err(DocumentError { message, offset }),
             );
+        }
+    }
+
+    #[test]
+    fn short_strings_borrow_input_without_changing_the_buffer() {
+        for text in ["", "plain", "\u{e9}", "\u{1f642}", "123456", "1234567"] {
+            let input = format!("\"{text}\"");
+            let mut reader = DocumentReader::new(&input);
+            let mut buffer = String::from("previous decoded value");
+            let borrowed = reader.string_with_buffer(&mut buffer).unwrap().unwrap();
+            assert_eq!(borrowed, text);
+            assert_eq!(borrowed.as_ptr(), input[1..].as_ptr());
+            assert_eq!(buffer, "previous decoded value");
+            assert_eq!(reader.peek(), None);
         }
     }
 
