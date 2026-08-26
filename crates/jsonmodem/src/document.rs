@@ -602,7 +602,7 @@ mod tests {
         for byte in b"0123456789abcdefABCDEF" {
             for position in 0..4 {
                 let mut input = String::from("0000");
-                input.replace_range(position..position + 1, &char::from(*byte).to_string());
+                input.replace_range(position..=position, &char::from(*byte).to_string());
                 assert_eq!(
                     DocumentReader::new(&input).hex4(),
                     Ok(u32::from_str_radix(&input, 16).unwrap()),
