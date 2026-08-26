@@ -162,4 +162,13 @@ On 2026-08-26, upstream main was refreshed and remained at `47a5427`. The branch
 was clean and no matching upstream PR existed. The publishing account is
 `friel-openai`, with read-only upstream permission. The `jsonmodem` label does
 not exist upstream; an attempt to create it returned HTTP 404. Labeling requires
-maintainer assistance. Creating the draft PR and checking its workflows are next.
+maintainer assistance.
+
+[Upstream PR #74](https://github.com/AaronFriel/jsonmodem/pull/74) was created as
+a draft from the user's fork into upstream main. GitHub reports it mergeable.
+All ten workflows for the initial published head `f99ef28` concluded
+`action_required`; no tests ran. For example, the
+[Miri run](https://github.com/AaronFriel/jsonmodem/actions/runs/32936881926) requires
+maintainer approval. The empty PR check rollup is not passing evidence. The
+publishing account has no upstream write/triage permission and cannot approve
+fork workflows. Recheck the current head after a maintainer grants approval.

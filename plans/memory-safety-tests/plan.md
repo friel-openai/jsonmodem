@@ -1,7 +1,7 @@
 # Test unsafe streaming code and Python buffers
 
 
-Status: implementation complete; upstream publication in progress (2026-08-26).
+Status: upstream PR #74 is open; CI awaits maintainer approval (2026-08-26).
 This plan follows `PLANS.md`. Keep Progress, Decision Log, and Outcomes current
 until the upstream PR's final checks pass.
 
@@ -62,8 +62,8 @@ No merge is authorized.
 - [x] (2026-08-26) Measure streaming time and allocations; remove per-chunk attribute-name allocations.
 - [x] (2026-08-26) Complete local checks and independent source review.
 - [x] (2026-08-26) Refresh upstream once; confirm the base remains `47a5427` and no matching PR exists.
-- [ ] Push the branch and create the upstream draft PR.
-- [ ] Apply the project label, or record the upstream permission limitation.
+- [x] (2026-08-26) Push the branch and create upstream draft PR #74.
+- [x] (2026-08-26) Record the project-label permission limitation; the publishing account cannot create the missing label.
 - [ ] Verify final hosted checks and mark the PR ready.
 
 ## Surprises and Discoveries
@@ -110,8 +110,12 @@ test/Miri-only. Bytearray input adds one snapshot allocation per chunk; measured
 immutable-input allocation counts are unchanged. Shared-host timings do not
 support a general speedup claim or a consistent slowdown.
 
-Upstream publication and final hosted checks remain. Local results and coverage
-limits are in `record.md`; passing tests are not proof of soundness.
+[Upstream PR #74](https://github.com/AaronFriel/jsonmodem/pull/74) is open as a
+draft and is mergeable. All ten workflow runs require maintainer approval before
+executing fork code. The publishing account cannot approve them or create the
+missing project label. Final hosted checks and marking the PR ready remain.
+Local results and coverage limits are in `record.md`; passing tests are not proof
+of soundness.
 
 ## Context and Orientation
 
@@ -194,5 +198,7 @@ and allocator traces are not part of the upstream diff.
 ## Next Action
 
 
-Push the branch to the user's fork and create the upstream draft PR. Check
-whether fork workflows need maintainer approval, then verify required checks.
+A maintainer must approve the fork workflows on PR #74 and apply the `jsonmodem`
+label. After approval, inspect the runs for the current PR head, address in-scope
+failures, and mark the PR ready only after required checks pass. Do not bypass
+approval or treat an empty check list as passing CI.
