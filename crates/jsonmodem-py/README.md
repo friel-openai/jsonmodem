@@ -250,6 +250,11 @@ CPython. The complete-document reader and writers contain no explicit `unsafe`
 blocks, but other parts of the package and its native dependencies use unsafe
 code. Passing tests is not a proof of memory safety.
 
+The separate AddressSanitizer runner instruments the Python extension and
+launches subprocess tests with the same runtime. Virtual-address limits apply
+in ordinary tests, not under AddressSanitizer, whose own shadow memory needs
+a large address range. The same depth and lifetime assertions still run.
+
 To repeat the release tests, check out `ijl/orjson` tag `3.11.9` separately,
 install that checkout's test requirements into this development environment,
 and run `python crates/jsonmodem-py/benchmarks/check_orjson_release.py /path/to/orjson`
@@ -259,6 +264,9 @@ both libraries use orjson 3.11.9 on Python 3.10 or later. Python 3.9 runs the
 remaining tests.
 
 ## Benchmark
+
+See [performance after PR #74](benchmarks/PROFILE.md) for the latest benchmark
+rerun, CPU and allocation profiles, and measured SIMD build experiments.
 
 Install `orjson`, build jsonmodem in release mode, and run:
 
