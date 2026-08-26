@@ -165,10 +165,20 @@ not exist upstream; an attempt to create it returned HTTP 404. Labeling requires
 maintainer assistance.
 
 [Upstream PR #74](https://github.com/AaronFriel/jsonmodem/pull/74) was created as
-a draft from the user's fork into upstream main. GitHub reports it mergeable.
-All ten workflows for the initial published head `f99ef28` concluded
-`action_required`; no tests ran. For example, the
-[Miri run](https://github.com/AaronFriel/jsonmodem/actions/runs/32936881926) requires
-maintainer approval. The empty PR check rollup is not passing evidence. The
-publishing account has no upstream write/triage permission and cannot approve
-fork workflows. Recheck the current head after a maintainer grants approval.
+a draft from the user's fork into upstream main. On 2026-08-26, the user explicitly
+requested ready status. `gh pr ready 74 -R AaronFriel/jsonmodem` succeeded, and
+`gh pr view` confirmed `isDraft=false` at `bcce5200ff12403ae5ddc111acba3fcc6f8d785c`.
+Preserve ready status; no merge is authorized.
+
+All ten workflows for both the initial published head `f99ef28` and the
+subsequent head `bcce520` concluded `action_required`; no hosted tests ran.
+The [Miri run for bcce520](https://github.com/AaronFriel/jsonmodem/actions/runs/32936966789)
+requires maintainer approval. Ready status and the empty PR check rollup are not
+passing evidence. Hosted validation remains incomplete and must cover the final
+published head, including any later documentation commit.
+
+GitHub's repository API confirmed that the authenticated publishing account has
+admin/push permission on `friel-openai/jsonmodem` but no write/triage permission
+on `AaronFriel/jsonmodem`. The upstream PR has no labels. Workflow approval and
+creation/application of the missing `jsonmodem` label require upstream authority
+that these credentials do not have. Recheck the current head after approval.

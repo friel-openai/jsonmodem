@@ -1,7 +1,8 @@
 # Test unsafe streaming code and Python buffers
 
 
-Status: upstream PR #74 is open; CI awaits maintainer approval (2026-08-26).
+Status: upstream PR #74 is ready for review at the user's request; hosted
+validation awaits maintainer approval (2026-08-26).
 This plan follows `PLANS.md`. Keep Progress, Decision Log, and Outcomes current
 until the upstream PR's final checks pass.
 
@@ -47,7 +48,8 @@ confirmed defect has a failing baseline and a passing regression after the fix.
 
 Existing tests pass. Performance and allocation changes are measured. The
 separate upstream PR is labeled `jsonmodem` if repository permissions allow it,
-and becomes ready for review after required checks pass on its final head.
+and required checks pass on its final head. The user explicitly requested ready
+status before those checks could run; preserve that status.
 Document any permission limitation rather than bypassing repository controls.
 No merge is authorized.
 
@@ -64,7 +66,8 @@ No merge is authorized.
 - [x] (2026-08-26) Refresh upstream once; confirm the base remains `47a5427` and no matching PR exists.
 - [x] (2026-08-26) Push the branch and create upstream draft PR #74.
 - [x] (2026-08-26) Record the project-label permission limitation; the publishing account cannot create the missing label.
-- [ ] Verify final hosted checks and mark the PR ready.
+- [x] (2026-08-26) Mark PR #74 ready for review at the user's explicit request.
+- [ ] Verify required hosted checks on the final published head after maintainer approval.
 
 ## Surprises and Discoveries
 
@@ -101,6 +104,10 @@ attribute name after measurements showed avoidable allocations.
 2026-08-26: Reopen this plan for the user's upstream publication request. The
 publishing account has read-only upstream access; project-label creation failed.
 
+2026-08-26: The user requested ready status while fork workflows await approval.
+Mark PR #74 ready without changing CI requirements. Do not return it to draft
+without the user's permission. Readiness does not establish successful testing.
+
 ## Outcomes and Retrospective
 
 
@@ -110,10 +117,10 @@ test/Miri-only. Bytearray input adds one snapshot allocation per chunk; measured
 immutable-input allocation counts are unchanged. Shared-host timings do not
 support a general speedup claim or a consistent slowdown.
 
-[Upstream PR #74](https://github.com/AaronFriel/jsonmodem/pull/74) is open as a
-draft and is mergeable. All ten workflow runs require maintainer approval before
-executing fork code. The publishing account cannot approve them or create the
-missing project label. Final hosted checks and marking the PR ready remain.
+[Upstream PR #74](https://github.com/AaronFriel/jsonmodem/pull/74) is ready for
+review at the user's request. All ten workflow runs require maintainer approval
+before executing fork code. The publishing account cannot approve them or create
+the missing project label. Final hosted validation remains incomplete.
 Local results and coverage limits are in `record.md`; passing tests are not proof
 of soundness.
 
@@ -169,8 +176,9 @@ All commands must pass without unexplained diagnostics. Keep the deliberate
 sanitizer failure in its isolated subprocess; it is required evidence that
 instrumentation works. Distinguish excluded crates, compiled-out tests, ignored
 tests, and actual execution. Preserve baseline failures for production fixes.
-After publication, inspect checks for the exact published head before marking
-the PR ready. Do not bypass approvals or classify missing checks as passing.
+After publication, inspect checks for the exact published head before completing
+this plan. The PR is already ready at the user's request. Do not bypass approvals
+or classify ready status or missing checks as passing CI.
 
 ## Idempotence and Recovery
 
@@ -199,6 +207,11 @@ and allocator traces are not part of the upstream diff.
 
 
 A maintainer must approve the fork workflows on PR #74 and apply the `jsonmodem`
-label. After approval, inspect the runs for the current PR head, address in-scope
-failures, and mark the PR ready only after required checks pass. Do not bypass
-approval or treat an empty check list as passing CI.
+label. After approval, inspect the runs for the current PR head and address
+in-scope failures. Preserve ready status and complete this plan only after
+required checks pass. Do not bypass approval or treat an empty check list as
+passing CI.
+
+Revision (2026-08-26): Record the user's request for ready status separately from
+the still-incomplete hosted validation, so review status cannot be mistaken for
+test evidence.
