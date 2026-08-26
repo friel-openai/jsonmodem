@@ -57,7 +57,7 @@ struct Decoder<'py, 'src> {
 /// Unfinished containers use bounded inline storage, spilling to the heap
 /// without recursive calls.
 enum DecodeContainer<'py> {
-    Array(Bound<'py, PyList>),
+    Array(SmallVec<[PyObject; 8]>),
     Object(Bound<'py, PyDict>, Py<PyString>),
 }
 
@@ -109,13 +109,12 @@ impl<'py, 'src> Decoder<'py, 'src> {
                         return Err(self.fail("recursion depth exceeded"));
                     }
                     self.expect(b'[')?;
-                    let list = PyList::empty(py);
                     if self.reader.peek() != Some(b']') {
-                        stack.push(DecodeContainer::Array(list));
+                        stack.push(DecodeContainer::Array(SmallVec::new()));
                         continue;
                     }
                     self.expect(b']')?;
-                    list.into_any().unbind()
+                    PyList::empty(py).into_any().unbind()
                 }
                 Some(b'{') => {
                     if stack.len() >= MAX_DECODE_DEPTH {
@@ -185,7 +184,7 @@ impl<'py, 'src> Decoder<'py, 'src> {
                 match stack.last_mut() {
                     None => return Ok(value),
                     Some(DecodeContainer::Array(list)) => {
-                        list.append(value)?;
+                        list.push(value);
                         match self.reader.peek() {
                             Some(b',') => {
                                 self.expect(b',')?;
@@ -209,7 +208,7 @@ impl<'py, 'src> Decoder<'py, 'src> {
                     }
                 }
                 value = match stack.pop().expect("unfinished container") {
-                    DecodeContainer::Array(list) => list.into_any().unbind(),
+                    DecodeContainer::Array(list) => PyList::new(py, list)?.into_any().unbind(),
                     DecodeContainer::Object(dict, _) => dict.into_any().unbind(),
                 };
             }
@@ -380,7 +379,11 @@ impl Encoder {
             self.output.reserve(value.len() + 2);
         }
         self.output.push(b'"');
-        let mut remaining = value.as_bytes();
+        self.string_contents(value.as_bytes());
+        self.output.push(b'"');
+    }
+
+    fn string_contents(&mut self, mut remaining: &[u8]) {
         while !remaining.is_empty() {
             let prefix = plain_string_prefix(remaining);
             self.output.extend_from_slice(&remaining[..prefix]);
@@ -409,7 +412,6 @@ impl Encoder {
                 remaining = tail;
             }
         }
-        self.output.push(b'"');
     }
 
     fn newline(&mut self, depth: usize) {
@@ -625,6 +627,42 @@ fn supplied_default<'py>(value: &Bound<'py, PyAny>) -> PyResult<Option<Bound<'py
     Ok(Some(value.clone()))
 }
 
+/// Write long plain strings into Python's initialized bytes storage directly.
+#[inline(never)]
+fn dump_long_string(py: Python<'_>, text: &str, flags: i32) -> PyResult<PyObject> {
+    let bytes = text.as_bytes();
+    let prefix = plain_string_prefix(bytes);
+    if prefix == bytes.len() {
+        let newline = usize::from(flags & APPEND_NEWLINE != 0);
+        return Ok(PyBytes::new_with(py, bytes.len() + 2 + newline, |output| {
+            output[0] = b'"';
+            output[1..bytes.len() + 1].copy_from_slice(bytes);
+            output[bytes.len() + 1] = b'"';
+            if newline != 0 {
+                output[bytes.len() + 2] = b'\n';
+            }
+            Ok(())
+        })?
+        .into_any()
+        .unbind());
+    }
+    let mut encoder = Encoder {
+        output: Vec::with_capacity(bytes.len() + 2),
+        option: flags,
+        base_depth: 0,
+        dataclass_root: false,
+        keys: Vec::new(),
+    };
+    encoder.output.push(b'"');
+    encoder.output.extend_from_slice(&bytes[..prefix]);
+    encoder.string_contents(&bytes[prefix..]);
+    encoder.output.push(b'"');
+    if flags & APPEND_NEWLINE != 0 {
+        encoder.output.push(b'\n');
+    }
+    Ok(PyBytes::new(py, &encoder.output).into_any().unbind())
+}
+
 /// Serialize common JSON types directly, preserving the uncommon-type fallback.
 #[pyfunction]
 #[pyo3(signature=(obj, /, default=None, option=None))]
@@ -645,6 +683,17 @@ pub fn dumps(
     if flags < 0 || flags & !4095 != 0 {
         return Err(PyTypeError::new_err("unsupported option bits"));
     }
+    let root_string = if let Ok(string) = obj.downcast_exact::<PyString>() {
+        let text = string
+            .to_str()
+            .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
+        if text.len() >= INITIAL_OUTPUT_CAPACITY {
+            return dump_long_string(py, text, flags);
+        }
+        Some(text)
+    } else {
+        None
+    };
     let mut encoder = Encoder {
         output: Vec::with_capacity(INITIAL_OUTPUT_CAPACITY),
         option: flags,
@@ -652,7 +701,13 @@ pub fn dumps(
         dataclass_root: false,
         keys: Vec::new(),
     };
-    if encoder.value(&obj)? {
+    let encoded = if let Some(text) = root_string {
+        encoder.string(text);
+        true
+    } else {
+        encoder.value(&obj)?
+    };
+    if encoded {
         if flags & APPEND_NEWLINE != 0 {
             encoder.output.push(b'\n');
         }
