@@ -1,0 +1,85 @@
+diff --git a/crates/jsonmodem-py/src/compat.rs b/crates/jsonmodem-py/src/compat.rs
+index bea8b94..f6dc5f5 100644
+--- a/crates/jsonmodem-py/src/compat.rs
++++ b/crates/jsonmodem-py/src/compat.rs
+@@ -298,0 +299,65 @@ fn decode_bytes(py: Python<'_>, bytes: &[u8]) -> PyResult<PyObject> {
++/// Accumulates small writes before copying a complete batch to the output Vec.
++struct BufferedOutput {
++    output: Vec<u8>,
++    pending: [u8; 512],
++    used: usize,
++}
++
++impl BufferedOutput {
++    fn new() -> Self {
++        Self {
++            output: Vec::with_capacity(INITIAL_OUTPUT_CAPACITY),
++            pending: [0; 512],
++            used: 0,
++        }
++    }
++
++    fn flush(&mut self) {
++        self.output.extend_from_slice(&self.pending[..self.used]);
++        self.used = 0;
++    }
++
++    fn len(&self) -> usize {
++        self.output.len() + self.used
++    }
++
++    fn push(&mut self, byte: u8) {
++        if self.used == self.pending.len() {
++            self.flush();
++        }
++        self.pending[self.used] = byte;
++        self.used += 1;
++    }
++
++    fn extend_from_slice(&mut self, bytes: &[u8]) {
++        if bytes.len() > self.pending.len() - self.used {
++            self.flush();
++        }
++        if bytes.len() >= self.pending.len() {
++            self.output.extend_from_slice(bytes);
++        } else {
++            self.pending[self.used..self.used + bytes.len()].copy_from_slice(bytes);
++            self.used += bytes.len();
++        }
++    }
++
++    fn reserve(&mut self, additional: usize) {
++        self.output.reserve(self.used + additional);
++    }
++
++    fn resize(&mut self, length: usize, byte: u8) {
++        self.flush();
++        self.output.resize(length, byte);
++    }
++
++    fn extend_from_within(&mut self, range: Range<usize>) {
++        self.flush();
++        self.output.extend_from_within(range);
++    }
++
++    fn bytes(&mut self) -> &[u8] {
++        self.flush();
++        &self.output
++    }
++}
++
+@@ -301 +366 @@ struct Encoder {
+-    output: Vec<u8>,
++    output: BufferedOutput,
+@@ -649 +714 @@ pub fn dumps(
+-        output: Vec::with_capacity(INITIAL_OUTPUT_CAPACITY),
++        output: BufferedOutput::new(),
+@@ -659 +724 @@ pub fn dumps(
+-        return Ok(PyBytes::new(py, &encoder.output).into_any().unbind());
++        return Ok(PyBytes::new(py, encoder.output.bytes()).into_any().unbind());
+@@ -681 +746 @@ pub fn _dumps_fields(
+-        output: Vec::with_capacity(INITIAL_OUTPUT_CAPACITY),
++        output: BufferedOutput::new(),
+@@ -688 +753 @@ pub fn _dumps_fields(
+-        Ok(Some(PyBytes::new(py, &encoder.output).unbind()))
++        Ok(Some(PyBytes::new(py, encoder.output.bytes()).unbind()))

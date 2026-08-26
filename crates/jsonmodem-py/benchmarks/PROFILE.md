@@ -261,6 +261,8 @@ For integer arrays, benchmark output batching or formatting directly into
 checked output storage before replacing the number formatter. The native
 profile places more samples in small output copies than in integer formatting.
 Preserve exact output bytes and avoid uninitialized or out-of-bounds writes.
+The subsequent [output-buffer experiments](OUTPUT_BUFFERS.md) tested both
+approaches. Neither candidate improved integer output, so both were removed.
 
 For repeated dictionary keys, test a small bounded cache before the current
 hash map. Four repeated keys should not require a full hash calculation on
@@ -270,8 +272,8 @@ randomized hashing with an unbounded collision risk.
 Interning `c_contiguous` and `tobytes` is the smallest allocation change to try.
 The existing streaming code already uses `pyo3::intern!` for `obj`. Confirm
 the expected two-allocation reduction with Memray and measure tiny inputs,
-where setup costs matter most. No proposed optimization in this section has
-been implemented or assigned a projected speedup.
+where setup costs matter most. Apart from the rejected buffer experiments,
+these proposals have not been implemented or benchmarked.
 
 ## Reproduction
 
