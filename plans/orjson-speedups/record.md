@@ -72,7 +72,7 @@ as large as the initial 256-byte output capacity, then repeat. Artifacts:
 
 ## Correctness validation
 
-The final candidate passes 279 binding tests, including the original streaming
+The final candidate passes 281 binding tests, including the original streaming
 and security regressions, and cargo clippy for the Python crate with warnings
 denied. .agent/check.sh passes core tests, docs, formatting, actionlint, and
 Clippy; actual Miri execution is deferred to CI as in the prior work.
@@ -189,3 +189,22 @@ Artifacts: /tmp/jsonmodem-speedups-alloc-{final,orjson}.json. Reproduce with
 bench_allocations.py --calls 30 --module jsonmodem, then --module orjson, using
 distinct --output names. The previous RSS report remains historical; RSS was
 not remeasured for this pass.
+
+## Publication
+
+Implementation and measured runtime source:
+[4516f73](https://github.com/friel-openai/jsonmodem/commit/4516f73221ef8b5fbf806f5241576eb4a2b76ba6).
+The PR body now reports the confirmed NumPy wins, the full slower-case controls,
+and current Memray comparisons. Historical RSS measurements remain explicitly
+labeled as measurements of the previous implementation.
+
+On 2026-08-26, `gh pr checks --watch` exits successfully and `gh pr view`
+independently reports 21 SUCCESS checks on this exact SHA, no remaining checks,
+and PR #1 not draft. This includes Python 3.9/3.13, Miri, fuzzing, flamegraph,
+and all six benchmark jobs. Local .agent/check.sh, .agent/check-py.sh, Python
+crate Clippy with warnings denied, and git diff --check also pass. The pdoc
+build retains its preexisting __hash__ stub warnings.
+
+The completion commit changes only plan.md and this record. Verify checks on
+that published documentation revision before closing the goal; no further source
+implementation or optional tests are needed unless validation finds a defect.

@@ -1,6 +1,6 @@
 # Measure additional complete-document speedups
 
-Status: active. Follow PLANS.md and the plans-md skill. This plan continues the
+Status: completed (2026-08-26). Follow PLANS.md and the plans-md skill. This plan continues the
 completed orjson-compatibility plan without reopening its API decisions.
 
 ## Purpose / Big Picture
@@ -16,7 +16,7 @@ checks. Do not add an orjson runtime dependency or publish private information.
 - [x] Measure a fresh baseline and identify repeated work in native serialization.
 - [x] Implement typed NumPy row loops and long-string capacity reservation; 281 binding tests pass.
 - [x] Repeat timings, check allocations, and preserve streaming behavior.
-- [ ] Publish the existing PR and verify final CI.
+- [x] (2026-08-26) Publish implementation 4516f73 to PR #1; all 21 checks pass.
 
 ## Context and Orientation
 
@@ -121,6 +121,11 @@ The long-string reservation removes one allocation per call and reduces peak
 tracked bytes 33.3%, without a consistent below-2x timing result. Original
 small/medium limits are preserved in both full and confirmation runs. Local
 validation passes 281 binding tests and 1,626 public release tests, plus core
-checks. Publication and final CI remain in progress.
+checks. All 21 CI checks pass on implementation 4516f73, including Miri,
+Python 3.9/3.13, fuzzing, flamegraph, and all six benchmark jobs. PR #1 remains
+ready for review. The completion commit changes only this plan and record;
+its checks are verified separately before completing the goal.
 
 Created 2026-08-26 to record and validate the requested additional speed pass.
+Updated 2026-08-26 after implementation CI passed, preserving both the measured
+wins and the slower controls rather than claiming universal throughput parity.
