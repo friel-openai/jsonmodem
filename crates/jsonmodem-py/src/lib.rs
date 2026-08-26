@@ -181,6 +181,8 @@ fn build_view_event(
         .into_bound(py)
         .into_any()
         .unbind();
+    // SAFETY: the new tuple is private, indices are in bounds, and SetItem
+    // steals each owned reference. DECREF cleans up any partially filled tuple.
     unsafe {
         let tuple_ptr = ffi::PyTuple_New(3);
         if tuple_ptr.is_null() {
@@ -313,6 +315,8 @@ fn build_path_tuple<'py>(
         return Ok(PyTuple::empty(py));
     }
 
+    // SAFETY: each index belongs to the newly allocated, private tuple. Each
+    // pair is transferred exactly once; DECREF handles incomplete initialization.
     unsafe {
         let tuple_ptr = ffi::PyTuple_New(path.len() as ffi::Py_ssize_t);
         if tuple_ptr.is_null() {
@@ -370,6 +374,8 @@ fn build_path_tuple_for_event(py: Python<'_>, path: &[OwnedPathComponent]) -> Py
         return Ok(PyTuple::empty(py).into_any().unbind());
     }
 
+    // SAFETY: SetItem receives an in-bounds index and an owned reference in a
+    // private tuple. Failure releases the tuple and all initialized elements.
     unsafe {
         let tuple_ptr = ffi::PyTuple_New(path.len() as ffi::Py_ssize_t);
         if tuple_ptr.is_null() {
@@ -795,6 +801,8 @@ impl PyPathView {
             return Ok(PyTuple::empty(py).into_any().unbind());
         }
 
+        // SAFETY: the slice indices are checked against self.path, and every
+        // target index is within the private tuple allocated here.
         unsafe {
             let tuple_ptr = ffi::PyTuple_New(length as ffi::Py_ssize_t);
             if tuple_ptr.is_null() {
