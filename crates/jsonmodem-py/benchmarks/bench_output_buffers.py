@@ -21,6 +21,24 @@ class Record:
     name: str
 
 
+@dataclasses.dataclass
+class SlotsRecord:
+    """Equivalent declared fields stored in slots instead of an instance dictionary."""
+
+    __slots__ = ("id", "name")
+    id: int
+    name: str
+
+
+@dataclasses.dataclass
+class NestedRecord:
+    """A record with a child dataclass and an ordinary dictionary."""
+
+    id: int
+    child: Record
+    attributes: dict
+
+
 def worker(args):
     package = Path(args.package).resolve()
     sys.path.insert(0, str(package))
@@ -48,10 +66,26 @@ def worker(args):
         ("sorted_medium", benchmark.PAYLOADS["medium"], {"option": 32}),
         ("integer_keys", {i: str(i) for i in range(1000)}, {"option": 4}),
         ("dataclasses", [Record(i, f"item-{i}") for i in range(1000)], {}),
+        ("dataclass_single", Record(123, "record"), {}),
+        ("dataclass_slots_single", SlotsRecord(123, "record"), {}),
+        ("dataclass_slots", [SlotsRecord(i, f"item-{i}") for i in range(1000)], {}),
+        ("dataclass_nested", [NestedRecord(i, Record(i + 1, f"child-{i}"), {"z": i, "a": i + 1}) for i in range(1000)], {}),
+        ("dataclass_indent", [Record(i, f"item-{i}") for i in range(1000)], {"option": 1}),
+        ("dataclass_sorted", [NestedRecord(i, Record(i + 1, f"child-{i}"), {"z": i, "a": i + 1}) for i in range(1000)], {"option": 32}),
+        ("dataclass_default", [Record(i, object()) for i in range(1000)], {"default": lambda _: "converted"}),
         ("numpy_int64", np.arange(100000, dtype=np.int64).reshape(25000, 4), {"option": 16}),
         ("numpy_float32", np.arange(100000, dtype=np.float32).reshape(25000, 4), {"option": 16}),
         ("late_default", ["x" * 256] * 100 + [object()], {"default": lambda _: None}),
     ])
+    for count in (8, 16):
+        record_type = dataclasses.make_dataclass(
+            "Fields" + str(count), [("field_" + str(i), int) for i in range(count)]
+        )
+        cases.append((
+            "dataclass_fields" + str(count),
+            [record_type(*range(i, i + count)) for i in range(1000)],
+            {},
+        ))
     if args.cases:
         unknown = set(args.cases) - {name for name, _, _ in cases}
         if unknown:

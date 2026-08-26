@@ -1,9 +1,12 @@
 //! Complete-document operations: no streaming events and no Python
 //! preprocessing.
 
+mod objects;
+
 use std::{borrow::Cow, collections::HashMap, ops::Range};
 
 use jsonmodem::document::{DocumentError, DocumentReader, IntegerToken, plain_string_prefix};
+pub use objects::_dumps_objects;
 use pyo3::{
     PyTraverseError, PyVisit,
     exceptions::{PyTypeError, PyValueError},
