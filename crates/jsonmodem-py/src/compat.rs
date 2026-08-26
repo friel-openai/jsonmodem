@@ -316,6 +316,27 @@ fn signed_integer(value: &Bound<'_, PyInt>) -> PyResult<Option<i64>> {
     }
 }
 
+/// Use native-word conversion where size_t spans the unsigned 64-bit range.
+#[inline(always)]
+fn unsigned_integer(value: &Bound<'_, PyInt>) -> PyResult<u64> {
+    #[cfg(target_pointer_width = "64")]
+    {
+        // SAFETY: Bound retains the integer and keeps Python attached throughout
+        // the call. The public API accepts integer objects and returns no pointer.
+        let integer = unsafe { pyo3::ffi::PyLong_AsSize_t(value.as_ptr()) };
+        if integer == usize::MAX {
+            if let Some(error) = PyErr::take(value.py()) {
+                return Err(error);
+            }
+        }
+        Ok(integer as u64)
+    }
+    #[cfg(not(target_pointer_width = "64"))]
+    {
+        value.extract()
+    }
+}
+
 /// Single output buffer and bounded cache of encoded dictionary keys.
 struct Encoder {
     output: Vec<u8>,
@@ -467,8 +488,7 @@ impl Encoder {
                 self.output
                     .extend_from_slice(buffer.format(integer).as_bytes());
             } else {
-                let integer = value
-                    .extract::<u64>()
+                let integer = unsigned_integer(value)
                     .map_err(|_| PyTypeError::new_err("Integer exceeds 64-bit range"))?;
                 if self.option & STRICT_INTEGER != 0 && integer > 9_007_199_254_740_991 {
                     return Err(PyTypeError::new_err("Integer exceeds 53-bit range"));
