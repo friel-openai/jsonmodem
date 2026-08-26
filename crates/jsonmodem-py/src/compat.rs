@@ -405,7 +405,7 @@ struct Encoder<const CHECKED: bool = false> {
 /// recursion.
 enum EncodeIterator<'py> {
     Dict(BoundDictIterator<'py>),
-    Sorted(Vec<(Bound<'py, PyAny>, Bound<'py, PyAny>)>),
+    Sorted(Vec<(Bound<'py, PyString>, Bound<'py, PyAny>)>),
     List(BoundListIterator<'py>),
     Tuple(BoundTupleIterator<'py>),
 }
@@ -712,23 +712,18 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                         items = Vec::new();
                     }
                     items.reserve_exact(dict.len());
-                    items.extend(dict.iter());
-                    for (key, _) in &items {
-                        let Ok(key) = key.downcast_exact::<PyString>() else {
+                    for (key, item) in dict.iter() {
+                        let Ok(key) = key.downcast_into_exact::<PyString>() else {
                             return Ok(false);
                         };
                         key.to_str()
                             .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
+                        items.push((key, item));
                     }
                     // Exact string keys are unique. Descending order lets pop() emit ascending
                     // keys.
                     items.sort_unstable_by(|(left, _), (right, _)| {
-                        right
-                            .downcast::<PyString>()
-                            .unwrap()
-                            .to_str()
-                            .unwrap()
-                            .cmp(left.downcast::<PyString>().unwrap().to_str().unwrap())
+                        right.to_str().unwrap().cmp(left.to_str().unwrap())
                     });
                     (EncodeIterator::Sorted(items), b'{', b'}')
                 } else {
@@ -775,7 +770,7 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                 let item = match &mut frame.iter {
                     EncodeIterator::Dict(iter) => iter.next().map(|(key, item)| (Some(key), item)),
                     EncodeIterator::Sorted(items) => {
-                        items.pop().map(|(key, item)| (Some(key), item))
+                        items.pop().map(|(key, item)| (Some(key.into_any()), item))
                     }
                     EncodeIterator::List(iter) => iter.next().map(|item| (None, item)),
                     EncodeIterator::Tuple(iter) => iter.next().map(|item| (None, item)),
