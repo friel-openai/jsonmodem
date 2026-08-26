@@ -261,3 +261,33 @@ jobs. Final local .agent/check.sh and .agent/check-py.sh also pass on b145ac3.
 The completion commit changes only this evidence and plan.md. Its checks are
 verified separately before completing the goal; no further source changes or
 optional tests are needed unless final validation finds a defect.
+
+## Follow-up: direct memory comparisons
+
+The follow-up memory report is
+[benchmarks/MEMORY.md](../../crates/jsonmodem-py/benchmarks/MEMORY.md).
+It compares the existing Memray results directly with orjson, rather than only
+comparing jsonmodem before and after optimization. Runtime source is unchanged.
+
+The missing orjson late-default comparison uses the existing synthetic workload,
+ten warmups, three calls, and the same profiler settings. It measures 56 events,
+201,135,601 allocated bytes, and 33,555,105 peak live bytes, versus jsonmodem's
+254,786 events, 1,116,881,443 allocated bytes, and 42,672,883 peak live bytes.
+Artifact: /tmp/jsonmodem-memory-orjson-late.json.
+
+RSS is a separate experiment, without Memray. The question is whole-process
+resident memory, including imports and inputs; the decision is to report both
+libraries without treating baseline subtraction as allocation measurement.
+Five fresh workers per library/workload make ten calls each. Library order
+alternates and a CPU is pinned. Inputs are synthetic; decode fixture generation
+runs in another process. Startup, pre-call, first-call, and final readings are
+retained. The reproducible script is benchmarks/bench_rss.py.
+
+The initial script run is /tmp/jsonmodem-rss-results.json. The repository script
+adds isolated temporary fixtures and argument checks; its full repeat is
+/tmp/jsonmodem-rss-published.json and supplies the report's table. The initial
+large-decode peaks were 55.18/70.48 MiB for jsonmodem/orjson; the repeat returns
+55.02/73.99 MiB. Late-default peaks change from 57.36/36.99 to 58.90/37.59 MiB.
+Keep both runs: allocator and process baselines vary, but neither measurement
+supports a universal lower-memory claim. No timing or streaming claims follow
+from the RSS results.

@@ -259,3 +259,9 @@ For NumPy, dataclass, Fragment, and option timings, install NumPy and run
 this package directory. For allocation counts and peak live bytes, install
 Memray and run `benchmarks/bench_allocations.py --output /tmp/jsonmodem-alloc.json`.
 Repeat with `--module orjson`. Allocation profiling is separate from timing.
+
+See [memory compared with orjson](benchmarks/MEMORY.md) for direct Memray
+comparisons and separately measured whole-process RSS, including workloads
+where jsonmodem uses more memory. On Linux, repeat the RSS comparison with
+`python crates/jsonmodem-py/benchmarks/bench_rss.py --output /tmp/rss-comparison.json`
+from the repository root.
