@@ -3887,7 +3887,11 @@ fn with_readonly_byte_text<T>(
             "{caller} expected bytes or a read-only contiguous memoryview"
         ))
     })?;
-    if source.getattr("ndim")?.extract::<usize>()? != 1 {
+    if source
+        .getattr(pyo3::intern!(py, "ndim"))?
+        .extract::<usize>()?
+        != 1
+    {
         return Err(PyTypeError::new_err(
             "byte views require one-dimensional input",
         ));
@@ -3929,7 +3933,9 @@ fn with_readonly_byte_text<T>(
     if !owner.is_exact_instance_of::<PyBytes>() {
         // Copy through the built-in memoryview before creating a Rust borrow.
         // Unknown exporters may expose mutable storage as read-only.
-        let snapshot = source.call_method0("tobytes")?.downcast_into::<PyBytes>()?;
+        let snapshot = source
+            .call_method0(pyo3::intern!(py, "tobytes"))?
+            .downcast_into::<PyBytes>()?;
         let source = PyMemoryView::from(snapshot.as_any())?;
         let text = core::str::from_utf8(snapshot.as_bytes()).map_err(|err| {
             PyTypeError::new_err(format!("{caller} input bytes are not valid UTF-8: {err}"))

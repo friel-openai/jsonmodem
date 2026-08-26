@@ -103,31 +103,55 @@ impl<'a> DocumentReader<'a> {
     /// Rejects incomplete strings, controls, invalid escapes, and unpaired
     /// surrogates.
     pub fn string(&mut self) -> Result<Cow<'a, str>, DocumentError> {
+        let mut decoded = String::new();
+        Ok(match self.string_with_buffer(&mut decoded)? {
+            Some(text) => Cow::Borrowed(text),
+            None => Cow::Owned(decoded),
+        })
+    }
+
+    /// Read a JSON string, reusing `decoded` when the string contains escapes.
+    ///
+    /// Returns the input text for an unescaped string. Otherwise returns `None`
+    /// and replaces `decoded` with the decoded string, retaining its capacity.
+    /// A caller must copy decoded text before reusing the buffer.
+    ///
+    /// # Errors
+    /// Rejects incomplete strings, controls, invalid escapes, and unpaired
+    /// surrogates.
+    #[inline]
+    pub fn string_with_buffer(
+        &mut self,
+        decoded: &mut String,
+    ) -> Result<Option<&'a str>, DocumentError> {
         self.expect(b'"')?;
-        let mut start = self.offset;
-        let mut decoded: Option<String> = None;
-        loop {
-            let remaining = &self.input.as_bytes()[self.offset..];
-            self.offset += plain_string_prefix(remaining);
-            let Some(byte) = self.input.as_bytes().get(self.offset).copied() else {
-                return Err(self.error("unterminated string"));
-            };
-            if byte == b'"' {
+        let start = self.offset;
+        self.offset += plain_string_prefix(&self.input.as_bytes()[start..]);
+        match self.input.as_bytes().get(self.offset).copied() {
+            Some(b'"') => {
                 let text = &self.input[start..self.offset];
                 self.offset += 1;
-                return Ok(match decoded {
-                    Some(mut owned) => {
-                        owned.push_str(text);
-                        Cow::Owned(owned)
-                    }
-                    None => Cow::Borrowed(text),
-                });
+                Ok(Some(text))
             }
-            if byte < 0x20 {
-                return Err(self.error("unescaped control character"));
+            None => Err(self.error("unterminated string")),
+            Some(byte) if byte < 0x20 => Err(self.error("unescaped control character")),
+            Some(_) => {
+                self.string_escaped(start, decoded)?;
+                Ok(None)
             }
-            let output = decoded.get_or_insert_with(|| String::with_capacity(64));
-            output.push_str(&self.input[start..self.offset]);
+        }
+    }
+
+    fn string_escaped(
+        &mut self,
+        mut start: usize,
+        decoded: &mut String,
+    ) -> Result<(), DocumentError> {
+        decoded.clear();
+        // The first escape can add four UTF-8 bytes after the plain prefix.
+        decoded.reserve(64.max(self.offset - start + 4));
+        loop {
+            decoded.push_str(&self.input[start..self.offset]);
             let escape_start = self.offset;
             self.offset += 1;
             let escape = self
@@ -138,14 +162,14 @@ impl<'a> DocumentReader<'a> {
                 .ok_or_else(|| self.error("incomplete escape"))?;
             self.offset += 1;
             match escape {
-                b'"' => output.push('"'),
-                b'\\' => output.push('\\'),
-                b'/' => output.push('/'),
-                b'b' => output.push('\u{0008}'),
-                b'f' => output.push('\u{000c}'),
-                b'n' => output.push('\n'),
-                b'r' => output.push('\r'),
-                b't' => output.push('\t'),
+                b'"' => decoded.push('"'),
+                b'\\' => decoded.push('\\'),
+                b'/' => decoded.push('/'),
+                b'b' => decoded.push('\u{0008}'),
+                b'f' => decoded.push('\u{000c}'),
+                b'n' => decoded.push('\n'),
+                b'r' => decoded.push('\r'),
+                b't' => decoded.push('\t'),
                 b'u' => {
                     let mut code = self.hex4().map_err(|_| DocumentError {
                         message: "invalid escaped sequence in string",
@@ -169,7 +193,7 @@ impl<'a> DocumentReader<'a> {
                         }
                         code = 0x10000 + ((code - 0xd800) << 10) + low - 0xdc00;
                     }
-                    output.push(char::from_u32(code).ok_or(DocumentError {
+                    decoded.push(char::from_u32(code).ok_or(DocumentError {
                         message: "invalid high surrogate in string",
                         offset: escape_start,
                     })?);
@@ -182,6 +206,24 @@ impl<'a> DocumentReader<'a> {
                 }
             }
             start = self.offset;
+            let remaining = &self.input.as_bytes()[start..];
+            self.offset += if remaining.len() < 8 {
+                scalar_string_prefix::<false>(remaining)
+            } else {
+                plain_string_prefix(remaining)
+            };
+            match self.input.as_bytes().get(self.offset).copied() {
+                Some(b'"') => {
+                    decoded.push_str(&self.input[start..self.offset]);
+                    self.offset += 1;
+                    return Ok(());
+                }
+                None => return Err(self.error("unterminated string")),
+                Some(byte) if byte < 0x20 => {
+                    return Err(self.error("unescaped control character"));
+                }
+                Some(_) => {}
+            }
         }
     }
 
@@ -318,46 +360,78 @@ impl<'a> DocumentReader<'a> {
 /// Count string bytes before a quote, backslash, or unescaped control byte.
 /// All word loads use checked slices; non-ASCII bytes are copied unchanged.
 #[must_use]
-#[allow(clippy::missing_panics_doc)] // Checked chunks always contain eight bytes.
+#[inline]
 pub fn plain_string_prefix(bytes: &[u8]) -> usize {
-    const HIGH: u64 = 0x8080_8080_8080_8080;
-    const ONES: u64 = 0x0101_0101_0101_0101;
+    string_prefix::<false>(bytes)
+}
+
+// The incremental scanner counts non-ASCII characters separately from bytes.
+#[inline]
+pub(crate) fn ascii_string_prefix(bytes: &[u8]) -> usize {
+    string_prefix::<true>(bytes)
+}
+
+fn string_prefix<const ASCII_ONLY: bool>(bytes: &[u8]) -> usize {
     let mut index = 0;
-    while bytes.len() - index >= 64 {
-        let chunk = &bytes[index..index + 32];
-        let mut special = 0;
-        for word in chunk.chunks_exact(8) {
-            let word = u64::from_ne_bytes(word.try_into().expect("eight-byte slice"));
-            let quote = word ^ 0x2222_2222_2222_2222;
-            let slash = word ^ 0x5c5c_5c5c_5c5c_5c5c;
-            special |= (quote.wrapping_sub(ONES) & !quote)
-                | (slash.wrapping_sub(ONES) & !slash)
-                | (word.wrapping_sub(0x2020_2020_2020_2020) & !word);
+    // Most keys and values end before a full vector-sized chunk.
+    for _ in 0..2 {
+        let Some(chunk) = bytes.get(index..index + 8) else {
+            return index + scalar_string_prefix::<ASCII_ONLY>(&bytes[index..]);
+        };
+        let word = u64::from_le_bytes(chunk.try_into().expect("eight-byte slice"));
+        let special = string_special_mask::<ASCII_ONLY>(word);
+        if special != 0 {
+            return index + special.trailing_zeros() as usize / 8;
         }
-        if special & HIGH != 0 {
+        index += 8;
+    }
+    while bytes.len() - index >= 32 {
+        let chunk: &[u8; 32] = bytes[index..index + 32].try_into().expect("32-byte slice");
+        let special = chunk.map(|byte| {
+            u8::from(byte < 0x20)
+                | u8::from(byte == b'"')
+                | u8::from(byte == b'\\')
+                | u8::from(ASCII_ONLY && !byte.is_ascii())
+        });
+        if special.into_iter().fold(0, |found, byte| found | byte) != 0 {
             break;
         }
         index += 32;
     }
     while let Some(chunk) = bytes.get(index..index + 8) {
-        let word = u64::from_ne_bytes(chunk.try_into().expect("eight-byte slice"));
-        let quote = word ^ 0x2222_2222_2222_2222;
-        let slash = word ^ 0x5c5c_5c5c_5c5c_5c5c;
-        let special = (quote.wrapping_sub(ONES) & !quote)
-            | (slash.wrapping_sub(ONES) & !slash)
-            | (word.wrapping_sub(0x2020_2020_2020_2020) & !word);
-        if special & HIGH != 0 {
-            break;
+        let word = u64::from_le_bytes(chunk.try_into().expect("eight-byte slice"));
+        let special = string_special_mask::<ASCII_ONLY>(word);
+        if special != 0 {
+            return index + special.trailing_zeros() as usize / 8;
         }
         index += 8;
     }
-    while let Some(&byte) = bytes.get(index) {
-        if byte < 0x20 || matches!(byte, b'"' | b'\\') {
-            break;
-        }
-        index += 1;
-    }
-    index
+    index + scalar_string_prefix::<ASCII_ONLY>(&bytes[index..])
+}
+
+#[inline]
+fn string_special_mask<const ASCII_ONLY: bool>(word: u64) -> u64 {
+    const HIGH: u64 = 0x8080_8080_8080_8080;
+    const ONES: u64 = 0x0101_0101_0101_0101;
+    let quote = word ^ 0x2222_2222_2222_2222;
+    let slash = word ^ 0x5c5c_5c5c_5c5c_5c5c;
+    // Subtraction can mark later bytes too; the first marked byte is exact.
+    // Little-endian loads put that byte at the least-significant set bit.
+    ((quote.wrapping_sub(ONES) & !quote)
+        | (slash.wrapping_sub(ONES) & !slash)
+        | (word.wrapping_sub(0x2020_2020_2020_2020) & !word)
+        | if ASCII_ONLY { word } else { 0 })
+        & HIGH
+}
+
+#[inline]
+fn scalar_string_prefix<const ASCII_ONLY: bool>(bytes: &[u8]) -> usize {
+    bytes
+        .iter()
+        .position(|&byte| {
+            byte < 0x20 || matches!(byte, b'"' | b'\\') || (ASCII_ONLY && !byte.is_ascii())
+        })
+        .unwrap_or(bytes.len())
 }
 
 #[cfg(test)]
@@ -379,6 +453,30 @@ mod tests {
                         .position(|&b| b < 32 || matches!(b, b'"' | b'\\'))
                         .unwrap_or(length);
                     assert_eq!(plain_string_prefix(&bytes), expected);
+                    let ascii_expected = bytes
+                        .iter()
+                        .position(|&b| !(32..128).contains(&b) || matches!(b, b'"' | b'\\'))
+                        .unwrap_or(length);
+                    assert_eq!(ascii_string_prefix(&bytes), ascii_expected);
+                }
+                bytes[position] = b'x';
+            }
+        }
+    }
+
+    #[test]
+    fn checked_wide_scan_at_unaligned_starts() {
+        for alignment in [0, 1, 7] {
+            let mut storage = [b'x'; 104];
+            let bytes = &mut storage[alignment..alignment + 96];
+            for position in [0, 15, 16, 31, 32, 63, 64, 95] {
+                for byte in [b'"', b'\\', b'\n', 0xff] {
+                    bytes[position] = byte;
+                    assert_eq!(
+                        plain_string_prefix(bytes),
+                        if byte == 0xff { bytes.len() } else { position },
+                    );
+                    assert_eq!(ascii_string_prefix(bytes), position);
                 }
                 bytes[position] = b'x';
             }
@@ -408,6 +506,44 @@ mod tests {
                 DocumentReader::new(&format!("\"{escape}\""))
                     .string()
                     .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn string_buffer_reuses_storage_without_changing_borrowed_text() {
+        let input = r#""first\nvalue" "plain" "\uD83D\uDE42" "" "last\tvalue""#;
+        let mut reader = DocumentReader::new(input);
+        let mut buffer = String::with_capacity(128);
+        let storage = buffer.as_ptr();
+
+        assert_eq!(reader.string_with_buffer(&mut buffer).unwrap(), None);
+        assert_eq!(buffer, "first\nvalue");
+        let plain = reader.string_with_buffer(&mut buffer).unwrap().unwrap();
+        assert_eq!(plain, "plain");
+        assert_eq!(reader.string_with_buffer(&mut buffer).unwrap(), None);
+        assert_eq!(buffer, "\u{1f642}");
+        assert_eq!(reader.string_with_buffer(&mut buffer).unwrap(), Some(""));
+        assert_eq!(reader.string_with_buffer(&mut buffer).unwrap(), None);
+        assert_eq!(buffer, "last\tvalue");
+        assert_eq!(buffer.as_ptr(), storage);
+        assert_eq!(plain, "plain");
+        assert_eq!(reader.peek(), None);
+    }
+
+    #[test]
+    fn string_buffer_keeps_escape_error_positions() {
+        for (token, message, offset) in [
+            (r#""\q""#, "invalid escaped character in string", 2),
+            (r#""\uZZZZ""#, "invalid escaped sequence in string", 1),
+            (r#""\uD800\uZZZZ""#, "invalid escaped sequence in string", 7),
+            (r#""\uD800\u1234""#, "invalid low surrogate in string", 7),
+            (r#""\uDC00""#, "invalid high surrogate in string", 1),
+        ] {
+            let mut buffer = String::from("previous decoded value");
+            assert_eq!(
+                DocumentReader::new(token).string_with_buffer(&mut buffer),
+                Err(DocumentError { message, offset }),
             );
         }
     }

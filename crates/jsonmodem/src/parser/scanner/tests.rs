@@ -56,6 +56,37 @@ fn key_string_borrowed_simple() {
 }
 
 #[test]
+fn string_ascii_scan_preserves_capture_and_position() {
+    for length in [0, 1, 7, 8, 15, 16, 31, 32, 63, 64, 65, 128] {
+        for ending in [
+            "\"",
+            "\\n",
+            "\n",
+            "\t",
+            "\u{7f}",
+            "\u{80}",
+            "\u{2603}",
+            "\u{1f642}",
+        ] {
+            let batch = alloc::format!("{}{ending}tail", "x".repeat(length));
+            let mut fast = Scanner::from_state(carry(""), &batch);
+            let mut scalar = Scanner::from_state(carry(""), &batch);
+            let expected = scalar.consume_while_ascii(|byte| {
+                (0x20..0x80).contains(&byte) && !matches!(byte, b'"' | b'\\')
+            });
+            assert_eq!(fast.consume_string_ascii_fast(), expected);
+            assert_eq!(
+                (fast.char_idx, fast.line, fast.col),
+                (scalar.char_idx, scalar.line, scalar.col),
+            );
+            assert_eq!(fast.byte_idx, scalar.byte_idx);
+            assert_eq!(fast.emit(), scalar.emit());
+            assert_eq!(fast.peek(), scalar.peek());
+        }
+    }
+}
+
+#[test]
 fn key_string_switches_to_owned_on_escape_prefix_copy_once() {
     // abc\x (simulate encountering a backslash after reading abc)
     let batch = "abc\\rest";

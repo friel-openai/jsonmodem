@@ -27,6 +27,7 @@ const SORT_KEYS: i32 = 32;
 const STRICT_INTEGER: i32 = 64;
 const APPEND_NEWLINE: i32 = 1024;
 const INITIAL_OUTPUT_CAPACITY: usize = 256;
+const MAX_RETAINED_STRING_CAPACITY: usize = 64 * 1024;
 
 /// Explicit raw output, retaining its owner without parsing or placeholder
 /// substitution.
@@ -53,7 +54,9 @@ struct Decoder<'py, 'src> {
     py: Python<'py>,
     input: &'src str,
     reader: DocumentReader<'src>,
-    keys: HashMap<Cow<'src, str>, Py<PyString>>,
+    // Python strings and cached escaped keys own their text before this is reused.
+    string_buffer: String,
+    keys: Option<HashMap<Cow<'src, str>, Py<PyString>>>,
     cache_keys: bool,
 }
 
@@ -65,6 +68,8 @@ enum DecodeContainer<'py> {
 }
 
 impl<'py, 'src> Decoder<'py, 'src> {
+    #[cold]
+    #[inline(never)]
     fn error(&self, error: DocumentError) -> PyErr {
         let position = self
             .input
@@ -82,22 +87,42 @@ impl<'py, 'src> Decoder<'py, 'src> {
         self.reader.expect(byte).map_err(|error| self.error(error))
     }
 
+    #[inline]
+    fn release_large_string_buffer(&mut self) {
+        // A large first token must not stay allocated while later containers grow.
+        if self.string_buffer.capacity() > MAX_RETAINED_STRING_CAPACITY {
+            self.string_buffer = String::new();
+        }
+    }
+
     fn key(&mut self) -> PyResult<Py<PyString>> {
-        let text = self.reader.string().map_err(|error| self.error(error))?;
-        let key = if self.cache_keys {
-            match self.keys.get(text.as_ref()) {
+        let borrowed = self
+            .reader
+            .string_with_buffer(&mut self.string_buffer)
+            .map_err(|error| self.error(error))?;
+        let text = borrowed.unwrap_or(&self.string_buffer);
+        let key = if self.cache_keys && text.len() <= 64 {
+            let keys = self.keys.get_or_insert_with(HashMap::new);
+            match keys.get(text) {
                 Some(key) => key.clone_ref(self.py),
                 None => {
-                    let key = PyString::new(self.py, &text).unbind();
-                    if self.keys.len() < 512 && text.len() <= 64 {
-                        self.keys.insert(text, key.clone_ref(self.py));
+                    let key = PyString::new(self.py, text).unbind();
+                    if keys.len() < 512 {
+                        let text = match borrowed {
+                            Some(text) => Cow::Borrowed(text),
+                            None => Cow::Owned(text.to_owned()),
+                        };
+                        keys.insert(text, key.clone_ref(self.py));
                     }
                     key
                 }
             }
         } else {
-            PyString::new(self.py, &text).unbind()
+            PyString::new(self.py, text).unbind()
         };
+        if borrowed.is_none() {
+            self.release_large_string_buffer();
+        }
         self.expect(b':')?;
         Ok(key)
     }
@@ -135,8 +160,17 @@ impl<'py, 'src> Decoder<'py, 'src> {
                     dict.into_any().unbind()
                 }
                 Some(b'"') => {
-                    let text = self.reader.string().map_err(|error| self.error(error))?;
-                    PyString::new(py, &text).into_any().unbind()
+                    let borrowed = self
+                        .reader
+                        .string_with_buffer(&mut self.string_buffer)
+                        .map_err(|error| self.error(error))?;
+                    let value = PyString::new(py, borrowed.unwrap_or(&self.string_buffer))
+                        .into_any()
+                        .unbind();
+                    if borrowed.is_none() {
+                        self.release_large_string_buffer();
+                    }
+                    value
                 }
                 Some(b'n') => {
                     self.reader
@@ -228,7 +262,8 @@ fn decode(py: Python<'_>, input: &str) -> PyResult<PyObject> {
         py,
         input,
         reader: DocumentReader::new(input),
-        keys: HashMap::new(),
+        string_buffer: String::new(),
+        keys: None,
         cache_keys: input.len() >= 1024,
     };
     let value = decoder.value()?;
@@ -264,7 +299,7 @@ pub fn loads(py: Python<'_>, input: Bound<'_, PyAny>) -> PyResult<PyObject> {
             }
         };
         if !input
-            .getattr("c_contiguous")
+            .getattr(pyo3::intern!(py, "c_contiguous"))
             .map_err(view_error)?
             .extract::<bool>()?
         {
@@ -277,7 +312,9 @@ pub fn loads(py: Python<'_>, input: Bound<'_, PyAny>) -> PyResult<PyObject> {
         }
         // CPython copies the view before Rust reads it, including read-only
         // views of mutable storage. Native providers must keep that storage valid.
-        let bytes = input.call_method0("tobytes").map_err(view_error)?;
+        let bytes = input
+            .call_method0(pyo3::intern!(py, "tobytes"))
+            .map_err(view_error)?;
         return decode_bytes(py, bytes.downcast::<PyBytes>()?.as_bytes());
     }
     Err(super::json_decode_error(

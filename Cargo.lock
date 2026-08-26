@@ -497,7 +497,6 @@ dependencies = [
  "insta",
  "is_ci",
  "jiter",
- "memchr",
  "paste",
  "quickcheck",
  "quickcheck_macros",

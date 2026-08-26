@@ -32,13 +32,16 @@ class Record:
 
 WORKLOADS = (
     "loads_medium", "loads_integers", "loads_floats", "loads_strings", "loads_escaped",
-    "loads_small_view", "dumps_medium", "dumps_integers",
+    "loads_small_view", "loads_escaped_first", "dumps_medium", "dumps_integers",
     "dumps_escaped", "dumps_long_string", "sorted_medium", "dataclasses_1000",
     "numpy_float32", "late_default",
 )
 
 
 def workload(module, name):
+    if name == "loads_escaped_first":
+        value = ["x" * (1 << 20) + "\n", *range(250000)]
+        return module.loads, orjson.dumps(value), {}
     if name.startswith("loads_") and name != "loads_small_view":
         return module.loads, orjson.dumps(PAYLOADS[name.removeprefix("loads_")]), {}
     if name == "loads_small_view":
