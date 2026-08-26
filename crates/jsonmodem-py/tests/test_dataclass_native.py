@@ -494,6 +494,73 @@ def test_dataclass_explicit_invalid_default_has_cause(default):
     assert absent.value.__cause__ is None
 
 
+@pytest.mark.parametrize("name", ["Unknown", "\u03a9Value"])
+@pytest.mark.parametrize("use_default", [False, True])
+def test_unsupported_type_error_message_and_cause(name, use_default):
+    value = type(name, (), {})()
+    cause = ValueError("default failed")
+
+    def default(_):
+        raise cause
+
+    kwargs = {"default": default} if use_default else {}
+    with pytest.raises(TypeError) as raised:
+        jsonmodem.dumps(value, **kwargs)
+    assert str(raised.value) == "Type is not JSON serializable: " + name
+    assert raised.value.__cause__ is (cause if use_default else None)
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="requires Linux address-space accounting")
+@pytest.mark.parametrize("headroom", [2, 16])
+@pytest.mark.parametrize("use_default", [False, True])
+def test_unsupported_type_error_allocation_failure_does_not_abort(headroom, use_default):
+    code = f"headroom = {headroom!r}\nuse_default = {use_default!r}\n" + r'''
+import gc
+import os
+import resource
+import jsonmodem
+
+resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+name = "a" * 10000000
+value = type(name, (), {})()
+cause = ValueError("default failed")
+calls = 0
+
+def default(_):
+    global calls
+    calls += 1
+    raise cause
+
+kwargs = {"default": default} if use_default else {}
+gc.collect()
+original = resource.getrlimit(resource.RLIMIT_AS)
+if not os.environ.get("JSONMODEM_MEMORY_RUNNER"):
+    with open("/proc/self/statm") as statm:
+        size = int(statm.read().split()[0]) * os.sysconf("SC_PAGE_SIZE")
+    resource.setrlimit(resource.RLIMIT_AS, (size + headroom * 1024**2, original[1]))
+try:
+    jsonmodem.dumps(value, **kwargs)
+except MemoryError:
+    outcome = "MemoryError"
+except TypeError as error:
+    outcome = "TypeError"
+    saved_error = error
+else:
+    raise AssertionError("unsupported value was serialized")
+finally:
+    resource.setrlimit(resource.RLIMIT_AS, original)
+if outcome == "TypeError":
+    assert str(saved_error) == "Type is not JSON serializable: " + name
+    assert saved_error.__cause__ is (cause if use_default else None)
+assert calls == int(use_default)
+assert jsonmodem.dumps({"ok": True}) == b'{"ok":true}'
+print(outcome)
+'''
+    result = run_python(code)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() in ("MemoryError", "TypeError")
+
+
 @pytest.mark.skipif(sys.platform != "linux", reason="requires Linux address-space accounting")
 @pytest.mark.parametrize("kind", ["array", "dataclass", "sorted_dict"])
 def test_snapshot_allocation_failure_does_not_abort(kind):

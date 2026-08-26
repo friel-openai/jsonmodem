@@ -240,10 +240,13 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
 
     fn default_value(&self, value: &Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
         let error = || -> PyResult<PyErr> {
-            Ok(PyTypeError::new_err(format!(
-                "Type is not JSON serializable: {}",
-                value.get_type().name()?
-            )))
+            let py = value.py();
+            // Class names can be large. Keep both message creation and exception
+            // construction in fallible Python calls, without a Rust String copy.
+            let message = intern!(py, "Type is not JSON serializable: ")
+                .call_method1(intern!(py, "__add__"), (value.get_type().name()?,))?;
+            let exception = py.get_type::<PyTypeError>().call1((message,))?;
+            Ok(PyErr::from_value(exception))
         };
         if !self.default_provided {
             return Err(error()?);
