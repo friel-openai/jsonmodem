@@ -184,8 +184,8 @@ duplicate-rejection option or extra duplicate-tracking set.
 
 These behaviors deliberately differ from orjson:
 
-- `loads(memoryview(...))` requires an exact built-in bytes, bytearray, or
-  BytesIO buffer owner. External exporters are rejected with `JSONDecodeError`.
+- `loads()` rejects released memoryviews with `JSONDecodeError` instead of
+  reading their old buffer metadata.
 - NumPy datetime unit multipliers and dates outside the supported range raise
   `TypeError`. Date calculations check for overflow. They do not reproduce
   crashes or arithmetic overflow found in orjson.
@@ -207,6 +207,14 @@ trailing commas, non-finite numbers, invalid UTF-8, and unpaired UTF-16
 surrogates. `dumps` rejects cycles, unsupported types, and integers outside
 orjson's signed/unsigned 64-bit range. A non-callable default fails only if needed.
 Non-finite Python floats serialize as JSON `null`, matching orjson.
+
+`loads()` accepts C-contiguous memoryviews, including views supplied by native
+extensions and views with non-byte element formats. CPython copies the raw
+bytes before the Rust parser reads them. Read-only views are copied too: the
+underlying storage may still be mutable. Native providers must supply accurate
+buffer metadata and keep the storage valid until the copy completes. Copying
+does not make fabricated pointers safe. The streaming APIs retain their separate
+buffer restrictions described above.
 
 `dumps` writes ordinary JSON types directly from Python objects to a Rust byte
 buffer. `loads()` and `dumps()` store their position in up to two nested containers
@@ -293,6 +301,12 @@ arrays with four elements per row, one-dimensional arrays, and arrays with
 For allocation counts and peak live bytes, install Memray and run
 `benchmarks/bench_allocations.py --output /tmp/jsonmodem-alloc.json`.
 Repeat with `--module orjson`. Allocation profiling is separate from timing.
+
+The [buffer comparison](benchmarks/BUFFERS.md) measures complete-document
+`loads()` with bytes, bytearrays, and memoryviews, including the time and memory
+cost of copying a native-backed view. Use `--operations loads` and
+`--loads-inputs bytes bytearray memoryview array_view` with
+`bench_orjson_compat.py` to repeat it.
 
 See [memory compared with orjson](benchmarks/MEMORY.md) for direct Memray
 comparisons and a separate measurement of the whole process's resident memory
