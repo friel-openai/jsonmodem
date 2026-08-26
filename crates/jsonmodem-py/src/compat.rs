@@ -332,6 +332,13 @@ pub fn loads(py: Python<'_>, input: Bound<'_, PyAny>) -> PyResult<PyObject> {
 }
 
 fn decode_bytes(py: Python<'_>, bytes: &[u8]) -> PyResult<PyObject> {
+    // This validator is faster on Unicode but slower on short or ASCII input.
+    if bytes.len() >= 128 && !bytes[..32].is_ascii() {
+        let input = encoding_rs::UTF_8
+            .decode_without_bom_handling_and_without_replacement(bytes)
+            .ok_or_else(|| super::json_decode_error(py, "str is not valid UTF-8", "", 0))?;
+        return decode(py, &input);
+    }
     let input = std::str::from_utf8(bytes)
         .map_err(|_| super::json_decode_error(py, "str is not valid UTF-8", "", 0))?;
     decode(py, input)

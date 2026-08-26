@@ -70,3 +70,56 @@ def test_streaming_strings_at_every_split(length, ensure_ascii):
         list(values.feed(document[split:]))
         list(values.finish())
         assert values.view().snapshot() == value
+
+
+@pytest.mark.parametrize("prefix", [0, 29, 30, 31, 32, 33, 127])
+@pytest.mark.parametrize("length", [63, 126, 127, 128, 4096])
+@pytest.mark.parametrize("character", ["x", "\u00e9", "\u2603", "\U0001f642"])
+def test_unicode_validation_selection_preserves_values(prefix, length, character):
+    value = "x" * prefix + character * length + "\n"
+    for document in (
+        json.dumps(value, ensure_ascii=False),
+        json.dumps([value, {value: value}], ensure_ascii=False),
+    ):
+        expected = json.loads(document)
+        encoded = (" \t\r\n" + document + " \t\r\n").encode()
+        for input_value in (encoded, bytearray(encoded), memoryview(encoded)):
+            assert jsonmodem.loads(input_value) == expected
+
+
+@pytest.mark.parametrize("offset", [0, 1, 7, 15, 16, 31, 32, 33, 63, 64, 127, 128])
+def test_invalid_utf8_keeps_decode_error(offset):
+    invalid_sequences = [bytes([byte]) for byte in range(0x80, 0x100)] + [
+        b"\xc0\x80", b"\xc1\xbf", b"\xe0\x80\x80", b"\xed\xa0\x80",
+        b"\xf0\x80\x80\x80", b"\xf4\x90\x80\x80", b"\xf5\x80\x80\x80",
+        b"\xc2", b"\xe2\x98", b"\xf0\x9f\x99",
+    ]
+    for invalid in invalid_sequences:
+        document = b'"' + b"x" * offset + invalid + b"\xe2\x98\x83" * 128 + b'"'
+        for input_value in (document, bytearray(document), memoryview(document)):
+            with pytest.raises(jsonmodem.JSONDecodeError, match="valid UTF-8") as error:
+                jsonmodem.loads(input_value)
+            assert error.value.doc == ""
+            assert error.value.pos == 0
+
+
+@pytest.mark.parametrize("codepoint", [0x7F, 0x80, 0x7FF, 0x800, 0xD7FF, 0xE000, 0xFFFF, 0x10000, 0x10FFFF])
+def test_utf8_codepoint_boundaries(codepoint):
+    value = chr(codepoint) * 129
+    document = json.dumps(value, ensure_ascii=False).encode()
+    assert jsonmodem.loads(document) == value
+    for length in range(1, min(5, len(document))):
+        truncated = document[:-length]
+        with pytest.raises(jsonmodem.JSONDecodeError):
+            jsonmodem.loads(truncated)
+
+
+def test_unicode_result_outlives_mutable_input():
+    expected = "\u2603\U0001f642\u00e9" * 129
+    owner = bytearray(json.dumps(expected, ensure_ascii=False).encode())
+    view = memoryview(owner)
+    value = jsonmodem.loads(view)
+    view.release()
+    owner[:] = b"x" * len(owner)
+    del owner
+    assert value == expected
