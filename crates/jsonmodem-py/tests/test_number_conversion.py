@@ -1,7 +1,9 @@
 """Integer boundaries exercise native conversion without optional dependencies."""
 
 import json
+import math
 import random
+import struct
 
 import pytest
 
@@ -81,3 +83,66 @@ def test_integer_from_default(value):
     assert jsonmodem.dumps([object()], default=lambda _: value) == (
         b"[" + str(value).encode() + b"]"
     )
+
+
+def test_signed_and_unsigned_integer_input():
+    values = integer_values()
+    actual = jsonmodem.loads(json.dumps(values))
+    assert actual == values
+    assert all(type(value) is int for value in actual)
+
+
+def test_integer_input_overflow_uses_finite_double_conversion():
+    rng = random.Random(3581)
+    values = [-(2**63) - 1, 2**64, -(2**64), 2**64 + 1]
+    values.extend((-1 if rng.getrandbits(1) else 1) * rng.getrandbits(bits)
+                  for bits in range(65, 1100))
+    for value in values:
+        text = str(value)
+        expected = value if -(2**63) <= value < 2**64 else float(text)
+        if not math.isfinite(expected):
+            with pytest.raises(jsonmodem.JSONDecodeError, match="infinity"):
+                jsonmodem.loads(text)
+        else:
+            actual = jsonmodem.loads(text)
+            assert type(actual) is type(expected)
+            assert actual == expected
+
+
+@pytest.mark.parametrize("text", ["0", "-0", "0.0", "-0.0", "0e0", "-0e0", "0.0e-999", "-0.0e-999"])
+def test_numeric_zero_type_and_sign(text):
+    expected = float(text) if any(char in text for char in ".eE") else int(text)
+    actual = jsonmodem.loads(text)
+    assert type(actual) is type(expected)
+    assert actual == expected
+    assert math.copysign(1.0, actual) == math.copysign(1.0, expected)
+
+
+@pytest.mark.parametrize("text,offset", [
+    ("-", 1), ("1.", 2), ("1.e2", 2), ("1e", 2), ("1e+", 3), ("1e-", 3),
+    ("18446744073709551616.", 21), ("18446744073709551616e-", 22),
+])
+def test_invalid_numeric_offsets(text, offset):
+    prefix = '["\u00e9",'
+    with pytest.raises(jsonmodem.JSONDecodeError) as caught:
+        jsonmodem.loads(prefix + text + "]")
+    assert caught.value.pos == len(prefix) + offset
+
+
+@pytest.mark.parametrize("text", ["+1", ".1", "--1", "01", "-01", "1_000", "0x10", "1..0", "1e++2", "1.0e-+2"])
+def test_invalid_numeric_grammar(text):
+    with pytest.raises(jsonmodem.JSONDecodeError):
+        jsonmodem.loads(text)
+    with pytest.raises(jsonmodem.JSONDecodeError):
+        jsonmodem.loads("[" + text + "]")
+
+
+def test_float_input_bits_match_orjson():
+    orjson = pytest.importorskip("orjson")
+    rng = random.Random(9251)
+    values = [struct.unpack("<d", rng.getrandbits(64).to_bytes(8, "little"))[0] for _ in range(10000)]
+    values = [value for value in values if math.isfinite(value)]
+    document = orjson.dumps(values)
+    actual = jsonmodem.loads(document)
+    expected = orjson.loads(document)
+    assert [struct.pack("<d", value) for value in actual] == [struct.pack("<d", value) for value in expected]

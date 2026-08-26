@@ -19,6 +19,17 @@ pub struct NumberToken<'a> {
     pub text: &'a str,
     /// Whether the token contains a fraction or exponent.
     pub is_float: bool,
+    /// Integer conversion performed while scanning, when it fits a 64-bit type.
+    pub integer: Option<IntegerToken>,
+}
+
+/// An exact integer in the signed or unsigned 64-bit range.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IntegerToken {
+    /// Negative integers and nonnegative integers through `i64::MAX`.
+    Signed(i64),
+    /// Nonnegative integers above `i64::MAX` through `u64::MAX`.
+    Unsigned(u64),
 }
 
 /// A cursor for a complete UTF-8 document. Consumers build containers directly.
@@ -201,17 +212,21 @@ impl<'a> DocumentReader<'a> {
     pub fn number(&mut self) -> Result<NumberToken<'a>, DocumentError> {
         let start = self.offset;
         let bytes = self.input.as_bytes();
-        if bytes.get(self.offset) == Some(&b'-') {
+        let negative = bytes.get(self.offset) == Some(&b'-');
+        if negative {
             self.offset += 1;
         }
-        match bytes.get(self.offset) {
-            Some(b'0') => self.offset += 1,
-            Some(b'1'..=b'9') => {
+        let magnitude = match bytes.get(self.offset) {
+            Some(b'0') => {
                 self.offset += 1;
-                self.digits();
+                Some(0)
+            }
+            Some(&first @ b'1'..=b'9') => {
+                self.offset += 1;
+                self.integer_digits(first - b'0')
             }
             _ => return Err(self.error("expected digit")),
-        }
+        };
         let mut is_float = false;
         if bytes.get(self.offset) == Some(&b'.') {
             is_float = true;
@@ -233,7 +248,50 @@ impl<'a> DocumentReader<'a> {
         Ok(NumberToken {
             text: &self.input[start..self.offset],
             is_float,
+            integer: if is_float {
+                None
+            } else {
+                magnitude.and_then(|value| {
+                    if let Ok(value) = i64::try_from(value) {
+                        Some(IntegerToken::Signed(if negative { -value } else { value }))
+                    } else if !negative {
+                        Some(IntegerToken::Unsigned(value))
+                    } else if value == i64::MIN.unsigned_abs() {
+                        Some(IntegerToken::Signed(i64::MIN))
+                    } else {
+                        None
+                    }
+                })
+            },
         })
+    }
+
+    fn integer_digits(&mut self, first: u8) -> Option<u64> {
+        let bytes = self.input.as_bytes();
+        let mut value = u64::from(first);
+        // The first digit and up to eighteen more always fit in u64.
+        let end = self.offset.saturating_add(18).min(bytes.len());
+        while self.offset < end {
+            let byte = bytes[self.offset];
+            let digit = byte.wrapping_sub(b'0');
+            if digit > 9 {
+                return Some(value);
+            }
+            value = value * 10 + u64::from(digit);
+            self.offset += 1;
+        }
+        let Some(byte) = bytes.get(self.offset) else {
+            return Some(value);
+        };
+        let digit = byte.wrapping_sub(b'0');
+        if digit > 9 {
+            return Some(value);
+        }
+        self.offset += 1;
+        let value = value
+            .checked_mul(10)
+            .and_then(|value| value.checked_add(u64::from(digit)));
+        if self.digits() == 0 { value } else { None }
     }
 
     fn digits(&mut self) -> usize {
@@ -356,6 +414,75 @@ mod tests {
         }
         for input in ["-", "1.", "1.e2", "1e", "1e+"] {
             assert!(DocumentReader::new(input).number().is_err());
+        }
+    }
+
+    fn check_integer(input: &str) {
+        let mut reader = DocumentReader::new(input);
+        let number = reader.number().unwrap();
+        let expected = input
+            .parse::<i64>()
+            .map(IntegerToken::Signed)
+            .or_else(|_| input.parse::<u64>().map(IntegerToken::Unsigned))
+            .ok();
+        assert_eq!(number.integer, expected, "{input}");
+        assert_eq!(number.text, input);
+        assert!(!number.is_float);
+        assert_eq!(reader.offset(), input.len());
+    }
+
+    #[test]
+    fn integer_conversion_boundaries() {
+        check_integer("0");
+        check_integer("-0");
+        for bits in 0..=64 {
+            let boundary = 1u128 << bits;
+            for value in [boundary - 1, boundary, boundary + 1] {
+                check_integer(&format!("{value}"));
+                check_integer(&format!("-{value}"));
+            }
+        }
+        let limit = if cfg!(miri) { 32 } else { 310 };
+        for digits in 1..limit {
+            let input = "9".repeat(digits);
+            check_integer(&input);
+            check_integer(&format!("-{input}"));
+        }
+    }
+
+    #[test]
+    fn fractions_and_exponents_do_not_return_integer_values() {
+        for input in [
+            "0.0",
+            "-0.0",
+            "-0e-1000",
+            "1e+0",
+            "18446744073709551615.0",
+            "18446744073709551616.0",
+            "999999999999999999999999999999999999999999999e-40",
+        ] {
+            let mut reader = DocumentReader::new(input);
+            let number = reader.number().unwrap();
+            assert_eq!(number.integer, None, "{input}");
+            assert!(number.is_float);
+            assert_eq!(number.text, input);
+            assert_eq!(reader.offset(), input.len());
+        }
+    }
+
+    #[test]
+    fn number_errors_preserve_offsets() {
+        for (input, message, offset) in [
+            ("-", "expected digit", 1),
+            ("1.", "expected fraction digit", 2),
+            ("1.e2", "expected fraction digit", 2),
+            ("1e", "expected exponent digit", 2),
+            ("1e+", "expected exponent digit", 3),
+            ("18446744073709551616.", "expected fraction digit", 21),
+            ("18446744073709551616e-", "expected exponent digit", 22),
+        ] {
+            let error = DocumentReader::new(input).number().err();
+            assert_eq!(error, Some(DocumentError { message, offset }));
         }
     }
 }

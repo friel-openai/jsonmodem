@@ -3,7 +3,7 @@
 
 use std::{borrow::Cow, collections::HashMap, ops::Range};
 
-use jsonmodem::document::{DocumentError, DocumentReader, plain_string_prefix};
+use jsonmodem::document::{DocumentError, DocumentReader, IntegerToken, plain_string_prefix};
 use pyo3::{
     PyTraverseError, PyVisit,
     exceptions::{PyTypeError, PyValueError},
@@ -155,28 +155,23 @@ impl<'py, 'src> Decoder<'py, 'src> {
                 }
                 Some(b'-' | b'0'..=b'9') => {
                     let number = self.reader.number().map_err(|error| self.error(error))?;
-                    if number.is_float {
-                        let value: f64 = number
-                            .text
-                            .parse()
-                            .map_err(|_| self.fail("invalid number"))?;
-                        if !value.is_finite() {
-                            return Err(self.fail("number is infinity when parsed as double"));
+                    match number.integer {
+                        Some(IntegerToken::Signed(value)) => {
+                            value.into_pyobject(py)?.into_any().unbind()
                         }
-                        value.into_pyobject(py)?.into_any().unbind()
-                    } else if let Ok(value) = number.text.parse::<i64>() {
-                        value.into_pyobject(py)?.into_any().unbind()
-                    } else if let Ok(value) = number.text.parse::<u64>() {
-                        value.into_pyobject(py)?.into_any().unbind()
-                    } else {
-                        let value = number
-                            .text
-                            .parse::<f64>()
-                            .map_err(|_| self.fail("invalid number"))?;
-                        if !value.is_finite() {
-                            return Err(self.fail("number is infinity when parsed as double"));
+                        Some(IntegerToken::Unsigned(value)) => {
+                            value.into_pyobject(py)?.into_any().unbind()
                         }
-                        value.into_pyobject(py)?.into_any().unbind()
+                        None => {
+                            let value: f64 = number
+                                .text
+                                .parse()
+                                .map_err(|_| self.fail("invalid number"))?;
+                            if !value.is_finite() {
+                                return Err(self.fail("number is infinity when parsed as double"));
+                            }
+                            value.into_pyobject(py)?.into_any().unbind()
+                        }
                     }
                 }
                 _ => return Err(self.fail("expected JSON value")),
