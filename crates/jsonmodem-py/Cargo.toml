@@ -20,4 +20,4 @@ zmij = "=1.0.21"
 half = "2.6"
 chrono = { version = "0.4", default-features = false, features = ["std"] }
 lexical-parse-float = { version = "1.0.5", default-features = false }
-encoding_rs = "=0.8.35"
+simdutf8 = { git = "https://github.com/rusticstuff/simdutf8", rev = "1890235e87c59a44d45efa6a44fcf9b7166183d4" }
