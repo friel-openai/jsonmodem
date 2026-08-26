@@ -63,10 +63,12 @@ def test_arbitrary_buffer_exporters_are_not_borrowed(parser_type):
         list(parser_type().feed(memoryview(data)))
 
 
-def test_document_rejects_external_memoryview_owner():
+def test_document_copies_external_memoryview():
     import array
-    with pytest.raises(jsonmodem.JSONDecodeError):
-        jsonmodem.loads(memoryview(array.array("B", b"[1]")))
+    backing = array.array("B", b"[1]")
+    value = jsonmodem.loads(memoryview(backing))
+    backing[1] = ord("2")
+    assert value == [1]
 
 
 @pytest.mark.parametrize("name", ["JsonModem", "JsonModemValues"])

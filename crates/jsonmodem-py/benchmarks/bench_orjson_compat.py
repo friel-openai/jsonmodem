@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import array
 import gc
 import json
 import os
@@ -25,6 +26,13 @@ PAYLOADS = {
     "strings": [f"string-{index}-abcdefghijklmnopqrstuvwxyz" for index in range(1_000)],
     "escaped": [{"text": 'quote: " slash: \\ newline: \n unicode: \u2603'}] * 1_000,
     "long_string": "abcdefghijklmnopqrstuvxyz0123456789" * 4_096,
+}
+
+LOAD_INPUTS = {
+    "bytes": bytes,
+    "bytearray": bytearray,
+    "memoryview": memoryview,
+    "array_view": lambda data: memoryview(array.array("B", data)),
 }
 
 
@@ -73,6 +81,8 @@ def main():
     parser.add_argument("--seconds", type=float, default=0.03)
     parser.add_argument("--cpu", type=int)
     parser.add_argument("--workloads", nargs="+", choices=PAYLOADS, default=list(PAYLOADS))
+    parser.add_argument("--operations", nargs="+", choices=["loads", "dumps"], default=["loads", "dumps"])
+    parser.add_argument("--loads-inputs", nargs="+", choices=LOAD_INPUTS, default=["bytes"])
     args = parser.parse_args()
     cpu = args.cpu
     if hasattr(os, "sched_getaffinity"):
@@ -83,22 +93,24 @@ def main():
         "orjson": orjson.__version__, "jsonmodem": jsonmodem.__version__,
         "cpu": cpu, "rounds": args.rounds, "workloads": [],
     }
-    print(f"Python {result['python']}; orjson {result['orjson']}; CPU {cpu}; {args.rounds} alternating rounds")
-    print(f"{'operation':<10} {'payload':<14} {'jsonmodem ns':>14} {'orjson ns':>12} {'ratio':>8}")
+    print(f"Python {result['python']}; orjson {result['orjson']}; CPU {cpu}; {args.rounds} measurements per library")
+    print(f"{'operation':<10} {'payload':<14} {'input':<12} {'jsonmodem ns':>14} {'orjson ns':>12} {'ratio':>8}")
     for name in args.workloads:
         value = PAYLOADS[name]
         document = orjson.dumps(value)
-        for operation, argument in (("loads", document), ("dumps", value)):
-            ours, theirs = getattr(jsonmodem, operation), getattr(orjson, operation)
-            a, b = ours(argument), theirs(argument)
-            if operation == "loads":
-                assert a == b
-            else:
-                assert json.loads(a) == json.loads(b)
-            measurement = measure(ours, theirs, argument, args.rounds, args.seconds)
-            measurement.update(operation=operation, payload=name, bytes=len(document), exact_match=a == b)
-            result["workloads"].append(measurement)
-            print(f"{operation:<10} {name:<14} {measurement['jsonmodem_ns']:>14,.0f} {measurement['orjson_ns']:>12,.0f} {measurement['ratio']:>7.2f}x", flush=True)
+        for operation in args.operations:
+            inputs = [(kind, LOAD_INPUTS[kind](document)) for kind in args.loads_inputs] if operation == "loads" else [("object", value)]
+            for kind, argument in inputs:
+                ours, theirs = getattr(jsonmodem, operation), getattr(orjson, operation)
+                a, b = ours(argument), theirs(argument)
+                if operation == "loads":
+                    assert a == b
+                else:
+                    assert json.loads(a) == json.loads(b)
+                measurement = measure(ours, theirs, argument, args.rounds, args.seconds)
+                measurement.update(operation=operation, payload=name, input_type=kind, bytes=len(document), exact_match=a == b)
+                result["workloads"].append(measurement)
+                print(f"{operation:<10} {name:<14} {kind:<12} {measurement['jsonmodem_ns']:>14,.0f} {measurement['orjson_ns']:>12,.0f} {measurement['ratio']:>7.2f}x", flush=True)
     if args.output:
         with open(args.output, "w") as output:
             json.dump(result, output, indent=2)

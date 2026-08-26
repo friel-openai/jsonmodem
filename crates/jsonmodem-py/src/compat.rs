@@ -6,7 +6,7 @@ use std::{borrow::Cow, collections::HashMap, ops::Range};
 use jsonmodem::document::{DocumentError, DocumentReader, plain_string_prefix};
 use pyo3::{
     PyTraverseError, PyVisit,
-    exceptions::PyTypeError,
+    exceptions::{PyTypeError, PyValueError},
     prelude::*,
     types::{
         PyBool, PyByteArray, PyBytes, PyDict, PyFloat, PyInt, PyList, PyMemoryView, PyString,
@@ -235,7 +235,7 @@ fn decode(py: Python<'_>, input: &str) -> PyResult<PyObject> {
     };
     let value = decoder.value()?;
     if decoder.reader.peek().is_some() {
-        return Err(decoder.fail("trailing content"));
+        return Err(decoder.fail("unexpected content after document"));
     }
     Ok(value)
 }
@@ -253,33 +253,23 @@ pub fn loads(py: Python<'_>, input: Bound<'_, PyAny>) -> PyResult<PyObject> {
     if let Ok(bytes) = input.downcast_exact::<PyBytes>() {
         return decode_bytes(py, bytes.as_bytes());
     }
-    // Only built-in owners are accepted. Never borrow a Rust slice from an
-    // arbitrary exporter's pointer, even through a read-only memoryview.
     if input.is_exact_instance_of::<PyByteArray>() {
         let bytes = input.downcast::<PyByteArray>()?.to_vec();
         return decode_bytes(py, &bytes);
     }
     if input.is_exact_instance_of::<PyMemoryView>() {
-        let owner = input.getattr("obj")?;
-        if !owner.is_exact_instance_of::<PyBytes>() && !owner.is_exact_instance_of::<PyByteArray>()
-        {
-            // BytesIO exports an internal built-in owner, not the BytesIO object itself.
-            let builtin = py
-                .import("_io")?
-                .getattr("BytesIO")?
-                .call0()?
-                .call_method0("getbuffer")?
-                .getattr("obj")?;
-            if !owner.get_type().is(builtin.get_type()) {
-                return Err(super::json_decode_error(
-                    py,
-                    "memoryview must have a supported built-in owner",
-                    "",
-                    0,
-                ));
+        let view_error = |error: PyErr| {
+            if error.is_instance_of::<PyValueError>(py) {
+                super::json_decode_error(py, "memoryview has been released", "", 0)
+            } else {
+                error
             }
-        }
-        if !input.getattr("c_contiguous")?.extract::<bool>()? {
+        };
+        if !input
+            .getattr("c_contiguous")
+            .map_err(view_error)?
+            .extract::<bool>()?
+        {
             return Err(super::json_decode_error(
                 py,
                 "memoryview must be contiguous bytes",
@@ -287,7 +277,9 @@ pub fn loads(py: Python<'_>, input: Bound<'_, PyAny>) -> PyResult<PyObject> {
                 0,
             ));
         }
-        let bytes = input.call_method0("tobytes")?;
+        // CPython copies the view before Rust reads it, including read-only
+        // views of mutable storage. Native providers must keep that storage valid.
+        let bytes = input.call_method0("tobytes").map_err(view_error)?;
         return decode_bytes(py, bytes.downcast::<PyBytes>()?.as_bytes());
     }
     Err(super::json_decode_error(

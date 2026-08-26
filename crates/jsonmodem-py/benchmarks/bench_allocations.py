@@ -1,6 +1,7 @@
 """Measure complete-call allocation events and peak live bytes with Memray."""
 
 import argparse
+import array
 import dataclasses
 import gc
 import importlib
@@ -32,6 +33,7 @@ def main():
         os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
     medium = [{"id": i, "score": i / 7, "name": f"item-{i}"} for i in range(1000)]
     small = {"id": 42, "ok": True, "name": "jsonmodem", "tags": ["a", "b", "c"]}
+    long_string = "abcdefghijklmnopqrstuvxyz0123456789" * 4096
     fragment = module.Fragment(b'{"x":[1,2,3]}')
     cases = [
         ("loads_medium", module.loads, orjson.dumps(medium), {}),
@@ -44,6 +46,11 @@ def main():
         ("numpy_float32", module.dumps, numpy.arange(100000, dtype=numpy.float32).reshape(25000, 4), {"option": module.OPT_SERIALIZE_NUMPY}),
         ("late_default", module.dumps, ["x" * 4096] * 5000 + [object()], {"default": lambda _: None}),
     ]
+    for name, value in (("small", small), ("medium", medium), ("long_string", long_string)):
+        document = orjson.dumps(value)
+        cases.append((f"loads_{name}_array_view", module.loads, memoryview(array.array("B", document)), {}))
+        if name != "medium":
+            cases.append((f"loads_{name}", module.loads, document, {}))
     if args.workload:
         cases = [case for case in cases if case[0] == args.workload]
         if not cases:

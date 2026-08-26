@@ -117,6 +117,7 @@ impl<'a> DocumentReader<'a> {
             }
             let output = decoded.get_or_insert_with(|| String::with_capacity(64));
             output.push_str(&self.input[start..self.offset]);
+            let escape_start = self.offset;
             self.offset += 1;
             let escape = self
                 .input
@@ -135,21 +136,32 @@ impl<'a> DocumentReader<'a> {
                 b'r' => output.push('\r'),
                 b't' => output.push('\t'),
                 b'u' => {
-                    let mut code = self.hex4()?;
+                    let mut code = self.hex4().map_err(|_| DocumentError {
+                        message: "invalid escaped sequence in string",
+                        offset: escape_start,
+                    })?;
                     if (0xd800..=0xdbff).contains(&code) {
                         if !self.input[self.offset..].starts_with("\\u") {
-                            return Err(self.error("unpaired high surrogate"));
+                            return Err(self.error("no low surrogate in string"));
                         }
+                        let low_start = self.offset;
                         self.offset += 2;
-                        let low = self.hex4()?;
+                        let low = self.hex4().map_err(|_| DocumentError {
+                            message: "invalid escaped sequence in string",
+                            offset: low_start,
+                        })?;
                         if !(0xdc00..=0xdfff).contains(&low) {
-                            return Err(self.error("invalid surrogate pair"));
+                            return Err(DocumentError {
+                                message: "invalid low surrogate in string",
+                                offset: low_start,
+                            });
                         }
                         code = 0x10000 + ((code - 0xd800) << 10) + low - 0xdc00;
                     }
-                    output.push(
-                        char::from_u32(code).ok_or_else(|| self.error("invalid Unicode scalar"))?,
-                    );
+                    output.push(char::from_u32(code).ok_or(DocumentError {
+                        message: "invalid high surrogate in string",
+                        offset: escape_start,
+                    })?);
                 }
                 _ => {
                     return Err(DocumentError {
