@@ -295,6 +295,27 @@ fn decode_bytes(py: Python<'_>, bytes: &[u8]) -> PyResult<PyObject> {
     decode(py, input)
 }
 
+/// Return a signed integer, or select unsigned conversion without an exception.
+#[inline(always)]
+fn signed_integer(value: &Bound<'_, PyInt>) -> PyResult<Option<i64>> {
+    let mut overflow = 0;
+    // SAFETY: Bound retains the integer while Python is attached, and overflow
+    // is a live, initialized C int for the duration of this call.
+    let integer = unsafe { pyo3::ffi::PyLong_AsLongLongAndOverflow(value.as_ptr(), &mut overflow) };
+    match overflow {
+        0 => {
+            if integer == -1 {
+                if let Some(error) = PyErr::take(value.py()) {
+                    return Err(error);
+                }
+            }
+            Ok(Some(integer))
+        }
+        1 => Ok(None),
+        _ => Err(PyTypeError::new_err("Integer exceeds 64-bit range")),
+    }
+}
+
 /// Single output buffer and bounded cache of encoded dictionary keys.
 struct Encoder {
     output: Vec<u8>,
@@ -435,9 +456,9 @@ impl Encoder {
         } else if let Ok(boolean) = value.downcast_exact::<PyBool>() {
             self.output
                 .extend_from_slice(if boolean.is_true() { b"true" } else { b"false" });
-        } else if value.is_exact_instance_of::<PyInt>() {
+        } else if let Ok(value) = value.downcast_exact::<PyInt>() {
             let mut buffer = itoa::Buffer::new();
-            if let Ok(integer) = value.extract::<i64>() {
+            if let Some(integer) = signed_integer(value)? {
                 if self.option & STRICT_INTEGER != 0
                     && !(-9_007_199_254_740_991..=9_007_199_254_740_991).contains(&integer)
                 {
