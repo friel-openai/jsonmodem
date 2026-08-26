@@ -2,11 +2,24 @@
 
 import gc
 import json
+import os
+from pathlib import Path
+import subprocess
 import sys
 
 import pytest
 
 from jsonmodem import JsonModem, JsonModemSyntaxError, JsonModemValues
+
+
+def test_gc_callback_cannot_change_text_being_parsed():
+    runner = os.environ.get("JSONMODEM_MEMORY_RUNNER")
+    command = [runner] if runner else []
+    script = Path(__file__).resolve().parents[3] / "scripts" / "gc_buffer_regression.py"
+    result = subprocess.run(
+        [*command, sys.executable, str(script)], capture_output=True, text=True, timeout=30
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 @pytest.mark.parametrize("factory", [bytes, bytearray, memoryview])
@@ -177,17 +190,17 @@ def test_python_exporter_releases_every_acquired_buffer(data):
 
 
 @pytest.mark.skipif(sys.version_info < (3, 12), reason="Python buffer methods require 3.12")
-def test_byte_payload_keeps_python_exporter_alive_until_release():
+def test_byte_payload_snapshots_unknown_python_exporter():
     class Exporter:
-        """Owns immutable storage used by a no-copy payload."""
+        """Owns storage whose immutability cannot be established by the caller."""
 
         def __init__(self):
             self.active = 0
-            self.data = bytes(bytearray(b'["value"]'))
+            self.data = bytearray(b'["value"]')
 
         def __buffer__(self, flags):
             self.active += 1
-            return memoryview(self.data)
+            return memoryview(self.data).toreadonly()
 
         def __release_buffer__(self, buffer):
             self.active -= 1
@@ -199,7 +212,10 @@ def test_byte_payload_keeps_python_exporter_alive_until_release():
     del parser, events
     gc.collect()
     assert payload.tobytes() == b"value"
-    assert source.active > 0
+    assert source.active == 0
+    assert isinstance(payload.obj, bytes)
+    source.data[:] = b"changed"
+    assert payload.tobytes() == b"value"
     payload.release()
     gc.collect()
     assert source.active == 0

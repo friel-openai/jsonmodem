@@ -89,6 +89,8 @@ and a separate virtual environment go under `target/python-memory`. The script
 installs a wheel there; it does not replace the ordinary editable extension.
 It uses `python3` by default. Set `JSONMODEM_MEMORY_PYTHON` to select another
 interpreter, for example `3.13` to match CI.
+CI tests Python 3.9 and 3.13. The older version exercises synchronous garbage
+collection callbacks that can run while `feed()` allocates Python objects.
 
 `scripts/python_memory_runner.rs` starts CPython from a Rust executable linked
 with AddressSanitizer. The extension is built with the same Rust toolchain and
@@ -110,13 +112,40 @@ parser or input is discarded. It tries all 256 single-byte mutations of a short
 JSON string. Python 3.12 and later also exercise Python-defined buffer exporters
 and count buffer acquisitions and releases.
 
+Two regressions found bugs that the original tests missed. One exporter returned
+different immutable bytes for parsing and payload creation. Byte-view mode now
+parses the exact retained export. Another test changed a bytearray from a GC
+callback during Python 3.9 parsing. Ordinary buffer input is now copied unless
+its storage is known to be immutable. `scripts/gc_buffer_regression.py` runs in a
+subprocess and requires actual callbacks inside `feed` on Python 3.9-3.11.
+
 The tuple-building unsafe operations are exercised by saved nested events,
 path conversion, path slicing, and no-copy byte events. The buffer operations
 are exercised through `with_buffer_text`, `with_readonly_byte_text`,
 `supports_buffer_protocol`, and `PyBufferGuard::drop`. The exporter must supply a
 valid allocation for the requested length, and the guard must keep the export
-alive until the Rust borrow ends. Returned no-copy memoryviews must retain their
-own buffer export after the temporary guard releases its export.
+alive until the Rust borrow or copy ends. Unknown read-only exporters are copied
+to immutable bytes before parsing, so their payloads retain the copy. Known
+immutable bytes-backed payloads retain their own export after the temporary
+guard releases its export.
+
+## Measuring buffer-copy cost
+
+`benchmarks/bench_buffer_inputs.py` compares two installed release builds using
+the existing synthetic array-of-strings workload, split into 512-byte chunks.
+Both environments need Python 3.12 or later, `pyperf`, and `memray`. For example:
+
+```sh
+python crates/jsonmodem-py/benchmarks/bench_buffer_inputs.py \
+  --baseline-python /path/to/baseline/bin/python \
+  --candidate-python /path/to/candidate/bin/python > comparison.json
+```
+
+The script alternates the builds' execution order for seven paired measurements.
+Each measurement times 200 streams three times and takes the median. It also
+tracks allocations over 100 streams in separate Memray runs. Allocation counts
+exclude free and unmap records; peak tracked memory is not process RSS. Timings
+on a shared host are evidence for that run, not a performance guarantee.
 
 ## Limits
 

@@ -1,7 +1,10 @@
 # Memory-safety test evidence
 
 
-This record supports `plan.md`. No new tests have been run for this branch yet.
+This record supports `plan.md`. Rust Miri checks passed, and the Python tests
+found two callback-related input ownership defects. Both fixes have regression
+tests and native sanitizer validation. The sections below retain the initial
+questions, failed attempts, and final evidence.
 
 ## Baseline and independence
 
@@ -183,7 +186,9 @@ checks cannot prove it. Tests cover empty buffers without dereferencing null,
 valid storage, invalid UTF-8, writable/read-only restrictions, failed acquisition,
 and matched releases. A returned memoryview retains an independent export after
 the temporary guard is released. Native exporters that violate the CPython
-contract remain outside tested guarantees.
+contract remain outside tested guarantees. This paragraph describes the initial
+review; the fixes below replace mutable borrows with snapshots and give unknown
+read-only exporters snapshot-backed payloads.
 
 `docs/memory-safety-testing.md` provides the durable user-facing inventory.
 
@@ -228,3 +233,123 @@ Next action: run this regression against the baseline extension, then ensure
 parsing and returned memoryviews share the exact same acquired storage. Review
 whether GC callbacks can mutate other accepted backing storage during parsing
 before deciding whether additional snapshots are required.
+
+The safe regression failed on the baseline extension exactly as expected:
+`b'secon' != b'first'`. Test-infrastructure commit `7883dad` retains this failing
+regression before any production fix.
+
+The reviewer also reproduced synchronous GC mutation on Python 3.9.25. A
+`gc.callbacks` function changed one ASCII byte only when reading
+`parser.is_finished` raised PyO3's mutable-borrow error, proving the callback ran
+inside `feed`. The parsed last string changed from `abc` to `abz`. The primary
+agent independently reproduced the safe ASCII case with
+`target/memory-baseline-py39/bin/python scripts/gc_buffer_regression.py`: nine
+callbacks ran inside feed and the unchanged-text assertion failed. No such
+callback ran inside feed in the reviewer's 3.12/3.13 tests. The regression is a
+subprocess so global GC settings and any interpreter fault remain isolated.
+
+The fix snapshots mutable or unverifiable ordinary buffer input before Python
+allocations can run callbacks. Exact bytes-backed memoryviews remain borrowed,
+as does the existing bytes fast case. Byte-view parsing first acquires the
+retained memoryview, then inspects that exact export. Unknown read-only exporters
+are copied to immutable bytes before parsing; their payloads retain that copy.
+This preserves acceptance of valid exporters without promising no-copy access to
+unverifiable storage. Direct mutable memoryviews remain rejected in byte-view mode.
+
+## Buffer-fix performance experiment
+
+
+Question: how much do immutable-owner checking and required snapshots cost for
+chunked streaming input? Baseline: a release wheel built from the production
+code at `7883dad`, installed separately in `target/memory-benchmark-baseline`.
+Candidate: this worktree's ordinary release extension. Use the public
+`make_array_strings(1024)` workload and event loop from
+`benchmarks/bench_jiter_chunked.py`, with 512-byte chunks. Compare bytes,
+bytearray, bytes-backed memoryviews, and byte-view mode with bytes and a Python
+read-only exporter. Run both interpreters alternately for seven pairs, recording
+time per complete stream. Use Memray native allocation tracking separately for
+100 streams; record allocation counts and peak tracked bytes. No orjson result
+is needed for this safety-only comparison.
+
+Decision rule: bytes must retain its no-copy behavior; measure any regression
+and reduce avoidable copies or callback work without removing required ownership.
+Do not interpret shared-host timings as a release performance guarantee. Keep
+generated timing/allocation artifacts outside tracked files. Next action: run
+the paired baseline/candidate experiment after regression tests pass.
+
+## Final measurements
+
+
+The first measurement found avoidable allocations from repeatedly constructing
+the Python attribute name `obj`. The fix now interns that name and reads a
+byte-view owner's attribute only once. This removed those per-chunk allocations
+without weakening the ownership checks.
+
+The reproducible comparison is now
+`crates/jsonmodem-py/benchmarks/bench_buffer_inputs.py`. Command:
+
+    .venv/bin/python crates/jsonmodem-py/benchmarks/bench_buffer_inputs.py --baseline-python target/memory-benchmark-baseline/bin/python --candidate-python .venv/bin/python
+
+The baseline release wheel contains production code from `7883dad`; the candidate
+contains the buffer fixes and interned attribute name. Both used CPython 3.12.13,
+Rust 1.94.1, and Memray 1.20.0 on the same shared Linux x86_64 host, without CPU
+pinning. Seven paired timing measurements alternate execution order. Each is
+the median of three measurements of 200 streams. Each stream contains 1,024
+strings, 7,169 input bytes, 15 chunks, and 1,034 emitted events. All event counts
+matched. Memray runs are separate from timing, with 100 streams after ten warmups.
+
+| Input/mode | Baseline us/stream | Fixed us/stream | Median paired fixed/baseline | Paired ratio range |
+| --- | ---: | ---: | ---: | --- |
+| bytes, ordinary events | 365.25 | 354.69 | 0.970 | 0.955-1.024 |
+| bytearray, ordinary events | 366.36 | 365.86 | 0.986 | 0.960-1.054 |
+| bytes-backed memoryview, ordinary events | 366.70 | 358.04 | 0.981 | 0.904-0.994 |
+| bytes, byte-view events | 535.55 | 532.71 | 1.001 | 0.938-1.021 |
+| Python exporter, byte-view events | 544.51 | 551.24 | 1.003 | 0.961-1.054 |
+
+Ratios near one indicate similar timings, not proof of zero overhead. Variation
+on this shared host does not support a general speedup claim. The bytes fast
+case was not changed by the ownership fix.
+
+| Input/mode | Baseline allocations/stream | Fixed allocations/stream | Baseline peak tracked bytes | Fixed peak tracked bytes |
+| --- | ---: | ---: | ---: | ---: |
+| bytes, ordinary events | 2921.46 | 2921.46 | 11164 | 11164 |
+| bytearray, ordinary events | 2921.07 | 2936.07 | 8644 | 9084 |
+| bytes-backed memoryview, ordinary events | 2921.07 | 2921.07 | 8644 | 8644 |
+| bytes, byte-view events | 5144.07 | 5144.07 | 2902027 | 2902027 |
+| Python exporter, byte-view events | 5339.07 | 5339.07 | 2902515 | 2904596 |
+
+These counts use native and Python allocator tracing and exclude free/unmap
+records. Bytearray input adds exactly one snapshot allocation per chunk. The
+Python exporter needs a snapshot but avoids reacquiring another export, leaving
+the measured allocation count unchanged. Peak tracked memory is not RSS.
+No claim about orjson performance follows from this safety-fix comparison.
+
+## Final validation
+
+
+`cargo +nightly miri nextest run --workspace --profile default-miri --exclude
+jsonmodem-fuzz --exclude jsonmodem-py` with an explicitly forwarded 32-case setting
+passed 188 tests, with four ignored debug helpers, in 242.313 seconds. Snapshot
+tests compiled out under Miri and excluded crates are additional omissions.
+
+`bash .agent/check-miri.sh targeted` passed all six configurations: Stacked
+Borrows and Tree Borrows, each with execution seeds 0, 1, and 2. Every configuration
+ran six unit tests and four integration tests, including 32 generated cases.
+Unit tests took about 8.5 seconds; integration tests took about 98.5 seconds.
+These results validate the final Rust test behavior; subsequent source edits
+were limited to Python buffer handling, comments, and equivalent formatting.
+
+The ordinary Rust check script, release-mode safety tests, Python build/tests,
+and Python Clippy check passed. The default check script still does not run Miri
+unless requested; the actual Miri runs above provide that evidence separately.
+
+Native checks passed the required deliberate heap-buffer-overflow detection and
+then verified the installed extension's sanitizer symbol. Python 3.9.25 passed
+47 tests, skipping five Python-defined-exporter cases that require 3.12. Its GC
+regression exercised callbacks inside feed. Python 3.13.14 passed 52 tests before
+the final attribute-name allocation change; the final 3.13 rerun is pending.
+
+An independent source review found the two Python defects, then reviewed the
+fixes and found both closed. It found no additional defect in the launcher,
+instrumentation verification, or Rust tests. The source-review conclusion is
+separate from actual test results and does not remove the documented limitations.

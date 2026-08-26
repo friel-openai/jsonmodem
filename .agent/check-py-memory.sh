@@ -50,4 +50,5 @@ if [[ "$EXTENSION" != "$VENV/"* ]]; then
 fi
 echo "Instrumented extension: $EXTENSION"
 nm -D "$EXTENSION" | grep __asan_init
+export JSONMODEM_MEMORY_RUNNER="$BUILD/python-memory"
 "$BUILD/python-memory" "$VENV/bin/python" -m pytest -q crates/jsonmodem-py/tests
