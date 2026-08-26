@@ -2,6 +2,9 @@
 resolver = "3"
 members = ["crates/*", "fuzz"]
 
+[workspace.dependencies]
+simdutf8 = { git = "https://github.com/rusticstuff/simdutf8", rev = "1890235e87c59a44d45efa6a44fcf9b7166183d4" }
+
 [profile.release]
 debug = "line-tables-only"
 lto = "thin"

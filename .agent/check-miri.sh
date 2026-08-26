@@ -31,3 +31,15 @@ for model in stacked tree; do
         cargo "+$TOOLCHAIN" miri test -p jsonmodem --test memory_safety -- --nocapture
     done
 done
+
+if [[ "$(uname -m)" == x86_64 ]]; then
+    for features in \
+        "+sse4.2,-avx2,-avx512f,-avx512bw,-avx512vbmi,-avx512vbmi2" \
+        "+sse4.2,+avx2,-avx512f,-avx512bw,-avx512vbmi,-avx512vbmi2" \
+        "+sse4.2,+avx2,+avx512f,+avx512bw,+avx512vbmi,+avx512vbmi2"; do
+        echo "Miri model=tree execution_seed=1 target_features=$features"
+        MIRIFLAGS="-Zmiri-tree-borrows -Zmiri-seed=1" \
+            RUSTFLAGS="-C target-feature=$features" \
+            cargo "+$TOOLCHAIN" miri test -p jsonmodem-py-validation -- --nocapture
+    done
+fi
