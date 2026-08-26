@@ -1,10 +1,20 @@
 """Binding regressions run without relying on the complete-document frontend."""
 
+import os
 import subprocess
 import sys
 
 import pytest
 import jsonmodem
+
+
+def run_python(code):
+    runner = os.environ.get("JSONMODEM_MEMORY_RUNNER")
+    command = [runner] if runner else []
+    return subprocess.run(
+        [*command, sys.executable, "-c", code],
+        capture_output=True, text=True, timeout=10,
+    )
 
 
 @pytest.mark.parametrize("document,expected", [("0", 0), ("-0", 0), ("1e2", 100.0), ("1.25e2", 125.0), ("123456789", 123456789)])
@@ -17,9 +27,11 @@ def test_finish_finalizes_number(document, expected):
 @pytest.mark.parametrize("name", ["JsonModem", "JsonModemValues"])
 def test_depth_rejected_before_eager_allocation(name):
     code = f'''
-import resource
+import os, resource
 import jsonmodem
-resource.setrlimit(resource.RLIMIT_AS, (256 * 1024**2, 256 * 1024**2))
+# ASan reserves a large virtual address range; ordinary tests enforce the limit.
+if not os.environ.get("JSONMODEM_MEMORY_RUNNER"):
+    resource.setrlimit(resource.RLIMIT_AS, (256 * 1024**2, 256 * 1024**2))
 p = jsonmodem.{name}()
 try:
     list(p.feed("[" * 20000 + "0" + "]" * 20000))
@@ -28,7 +40,7 @@ except jsonmodem.JsonModemSyntaxError as exc:
 else:
     raise AssertionError("deep input accepted")
 '''
-    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=10)
+    result = run_python(code)
     assert result.returncode == 0, result.stderr
 
 
@@ -59,8 +71,14 @@ def test_streaming_rejects_infinity():
 def test_arbitrary_buffer_exporters_are_not_borrowed(parser_type):
     import array
     data = array.array("B", b"[1]")
-    with pytest.raises(TypeError):
-        list(parser_type().feed(memoryview(data)))
+    parser = parser_type()
+    events = list(parser.feed(memoryview(data)))
+    data[:] = array.array("B", b"changed")
+    events.extend(parser.finish())
+    if parser_type is jsonmodem.JsonModem:
+        assert [payload for kind, _, payload in events if kind == "number"] == [1]
+    else:
+        assert parser.view().snapshot() == [1]
 
 
 def test_document_copies_external_memoryview():
@@ -74,16 +92,17 @@ def test_document_copies_external_memoryview():
 @pytest.mark.parametrize("name", ["JsonModem", "JsonModemValues"])
 def test_long_keys_are_shared_between_events(name):
     code = f'''
-import resource
+import os, resource
 import jsonmodem
-resource.setrlimit(resource.RLIMIT_AS, (128 * 1024**2, 128 * 1024**2))
+if not os.environ.get("JSONMODEM_MEMORY_RUNNER"):
+    resource.setrlimit(resource.RLIMIT_AS, (128 * 1024**2, 128 * 1024**2))
 doc = '{{"' + 'x' * 20000 + '":[' + ','.join(['0'] * 20000) + ']}}'
 parser = jsonmodem.{name}()
 events = list(parser.feed(doc))
 list(parser.finish())
 assert len(events) >= 20000
 '''
-    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=10)
+    result = run_python(code)
     assert result.returncode == 0, result.stderr
 
 
@@ -105,7 +124,7 @@ thread.start()
 thread.join()
 assert len(results) == 1
 '''
-    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=10)
+    result = run_python(code)
     assert result.returncode == 0, result.stderr
 
 

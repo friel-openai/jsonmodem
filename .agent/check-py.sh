@@ -37,7 +37,7 @@ PYDOC_DIR="$DOC_ROOT/pydoc"
 PDOC_DIR="$DOC_ROOT/pdoc"
 mkdir -p "$PYDOC_DIR" "$PDOC_DIR"
 
-run_step "pydoc html" bash -lc "cd \"$PYDOC_DIR\" && python -m pydoc -w jsonmodem >/dev/null"
+run_step "pydoc html" bash -c "cd \"$PYDOC_DIR\" && python -m pydoc -w jsonmodem >/dev/null"
 run_step "pdoc deps" uv pip install --quiet pdoc
 run_step "pdoc html" pdoc -o "$PDOC_DIR" jsonmodem
 

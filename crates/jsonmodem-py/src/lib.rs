@@ -24,8 +24,8 @@ use pyo3::{
     ffi,
     prelude::*,
     types::{
-        PyAny, PyBool, PyByteArray, PyBytes, PyDict, PyList, PyMemoryView, PySlice, PyString,
-        PyStringMethods, PyTuple,
+        PyAny, PyBool, PyBytes, PyDict, PyList, PyMemoryView, PySlice, PyString, PyStringMethods,
+        PyTuple,
     },
 };
 
@@ -3726,7 +3726,17 @@ fn is_single_byte_view_input(data: &Bound<'_, PyAny>) -> bool {
 }
 
 fn supports_buffer_protocol(data: &Bound<'_, PyAny>) -> bool {
-    data.is_exact_instance_of::<PyByteArray>() || data.is_exact_instance_of::<PyMemoryView>()
+    const PYBUF_SIMPLE: c_int = 0;
+
+    let mut view = PyBufferView::new();
+    let status = unsafe { PyObject_GetBuffer(data.as_ptr(), &mut view, PYBUF_SIMPLE) };
+    if status != 0 {
+        unsafe { ffi::PyErr_Clear() };
+        return false;
+    }
+    let guard = PyBufferGuard { view };
+    drop(guard);
+    true
 }
 
 struct PyBufferGuard {
@@ -3838,6 +3848,11 @@ fn with_readonly_byte_text<T>(
         return Err(PyTypeError::new_err(format!(
             "{caller} cannot return no-copy memoryview payloads from str input; pass bytes or a read-only memoryview"
         )));
+    }
+    if data.is_instance_of::<PyBytes>() && !data.is_exact_instance_of::<PyBytes>() {
+        return Err(PyTypeError::new_err(
+            "byte views require exact bytes or a read-only buffer",
+        ));
     }
     const PYBUF_SIMPLE: c_int = 0;
 
