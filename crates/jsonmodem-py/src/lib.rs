@@ -24,8 +24,8 @@ use pyo3::{
     ffi,
     prelude::*,
     types::{
-        PyAny, PyBool, PyBytes, PyDict, PyList, PyMemoryView, PySlice, PyString, PyStringMethods,
-        PyTuple,
+        PyAny, PyBool, PyBytes, PyDict, PyFloat, PyInt, PyList, PyMemoryView, PySlice, PyString,
+        PyStringMethods, PyTuple,
     },
 };
 
@@ -67,26 +67,15 @@ fn load_number(py: Python<'_>, lexeme: &str) -> PyResult<PyObject> {
         .iter()
         .any(|byte| matches!(byte, b'.' | b'e' | b'E'));
     if is_float {
-        let number = match lexeme.parse::<f64>() {
-            Ok(number) if number.is_finite() => number,
-            _ => {
-                return Err(PyTypeError::new_err(
-                    "number is infinity when parsed as double",
-                ));
-            }
-        };
-        return Ok(number.into_pyobject(py)?.into_any().unbind());
-    }
-    // Valid JSON integers longer than twenty bytes cannot fit either type.
-    if lexeme.len() <= 20 {
-        if let Ok(number) = lexeme.parse::<i64>() {
-            return Ok(number.into_pyobject(py)?.into_any().unbind());
+        let number = py.get_type::<PyFloat>().call1((lexeme,))?;
+        if !number.extract::<f64>()?.is_finite() {
+            return Err(PyTypeError::new_err(
+                "number is infinity when parsed as double",
+            ));
         }
-        if let Ok(number) = lexeme.parse::<u64>() {
-            return Ok(number.into_pyobject(py)?.into_any().unbind());
-        }
+        return Ok(number.unbind());
     }
-    let number = py.import("builtins")?.getattr("int")?.call1((lexeme,))?;
+    let number = py.get_type::<PyInt>().call1((lexeme,))?;
     Ok(number.into_any().unbind())
 }
 
