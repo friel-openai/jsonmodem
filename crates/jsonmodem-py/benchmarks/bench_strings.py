@@ -79,13 +79,14 @@ def compare(args):
     runs = {name: [] for name in packages}
     for pair in range(args.pairs):
         order = list(packages) if pair % 2 == 0 else list(reversed(packages))
+        environment = dict(os.environ, PYTHONHASHSEED=str(1729 + pair))
         for name in order:
             command = [sys.executable, __file__, "--package", packages[name],
                        "--seconds", str(args.seconds), "--operations", *args.operations,
                        "--inputs", *args.inputs]
             if args.cases:
                 command.extend(["--cases", *args.cases])
-            runs[name].append(json.loads(subprocess.check_output(command, text=True)))
+            runs[name].append(json.loads(subprocess.check_output(command, text=True, env=environment)))
         print(f"Completed comparison {pair + 1} of {args.pairs}", flush=True)
     summary = {}
     for case in runs["baseline"][0]["cases"]:
@@ -105,6 +106,7 @@ def compare(args):
         print(f"{case}: candidate / baseline = {statistics.median(paired):.3f}", flush=True)
     return {
         "cpu": min(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else None,
+        "python_hash_seeds": list(range(1729, 1729 + args.pairs)),
         "pairs": args.pairs, "seconds": args.seconds, "summary": summary, "runs": runs,
     }
 
