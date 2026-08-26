@@ -291,7 +291,8 @@ The reproducible comparison is now
     .venv/bin/python crates/jsonmodem-py/benchmarks/bench_buffer_inputs.py --baseline-python target/memory-benchmark-baseline/bin/python --candidate-python .venv/bin/python
 
 The baseline release wheel contains production code from `7883dad`; the candidate
-contains the buffer fixes and interned attribute name. Both used CPython 3.12.13,
+contains the buffer fixes and interned attribute name committed in
+`2e61d8fabc0930bed8323e10124b1e197a099280`. Both used CPython 3.12.13,
 Rust 1.94.1, and Memray 1.20.0 on the same shared Linux x86_64 host, without CPU
 pinning. Seven paired timing measurements alternate execution order. Each is
 the median of three measurements of 200 streams. Each stream contains 1,024
@@ -346,10 +347,16 @@ unless requested; the actual Miri runs above provide that evidence separately.
 Native checks passed the required deliberate heap-buffer-overflow detection and
 then verified the installed extension's sanitizer symbol. Python 3.9.25 passed
 47 tests, skipping five Python-defined-exporter cases that require 3.12. Its GC
-regression exercised callbacks inside feed. Python 3.13.14 passed 52 tests before
-the final attribute-name allocation change; the final 3.13 rerun is pending.
+regression exercised callbacks inside feed. The final Python 3.13.14 rerun passed
+52 tests. Both interpreter runs include the final attribute-name allocation
+change. Python 3.9 skips only the five tests requiring Python 3.12 buffer methods.
 
 An independent source review found the two Python defects, then reviewed the
 fixes and found both closed. It found no additional defect in the launcher,
 instrumentation verification, or Rust tests. The source-review conclusion is
 separate from actual test results and does not remove the documented limitations.
+
+Final source commit: `2e61d8fabc0930bed8323e10124b1e197a099280`. The original PR's
+commits are not ancestors of this branch. No new PR or hosted CI run was
+requested. The workflow definitions passed actionlint; their commands were
+executed locally as recorded above. Next action: publication only if requested.

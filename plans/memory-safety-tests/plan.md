@@ -1,7 +1,7 @@
 # Test unsafe streaming code and Python buffers
 
 
-Status: active on 2026-08-26. Implementation is underway. This plan follows
+Status: completed locally on 2026-08-26. Publication was not requested. This plan follows
 `PLANS.md` and uses `plan.md` and `record.md` as requested. Keep Progress,
 Surprises and Discoveries, Decision Log, and Outcomes and Retrospective current.
 
@@ -9,9 +9,9 @@ Surprises and Discoveries, Decision Log, and Outcomes and Retrospective current.
 
 
 Make the memory-safety checks for jsonmodem's streaming parser and Python binding
-specific and reproducible. Today, a passing Miri job says little about the Python
-binding because that crate is excluded. Some Rust integration tests are also
-excluded, and the pointer traversal has no dedicated unit tests.
+specific and reproducible. Before this work, a passing Miri job said little about
+the Python binding because that crate was excluded. Some Rust integration tests
+were also excluded, and the pointer traversal had no dedicated unit tests.
 
 After this work, contributors will have tests tied to the assumptions behind
 each relevant `unsafe` block, a Miri command for the Rust tests, and a native
@@ -93,11 +93,13 @@ required checks green before it is marked ready. Do not merge either PR.
 - [x] (2026-08-26 05:26Z) Create an independent worktree and branch at upstream `47a5427`.
 - [x] (2026-08-26 05:26Z) Write this plan and the initial evidence record.
 - [x] (2026-08-26) Map each unsafe operation to its safety assumptions and named tests; document untested cases.
-- [x] (2026-08-26) Add six scanner/ValueZipper unit tests and four integration tests. No production defect reproduced so far.
-- [ ] Finish all six targeted Miri configurations and the full suite (completed: default model seeds 0 and 1; remaining: other seeds/model and full-suite completion).
-- [x] (2026-08-26) Verify native instrumentation with a required failure check; pass 50 Python tests on CPython 3.12.
+- [x] (2026-08-26) Add six scanner/ValueZipper unit tests and four integration tests.
+- [x] (2026-08-26) Pass 188 full-suite Miri tests and all six targeted configurations, each with 32 generated cases.
+- [x] (2026-08-26) Reproduce and fix exporter reacquisition and Python 3.9 GC mutation of borrowed input.
+- [x] (2026-08-26) Verify native instrumentation with a required failure check; pass 47 Python 3.9 tests and 52 Python 3.13 tests.
 - [x] (2026-08-26) Add CI commands, local scripts, prerequisites, and coverage documentation.
-- [ ] Run final checks, review the independent diff, and summarize results.
+- [x] (2026-08-26) Measure paired streaming timings and Memray allocations; remove avoidable attribute-name allocations.
+- [x] (2026-08-26) Pass final local checks and independent source review; commit fixes at `2e61d8f` without PR #1 ancestry.
 
 ## Surprises and Discoveries
 
@@ -111,6 +113,12 @@ The repository's `.agent/check.sh` compiles a Clippy configuration with
 `cfg(miri)`, but skips actual Miri execution by default. The optional Miri command
 also differs from the workflow's crate exclusions. Neither compilation nor a
 skipped command is execution evidence.
+
+The new Python tests and review found two real defects. Byte-view mode acquired
+different exports for parsing and payload creation. On Python 3.9, synchronous GC
+callbacks could mutate ordinary bytearray input during parsing. Both now have
+before-and-after regression evidence in `record.md`. They also show why passing
+Miri or AddressSanitizer alone would not establish input ownership correctness.
 
 ## Decision Log
 
@@ -127,14 +135,37 @@ calls would not establish coverage.
 2026-08-26, Codex: Prepare the plan and worktree now. Implementation and
 publication remain unchecked; no source edits or new PR are part of this setup.
 
+2026-08-26, Codex: Implement the plan after the user's instruction to proceed.
+Keep the failing exporter regression in `7883dad` and the ownership fixes in
+`2e61d8f` so their before-and-after behavior can be reproduced independently.
+
+2026-08-26, Codex: Preserve borrowing of immutable bytes-backed storage. Snapshot
+mutable or unverifiable storage before Python callbacks, including unknown
+read-only exporters. This closes demonstrated defects without rejecting
+previously accepted valid exporters. Add Python 3.9 to native CI because the GC
+regression does not execute callbacks inside feed on newer interpreters.
+
 ## Outcomes and Retrospective
 
 
-The independent worktree now contains deterministic Rust tests, Python buffer
-and lifetime tests, Miri and AddressSanitizer scripts, and CI jobs. Native
-instrumentation has been verified by a deliberate failure, and 50 Python tests
-pass on CPython 3.12. Final Miri validation and review are still running. The
-existing PR and its uncommitted audit work were left untouched.
+The independent branch contains deterministic Rust tests, Python buffer and
+lifetime tests, repeatable Miri and AddressSanitizer scripts, and CI definitions.
+The full Miri suite passed 188 tests. Six targeted configurations passed under
+two reference models and three execution seeds. AddressSanitizer detected the
+deliberate bad test library, then passed 47 tests on Python 3.9 (five unsupported
+Python-exporter cases skipped) and 52 tests on Python 3.13.
+
+Two Python input ownership bugs were reproduced and fixed. No new production
+unsafe block was added. Scanner validation assertions run only in test or Miri
+builds. Python mutable-input snapshots add one allocation per chunk; the measured
+ordinary immutable-input allocation counts are unchanged. Shared-host timings
+did not show a consistent slowdown. Detailed results and limitations are in
+`record.md` and `docs/memory-safety-testing.md`.
+
+The existing PR and its checkout were not modified. This branch is based on
+upstream `47a5427` and can be reviewed independently. No new PR was opened or
+pushed. CI definitions passed actionlint and their test commands passed locally;
+hosted CI has not run for this branch.
 
 ## Context and Orientation
 
@@ -288,16 +319,18 @@ After adding the tests, the fastest checks are:
     MIRIFLAGS="-Zmiri-tree-borrows -Zmiri-seed=0" cargo +nightly miri test -p jsonmodem --test memory_safety
 
 Repeat targeted Miri commands for both models and all three selected seeds. The
-default model uses `-Zmiri-seed=0` without `-Zmiri-tree-borrows`. For any configurable
-test count, use `-Zmiri-env-set=NAME=VALUE` with the actual name added by the tests.
-Write the final full commands in the record; this placeholder is not evidence.
+default model uses `-Zmiri-seed=0` without `-Zmiri-tree-borrows`. Set the generated
+case count with `-Zmiri-env-set=JSONMODEM_SAFETY_CASES=32`.
+`bash .agent/check-miri.sh` runs the full suite and all targeted configurations.
 
 After adding and verifying the native script, run:
 
-    .agent/check-py-memory.sh
+    bash .agent/check-py-memory.sh
 
-No sanitizer build recipe is claimed to work yet. Milestone 4 must establish and
-record the exact build command, runtime loading, interpreter, and failure check.
+The native script now builds a Rust launcher and extension with the same
+AddressSanitizer runtime. It checks a deliberate failure, verifies the installed
+extension, and runs Python tests. Set `JSONMODEM_MEMORY_PYTHON=3.9` or `3.13` to
+reproduce the two tested interpreter versions. See the record for tool versions.
 
 ## Validation and Acceptance
 
@@ -348,8 +381,13 @@ orjson frontend from PR #1.
 ## Next Action
 
 
-Finish the remaining Miri runs, check the Python sanitizer script on CPython
-3.13 to match CI, resolve concrete review findings, and record final validation.
+No implementation work remains. If publication is requested, push this branch
+to the user's fork and open a separate draft PR based on upstream main. Verify
+the hosted checks before marking that PR ready. Do not merge it or modify PR #1.
 
 Created 2026-08-26 to address missing memory-safety test coverage independently
 of the orjson frontend PR.
+
+Completed 2026-08-26 after actual Miri/native execution, two reproduced Python
+defects and fixes, allocation measurements, and review. Publication remains a
+separate user decision.
