@@ -1,6 +1,7 @@
 """Dataclass output and ownership during field access and default callbacks."""
 
 import dataclasses
+import enum
 import gc
 import json
 import random
@@ -34,6 +35,84 @@ class SlotsRecord:
     _private: int
     temporary: dataclasses.InitVar[int] = 0
     shared: ClassVar[str] = "class value"
+
+
+@pytest.mark.parametrize("kind", ["prepared", "array_int64", "array_float32", "scalar_int64", "scalar_float32"])
+@pytest.mark.parametrize("context", ["root", "default", "enum", "nested"])
+@pytest.mark.parametrize("option", [16, 17, 16 | 1024, 17 | 1024])
+def test_root_encoded_bytes_retain_their_owner(kind, context, option, monkeypatch):
+    captured = []
+    if kind == "prepared":
+        from jsonmodem import _compat
+
+        value = object()
+        expected = {"ready": [1, 2, 3]}
+        encoded = json.dumps(expected, separators=(",", ":")).encode()
+
+        def special(item, option, default_provided, depth):
+            if item is value:
+                captured.append((encoded, depth))
+                return True, encoded
+            return None
+
+        helpers = _compat._ENCODER_HELPERS
+        monkeypatch.setattr(_compat, "_ENCODER_HELPERS", helpers[:3] + (special,) + helpers[4:])
+    else:
+        np = pytest.importorskip("numpy")
+        from jsonmodem import _jsonmodem as native
+
+        values = {
+            "array_int64": lambda: np.array([[1, 2], [3, 4]], dtype=np.int64),
+            "array_float32": lambda: np.array([[0.5, 1.25], [-1.5, 2.5]], dtype=np.float32),
+            "scalar_int64": lambda: np.int64(12345),
+            "scalar_float32": lambda: np.float32(1.25),
+        }
+        value = values[kind]()
+        expected = value.tolist()
+        numpy_dumps = native._numpy_dumps
+
+        def capture(*args):
+            encoded = numpy_dumps(*args)
+            captured.append((encoded, args[-1]))
+            return encoded
+
+        monkeypatch.setattr(native, "_numpy_dumps", capture)
+
+    kwargs = {}
+    calls = []
+    if context == "default":
+        obj = object()
+
+        def default(item):
+            calls.append(item)
+            return value
+
+        kwargs["default"] = default
+    elif context == "enum":
+        class Wrapper(enum.Enum):
+            VALUE = value
+
+        obj = Wrapper.VALUE
+    elif context == "nested":
+        obj = {"payload": [value]}
+        expected = {"payload": [expected]}
+    else:
+        obj = value
+
+    result = jsonmodem.dumps(obj, option=option, **kwargs)
+    assert len(captured) == 1
+    encoded, depth = captured.pop()
+    assert depth == (2 if context == "nested" else 0)
+    if context != "nested" and not option & jsonmodem.OPT_APPEND_NEWLINE:
+        assert result is encoded
+    else:
+        assert result is not encoded
+    if context != "nested":
+        assert result == encoded + (b"\n" if option & jsonmodem.OPT_APPEND_NEWLINE else b"")
+    assert calls == ([obj] if context == "default" else [])
+    del encoded
+    gc.collect()
+    assert json.loads(result) == expected
 
 
 @pytest.mark.parametrize("option", [0, 1, 32, 33, 64, 256, 1024, 1057, 2048])

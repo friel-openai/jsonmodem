@@ -114,7 +114,9 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
     }
 
     fn finish(mut self, py: Python<'py>, obj: Bound<'py, PyAny>) -> PyResult<Py<PyBytes>> {
-        self.value(obj)?;
+        if let Some(bytes) = self.value(obj)? {
+            return Ok(bytes);
+        }
         if self.encoder.option & APPEND_NEWLINE != 0 {
             self.encoder.push(b'\n')?;
         }
@@ -261,7 +263,7 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
         }
     }
 
-    fn value(&mut self, value: Bound<'py, PyAny>) -> PyResult<()> {
+    fn value(&mut self, value: Bound<'py, PyAny>) -> PyResult<Option<Py<PyBytes>>> {
         let py = value.py();
         let option = self.encoder.option;
         let mut value = value;
@@ -333,8 +335,11 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                     }
                     let (encoded, replacement): (bool, Bound<'_, PyAny>) = prepared.extract()?;
                     if encoded {
-                        self.encoder
-                            .extend(replacement.downcast::<PyBytes>()?.as_bytes())?;
+                        let bytes = replacement.downcast_into::<PyBytes>()?;
+                        if depth == 0 && option & APPEND_NEWLINE == 0 {
+                            return Ok(Some(bytes.unbind()));
+                        }
+                        self.encoder.extend(bytes.as_bytes())?;
                     } else {
                         value = replacement;
                         continue;
@@ -364,7 +369,7 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
             loop {
                 let depth = stack.len();
                 let Some(frame) = stack.last_mut() else {
-                    return Ok(());
+                    return Ok(None);
                 };
                 let item = match &mut frame.items {
                     Items::Object(items) => items.next().map(|(key, item)| (Some(key), item)),
