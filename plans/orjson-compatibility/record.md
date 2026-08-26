@@ -142,8 +142,8 @@ and files remain in the separate reference checkout.
 The memory tests initially failed because psutil could not find the sandbox's
 PID; they passed outside the sandbox. NumPy emits two deprecation warnings for
 the upstream generic-NaT tests. Core checks and binding checks pass locally;
-pdoc retains three pre-existing hash-stub warnings. Final publication and CI
-are still pending.
+pdoc retains three pre-existing hash-stub warnings. Publication and implementation
+CI completed successfully; see Publication below.
 
 The final ordinary benchmark found a small-dumps regression to 2.17x after native
 field snapshots. Before accepting it, avoid the PyO3 Fragment type lookup for
@@ -190,23 +190,28 @@ in throughput. The float formatter change improves both compatibility and time.
 
 Same timing procedure; NumPy arrays contain 100,000 elements shaped 25,000x4.
 All output bytes match the reference. Raw data:
-/tmp/jsonmodem-compat-objects-{baseline,v2,v3,final}.json.
+/tmp/jsonmodem-compat-objects-{baseline,v2,v3,final,inline}.json. The table uses
+the inline-stack build, including release of unused output before callbacks.
 
 | Workload | jsonmodem ns | orjson ns | Ratio |
 | --- | ---: | ---: | ---: |
-| sorted medium | 217,846 | 112,172 | 1.94x |
-| 1,000 dataclasses | 1,780,793 | 83,133 | 21.50x |
-| 1,000 integer keys | 39,870 | 35,647 | 1.12x |
-| NumPy int64 | 1,777,522 | 1,346,006 | 1.31x |
-| NumPy float32 | 3,787,397 | 3,266,435 | 1.16x |
-| NumPy float64 | 4,251,014 | 3,866,571 | 1.10x |
-| 1,000 Fragments | 14,999 | 10,470 | 1.43x |
+| sorted medium | 257,487 | 109,199 | 2.36x |
+| 1,000 dataclasses | 1,702,193 | 80,428 | 21.20x |
+| 1,000 integer keys | 42,005 | 35,367 | 1.19x |
+| NumPy int64 | 1,686,517 | 1,340,332 | 1.26x |
+| NumPy float32 | 3,838,705 | 3,249,504 | 1.18x |
+| NumPy float64 | 4,258,296 | 3,823,572 | 1.11x |
+| 1,000 Fragments | 14,593 | 10,456 | 1.40x |
 
 Primitive key formatting improved from 25.52x to 1.12x without duplicate
 tracking. The frozen Fragment accessor improved its workload from 2.08x to
 1.43x. Dataclass field snapshots roughly halved time versus the first direct
 serializer (43.40x), but Python object handling remains expensive. No claim is
 made that all supported types meet 2x.
+
+The inline-stack build improves the original small workload but sorted medium
+regresses from the previous run's 1.94x to 2.36x. Keep the allocation reduction
+and the original small/medium target; report sorted output as remaining work.
 
 Final ownership review added a GC traversal hook for Fragment's retained Python
 object. This lets Python collect cycles through an invalid Fragment payload;
@@ -237,3 +242,22 @@ call and brings small dumps to 1.80x; all 223 binding tests, including the 64 Ki
 stack tests, pass. The late-default peak drops from 76,243,699 to 42,672,883 bytes
 (44.0%) with exactly the same 254,786 events and 1,116,881,443 allocated bytes
 over three calls. Artifacts: /tmp/jsonmodem-compat-late-{before,after}.json.
+
+A separate 15-round confirmation on published b145ac3 returns small loads/dumps
+1.24x/1.77x and medium loads/dumps 1.76x/1.88x. Raw samples:
+/tmp/jsonmodem-compat-b145ac3-confirmation.json. This confirms margin below 2x
+on the original workloads rather than selecting the earlier favorable run.
+
+## Publication
+
+Implementation: cfc5da5; inline stacks and unused-output release: b145ac3. Both
+are pushed to friel-openai/jsonmodem PR #1, which remains ready for review.
+The PR body describes current timings and remaining limits. On 2026-08-26,
+GitHub's check-runs API reports all 21 checks successful on
+[b145ac3](https://github.com/friel-openai/jsonmodem/commit/b145ac342810707dd6827707ae93089a74143c38).
+This includes Python 3.9/3.13, Miri, fuzzing, flamegraph, and all six benchmark
+jobs. Final local .agent/check.sh and .agent/check-py.sh also pass on b145ac3.
+
+The completion commit changes only this evidence and plan.md. Its checks are
+verified separately before completing the goal; no further source changes or
+optional tests are needed unless final validation finds a defect.

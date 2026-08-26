@@ -1,6 +1,6 @@
 # Match orjson behavior and remove unnecessary allocations
 
-Status: active. This plan follows PLANS.md and the plans-md skill. It continues
+Status: completed (2026-08-26). This plan follows PLANS.md and the plans-md skill. It continues
 the completed performance work in ../orjson-performance/plan.md. That work met
 the original small/medium timing targets but did not establish drop-in behavior.
 
@@ -27,7 +27,7 @@ project information or private datasets belong in any public artifact.
 - [x] Match Fragment, float output, dictionary-key, and object serialization.
 - [x] Match supported NumPy dtypes, shape/layout rules, and float precision.
 - [x] Confirm shallow-stack optimization: small dumps 1.80x, one fewer allocation; release unused output before Python callbacks.
-- [ ] Update documentation, publish to the existing PR, and verify CI.
+- [x] (2026-08-26) Update documentation, publish to PR #1, and verify all 21 implementation checks on b145ac3.
 
 ## Surprises & Discoveries
 
@@ -69,7 +69,16 @@ The local suite passes 223 tests. The public release suite passes 1,626 tests,
 including Faker and process-memory tests, with six skips and four package
 identity assertions deselected. NumPy and ordinary small/medium workloads meet
 2x in the recorded runs. Dataclasses and several other workloads remain slower.
-Allocation profiling and timing confirmation are complete. Publication and CI remain.
+Allocation profiling, timing confirmation, and implementation publication are
+complete. All 21 CI checks pass on b145ac3, including Python 3.9/3.13, Miri,
+fuzzing, flamegraph, and all six benchmark jobs. PR #1 remains ready for review.
+
+The 15-round confirmation measures small loads/dumps at 1.24x/1.77x and medium
+loads/dumps at 1.76x/1.88x. NumPy measures 1.11x-1.26x. The late-callback peak
+falls 44%, and shallow native calls allocate once less. This is not universal
+2x performance: dataclasses remain 21.20x, sorted dictionaries 2.36x, and integer
+arrays 2.76x. Buffer-owner restrictions, callback snapshots, and checked handling
+of reference overflow/fault cases remain documented compatibility restrictions.
 
 ## Context and Orientation
 
@@ -137,5 +146,6 @@ do not interpret unchecked third-party buffer metadata as trusted Rust slices.
 Interpreter-specific wheels are packaging, not an API incompatibility; test the
 supported interpreter range and document the build choice precisely.
 
-Updated 2026-08-25: public release validation, native key/field serialization,
-allocation results, and remaining timing/CI work now reflect the implementation.
+Updated 2026-08-26: implementation CI passed all 21 checks. The completed plan
+and record preserve measured limitations; the goal's last check is CI on the
+documentation-only completion commit.
