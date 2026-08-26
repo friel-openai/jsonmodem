@@ -77,7 +77,7 @@ struct ObjectEncoder<'helpers, 'py> {
     type_dict: Borrowed<'helpers, 'py, PyAny>,
     classes: SmallVec<[ClassAttributes<'py>; 4]>,
     // Completed root output stays owned until finish returns it.
-    root_bytes: Option<Py<PyBytes>>,
+    root_bytes: Option<Bound<'py, PyBytes>>,
 }
 
 /// A live class dictionary view reflects changes made during callbacks.
@@ -119,7 +119,7 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
     fn finish(mut self, py: Python<'py>, obj: Bound<'py, PyAny>) -> PyResult<Py<PyBytes>> {
         self.value(obj)?;
         if let Some(bytes) = self.root_bytes.take() {
-            return Ok(bytes);
+            return Ok(bytes.unbind());
         }
         if self.encoder.option & APPEND_NEWLINE != 0 {
             self.encoder.push(b'\n')?;
@@ -341,7 +341,7 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                     if encoded {
                         let bytes = replacement.downcast_into::<PyBytes>()?;
                         if depth == 0 && option & APPEND_NEWLINE == 0 {
-                            self.root_bytes = Some(bytes.unbind());
+                            self.root_bytes = Some(bytes);
                             return Ok(());
                         }
                         self.encoder.extend(bytes.as_bytes())?;
