@@ -527,6 +527,7 @@ dependencies = [
  "half",
  "itoa",
  "jsonmodem",
+ "lexical-parse-float",
  "pyo3",
  "smallvec",
  "zmij",

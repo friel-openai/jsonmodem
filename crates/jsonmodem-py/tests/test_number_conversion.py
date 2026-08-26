@@ -1,4 +1,4 @@
-"""Integer boundaries exercise native conversion without optional dependencies."""
+"""Exact integer and floating-point conversion checks."""
 
 import json
 import math
@@ -146,3 +146,78 @@ def test_float_input_bits_match_orjson():
     actual = jsonmodem.loads(document)
     expected = orjson.loads(document)
     assert [struct.pack("<d", value) for value in actual] == [struct.pack("<d", value) for value in expected]
+
+
+@pytest.mark.parametrize("text", [
+    "1.7976931348623157e308", "1.7976931348623158e308", "-1.7976931348623157e308",
+    "2.2250738585072014e-308", "2.2250738585072011e-308", "5e-324", "-5e-324",
+    "2.4703282292062327e-324", "2.4703282292062328e-324", "-1e-999", "1e-999",
+    "9007199254740993.0", "18446744073709551615.0", "18446744073709551616e0",
+    "1.00000000000000011102230246251565404236316680908203125",
+    "1.00000000000000011102230246251565404236316680908203126",
+    "1.00000000000000033306690738754696212708950042724609375",
+    "-1.00000000000000011102230246251565404236316680908203125",
+])
+def test_float_rounding_boundaries(text):
+    expected = struct.pack("<d", float(text))
+    for document in (text, text + " \r\n\t", "[" + text + "]", '{"value":' + text + "}"):
+        actual = jsonmodem.loads(document)
+        if isinstance(actual, list):
+            actual = actual[0]
+        elif isinstance(actual, dict):
+            actual = actual["value"]
+        assert type(actual) is float
+        assert struct.pack("<d", actual) == expected
+
+
+@pytest.mark.parametrize("text", [
+    "1.7976931348623159e308", "-1.7976931348623159e308", "1e400", "-1e400",
+    "1e9999999999999999999999999999999", "-1e9999999999999999999999999999999",
+])
+def test_float_overflow_is_not_materialized(text):
+    for document in (text, "[" + text + "]", '{"value":' + text + "}"):
+        with pytest.raises(jsonmodem.JSONDecodeError, match="infinity"):
+            jsonmodem.loads(document)
+
+
+@pytest.mark.parametrize("zero_count", [64, 512, 1200])
+def test_float_long_mantissas_and_exponents(zero_count):
+    zeros = "0" * zero_count
+    midpoint = "1.00000000000000011102230246251565404236316680908203125"
+    values = [
+        f"0.{zeros}1e{zero_count}", f"1{zeros}e-{zero_count}",
+        f"-0.{zeros}1", f"1e{zeros}1", f"1e-{zeros}1",
+        midpoint + zeros, midpoint + zeros + "1", "-" + midpoint + zeros + "1",
+    ]
+    actual = jsonmodem.loads("[" + ",".join(values) + "]")
+    expected = [float(text) for text in values]
+    assert [struct.pack("<d", value) for value in actual] == [struct.pack("<d", value) for value in expected]
+
+
+def test_random_decimal_float_rounding():
+    rng = random.Random(69251)
+    texts = []
+    for _ in range(10000):
+        digits = str(rng.randrange(1, 10**rng.randrange(1, 100)))
+        fraction = rng.randrange(len(digits) + 1)
+        if fraction:
+            digits = (digits[:-fraction] or "0") + "." + digits[-fraction:]
+        sign = "-" if rng.getrandbits(1) else ""
+        text = f"{sign}{digits}e{rng.randrange(-400, 401)}"
+        if math.isfinite(float(text)):
+            texts.append(text)
+        else:
+            with pytest.raises(jsonmodem.JSONDecodeError, match="infinity"):
+                jsonmodem.loads(text)
+    actual = jsonmodem.loads("[" + ",".join(texts) + "]")
+    expected = [float(text) for text in texts]
+    assert [struct.pack("<d", value) for value in actual] == [struct.pack("<d", value) for value in expected]
+
+
+@pytest.mark.parametrize("suffix", ["-0", "+0", "_0", "true", "null", "[", "{", '"', "\u00e9"])
+def test_float_token_requires_a_delimiter(suffix):
+    for text in ("1.25e2", "-0.5e-1"):
+        with pytest.raises(jsonmodem.JSONDecodeError):
+            jsonmodem.loads(text + suffix)
+        with pytest.raises(jsonmodem.JSONDecodeError):
+            jsonmodem.loads("[" + text + suffix + "]")

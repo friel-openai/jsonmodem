@@ -6,6 +6,7 @@ mod objects;
 use std::{borrow::Cow, collections::HashMap, ops::Range};
 
 use jsonmodem::document::{DocumentError, DocumentReader, IntegerToken, plain_string_prefix};
+use lexical_parse_float::FromLexical;
 pub use objects::_dumps_objects;
 use pyo3::{
     PyTraverseError, PyVisit,
@@ -28,6 +29,13 @@ const STRICT_INTEGER: i32 = 64;
 const APPEND_NEWLINE: i32 = 1024;
 const INITIAL_OUTPUT_CAPACITY: usize = 256;
 const MAX_RETAINED_STRING_CAPACITY: usize = 64 * 1024;
+
+// Keep the float parser out of the container loop's instruction footprint.
+#[inline(never)]
+fn parse_double(text: &str) -> Result<f64, lexical_parse_float::Error> {
+    // DocumentReader already checked JSON syntax; only decimal conversion remains.
+    f64::from_lexical(text.as_bytes())
+}
 
 /// Explicit raw output, retaining its owner without parsing or placeholder
 /// substitution.
@@ -200,9 +208,7 @@ impl<'py, 'src> Decoder<'py, 'src> {
                             value.into_pyobject(py)?.into_any().unbind()
                         }
                         None => {
-                            let value: f64 = number
-                                .text
-                                .parse()
+                            let value = parse_double(number.text)
                                 .map_err(|_| self.fail("invalid number"))?;
                             if !value.is_finite() {
                                 return Err(self.fail("number is infinity when parsed as double"));
