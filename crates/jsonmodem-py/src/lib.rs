@@ -62,22 +62,31 @@ fn json_decode_error(py: Python<'_>, message: &str, doc: &str, pos: usize) -> Py
 }
 
 fn load_number(py: Python<'_>, lexeme: &str) -> PyResult<PyObject> {
-    let builtins = py.import("builtins")?;
     let is_float = lexeme
         .as_bytes()
         .iter()
         .any(|byte| matches!(byte, b'.' | b'e' | b'E'));
-    let constructor = if is_float {
-        builtins.getattr("float")?
-    } else {
-        builtins.getattr("int")?
-    };
-    if is_float && !lexeme.parse::<f64>().is_ok_and(f64::is_finite) {
-        return Err(PyTypeError::new_err(
-            "number is infinity when parsed as double",
-        ));
+    if is_float {
+        let number = match lexeme.parse::<f64>() {
+            Ok(number) if number.is_finite() => number,
+            _ => {
+                return Err(PyTypeError::new_err(
+                    "number is infinity when parsed as double",
+                ));
+            }
+        };
+        return Ok(number.into_pyobject(py)?.into_any().unbind());
     }
-    let number = constructor.call1((lexeme,))?;
+    // Valid JSON integers longer than twenty bytes cannot fit either type.
+    if lexeme.len() <= 20 {
+        if let Ok(number) = lexeme.parse::<i64>() {
+            return Ok(number.into_pyobject(py)?.into_any().unbind());
+        }
+        if let Ok(number) = lexeme.parse::<u64>() {
+            return Ok(number.into_pyobject(py)?.into_any().unbind());
+        }
+    }
+    let number = py.import("builtins")?.getattr("int")?.call1((lexeme,))?;
     Ok(number.into_any().unbind())
 }
 
