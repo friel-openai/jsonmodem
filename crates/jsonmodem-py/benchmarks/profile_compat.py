@@ -32,13 +32,15 @@ class Record:
 
 WORKLOADS = (
     "loads_medium", "loads_integers", "loads_floats", "loads_strings", "loads_escaped",
-    "loads_small_view", "loads_escaped_first", "dumps_medium", "dumps_integers",
+    "loads_small_view", "loads_escaped_first", "loads_bmp", "dumps_medium", "dumps_integers",
     "dumps_escaped", "dumps_long_string", "sorted_medium", "dataclasses_1000",
     "numpy_float32", "late_default",
 )
 
 
 def workload(module, name):
+    if name == "loads_bmp":
+        return module.loads, orjson.dumps("\u2603" * 43690), {}
     if name == "loads_escaped_first":
         value = ["x" * (1 << 20) + "\n", *range(250000)]
         return module.loads, orjson.dumps(value), {}
@@ -70,6 +72,8 @@ def main():
     parser.add_argument("--output", help="Required for cprofile and memray")
     parser.add_argument("--calls", type=int, default=1000)
     parser.add_argument("--seconds", type=float, default=10)
+    parser.add_argument("--text-input", action="store_true",
+                        help="Use warmed Python str input for a byte-based loads workload")
     args = parser.parse_args()
     if args.calls < 1 or args.seconds <= 0:
         parser.error("calls and seconds must be positive")
@@ -80,6 +84,11 @@ def main():
     module = importlib.import_module(args.module)
     function, value, kwargs = workload(module, args.workload)
     reference, reference_value, reference_kwargs = workload(orjson, args.workload)
+    if args.text_input:
+        if not args.workload.startswith("loads_") or not isinstance(value, bytes):
+            parser.error("--text-input requires a byte-based loads workload")
+        value = value.decode("utf-8")
+        reference_value = reference_value.decode("utf-8")
     assert function(value, **kwargs) == reference(reference_value, **reference_kwargs)
     for _ in range(10):
         function(value, **kwargs)
@@ -114,7 +123,8 @@ def main():
             peak = sum(record.size for record in reader.get_high_watermark_allocation_records())
             result = {"module": args.module, "version": module.__version__,
                       "module_file": module.__file__, "gc_disabled": True,
-                      "workload": args.workload, "calls": args.calls,
+                      "workload": args.workload, "input_type": type(value).__name__,
+                      "calls": args.calls,
                       "allocation_events": events, "allocated_bytes": allocated,
                       "peak_live_bytes": peak}
             Path(args.output + ".json").write_text(json.dumps(result, indent=2) + "\n")
