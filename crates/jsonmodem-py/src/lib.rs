@@ -24,7 +24,7 @@ use pyo3::{
     ffi,
     prelude::*,
     types::{
-        PyAny, PyBool, PyBytes, PyDict, PyFloat, PyInt, PyList, PyMemoryView, PySlice, PyString,
+        PyAny, PyBool, PyBytes, PyDict, PyInt, PyList, PyMemoryView, PySlice, PyString,
         PyStringMethods, PyTuple,
     },
 };
@@ -67,13 +67,37 @@ fn load_number(py: Python<'_>, lexeme: &str) -> PyResult<PyObject> {
         .iter()
         .any(|byte| matches!(byte, b'.' | b'e' | b'E'));
     if is_float {
-        let number = py.get_type::<PyFloat>().call1((lexeme,))?;
-        if !number.extract::<f64>()?.is_finite() {
-            return Err(PyTypeError::new_err(
-                "number is infinity when parsed as double",
-            ));
+        let number = match lexeme.parse::<f64>() {
+            Ok(number) if number.is_finite() => number,
+            _ => {
+                return Err(PyTypeError::new_err(
+                    "number is infinity when parsed as double",
+                ));
+            }
+        };
+        // SAFETY: Python is attached. The constructor returns a new reference
+        // or NULL, which the fallible wrapper checks before taking ownership.
+        return unsafe {
+            Bound::from_owned_ptr_or_err(py, ffi::PyFloat_FromDouble(number)).map(Bound::unbind)
+        };
+    }
+    // Valid JSON integers longer than twenty bytes cannot fit either type.
+    if lexeme.len() <= 20 {
+        if let Ok(number) = lexeme.parse::<i64>() {
+            // SAFETY: Python is attached. The constructor returns a new
+            // reference or NULL, which is checked before taking ownership.
+            return unsafe {
+                Bound::from_owned_ptr_or_err(py, ffi::PyLong_FromLongLong(number)).map(Bound::unbind)
+            };
         }
-        return Ok(number.unbind());
+        if let Ok(number) = lexeme.parse::<u64>() {
+            // SAFETY: Python is attached. The constructor returns a new
+            // reference or NULL, which is checked before taking ownership.
+            return unsafe {
+                Bound::from_owned_ptr_or_err(py, ffi::PyLong_FromUnsignedLongLong(number))
+                    .map(Bound::unbind)
+            };
+        }
     }
     let number = py.get_type::<PyInt>().call1((lexeme,))?;
     Ok(number.into_any().unbind())
