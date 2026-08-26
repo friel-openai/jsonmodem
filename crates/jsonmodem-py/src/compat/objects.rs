@@ -1,6 +1,7 @@
 //! Callback-aware serialization retains every item before invoking Python.
 
 use pyo3::{
+    Borrowed,
     exceptions::PyTypeError,
     intern,
     prelude::*,
@@ -8,10 +9,13 @@ use pyo3::{
 };
 use smallvec::SmallVec;
 
-use super::{APPEND_NEWLINE, Encoder, INITIAL_OUTPUT_CAPACITY, MAX_ENCODE_DEPTH, SORT_KEYS};
+use super::{
+    APPEND_NEWLINE, Encoder, INITIAL_OUTPUT_CAPACITY, MAX_ENCODE_DEPTH, SORT_KEYS, allocation_error,
+};
 
 const PASSTHROUGH_SUBCLASS: i32 = 256;
 const PASSTHROUGH_DATACLASS: i32 = 2048;
+const SERIALIZE_NUMPY: i32 = 16;
 
 /// Container snapshots keep their source alive for identity-based cycle checks.
 struct Container<'py> {
@@ -32,21 +36,45 @@ enum Items<'py> {
 /// Small objects retain their field owners without a heap allocation.
 type ObjectItems<'py> = SmallVec<[(Bound<'py, PyAny>, Bound<'py, PyAny>); 8]>;
 
+#[inline]
+fn push_field<'py>(
+    items: &mut ObjectItems<'py>,
+    key: Bound<'py, PyAny>,
+    value: Bound<'py, PyAny>,
+) -> PyResult<()> {
+    items.try_reserve(1).map_err(|_| allocation_error())?;
+    items.push((key, value));
+    Ok(())
+}
+
+fn array_items<'py>(values: impl Iterator<Item = Bound<'py, PyAny>>) -> PyResult<Items<'py>> {
+    let mut items = Vec::new();
+    items
+        .try_reserve(values.size_hint().0)
+        .map_err(|_| allocation_error())?;
+    for value in values {
+        items.try_reserve(1).map_err(|_| allocation_error())?;
+        items.push(value);
+    }
+    Ok(Items::Array(items.into_iter()))
+}
+
 /// Uncommon Python operations share the native output buffer and depth counter.
-struct ObjectEncoder<'py> {
-    encoder: Encoder,
+struct ObjectEncoder<'helpers, 'py> {
+    encoder: Encoder<true>,
     default: Bound<'py, PyAny>,
     default_provided: bool,
-    enum_type: Bound<'py, PyAny>,
-    dataclass_fields: Bound<'py, PyAny>,
-    key_text: Bound<'py, PyAny>,
-    special: Bound<'py, PyAny>,
-    datetime_types: [Bound<'py, PyAny>; 3],
-    uuid_type: Bound<'py, PyAny>,
-    str_base: Bound<'py, PyAny>,
-    int_base: Bound<'py, PyAny>,
-    get_attribute: Bound<'py, PyAny>,
-    type_dict: Bound<'py, PyAny>,
+    // The caller retains the immutable helper tuple until encoding finishes.
+    enum_type: Borrowed<'helpers, 'py, PyAny>,
+    dataclass_fields: Borrowed<'helpers, 'py, PyAny>,
+    key_text: Borrowed<'helpers, 'py, PyAny>,
+    special: Borrowed<'helpers, 'py, PyAny>,
+    datetime_types: [Borrowed<'helpers, 'py, PyAny>; 3],
+    uuid_type: Borrowed<'helpers, 'py, PyAny>,
+    str_base: Borrowed<'helpers, 'py, PyAny>,
+    int_base: Borrowed<'helpers, 'py, PyAny>,
+    get_attribute: Borrowed<'helpers, 'py, PyAny>,
+    type_dict: Borrowed<'helpers, 'py, PyAny>,
     classes: SmallVec<[ClassAttributes<'py>; 4]>,
 }
 
@@ -56,31 +84,31 @@ struct ClassAttributes<'py> {
     attributes: Bound<'py, PyAny>,
 }
 
-impl<'py> ObjectEncoder<'py> {
+impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
     fn new(
-        encoder: Encoder,
+        encoder: Encoder<true>,
         default: Bound<'py, PyAny>,
         default_provided: bool,
-        helpers: &Bound<'py, PyTuple>,
+        helpers: &'helpers Bound<'py, PyTuple>,
     ) -> PyResult<Self> {
         Ok(Self {
             encoder,
             default,
             default_provided,
-            enum_type: helpers.get_item(0)?,
-            dataclass_fields: helpers.get_item(1)?,
-            key_text: helpers.get_item(2)?,
-            special: helpers.get_item(3)?,
+            enum_type: helpers.get_borrowed_item(0)?,
+            dataclass_fields: helpers.get_borrowed_item(1)?,
+            key_text: helpers.get_borrowed_item(2)?,
+            special: helpers.get_borrowed_item(3)?,
             datetime_types: [
-                helpers.get_item(4)?,
-                helpers.get_item(5)?,
-                helpers.get_item(6)?,
+                helpers.get_borrowed_item(4)?,
+                helpers.get_borrowed_item(5)?,
+                helpers.get_borrowed_item(6)?,
             ],
-            uuid_type: helpers.get_item(7)?,
-            str_base: helpers.get_item(8)?,
-            int_base: helpers.get_item(9)?,
-            get_attribute: helpers.get_item(10)?,
-            type_dict: helpers.get_item(11)?,
+            uuid_type: helpers.get_borrowed_item(7)?,
+            str_base: helpers.get_borrowed_item(8)?,
+            int_base: helpers.get_borrowed_item(9)?,
+            get_attribute: helpers.get_borrowed_item(10)?,
+            type_dict: helpers.get_borrowed_item(11)?,
             classes: SmallVec::new(),
         })
     }
@@ -88,9 +116,9 @@ impl<'py> ObjectEncoder<'py> {
     fn finish(mut self, py: Python<'py>, obj: Bound<'py, PyAny>) -> PyResult<Py<PyBytes>> {
         self.value(obj)?;
         if self.encoder.option & APPEND_NEWLINE != 0 {
-            self.encoder.output.push(b'\n');
+            self.encoder.push(b'\n')?;
         }
-        Ok(PyBytes::new(py, &self.encoder.output).unbind())
+        self.encoder.bytes(py)
     }
 
     fn class_attributes(&mut self, class: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyAny>> {
@@ -100,6 +128,9 @@ impl<'py> ObjectEncoder<'py> {
         // The built-in descriptor bypasses custom metaclass attribute access.
         let attributes = self.type_dict.call1((class,))?;
         if self.classes.len() < 16 {
+            self.classes
+                .try_reserve(1)
+                .map_err(|_| allocation_error())?;
             self.classes.push(ClassAttributes {
                 owner: class.clone(),
                 attributes: attributes.clone(),
@@ -109,7 +140,13 @@ impl<'py> ObjectEncoder<'py> {
     }
 
     fn dict_items(&self, dict: &Bound<'py, PyDict>) -> PyResult<Items<'py>> {
-        let mut items: ObjectItems<'py> = dict.iter().collect();
+        let mut items = ObjectItems::new();
+        items
+            .try_reserve(dict.len())
+            .map_err(|_| allocation_error())?;
+        for (key, value) in dict.iter() {
+            push_field(&mut items, key, value)?;
+        }
         for (key, _) in &mut items {
             if !key.is_exact_instance_of::<PyString>() {
                 *key = self.key_text.call1((&*key, self.encoder.option))?;
@@ -121,13 +158,40 @@ impl<'py> ObjectEncoder<'py> {
                     .to_str()
                     .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
             }
-            items.sort_by(|(left, _), (right, _)| {
-                left.downcast::<PyString>()
+            // Original positions preserve equal converted keys without the
+            // infallible scratch allocation used by slice::sort_by.
+            let mut order: SmallVec<[usize; 16]> = SmallVec::new();
+            order
+                .try_reserve(items.len())
+                .map_err(|_| allocation_error())?;
+            order.extend(0..items.len());
+            order.sort_unstable_by(|&left, &right| {
+                items[left]
+                    .0
+                    .downcast::<PyString>()
                     .unwrap()
                     .to_str()
                     .unwrap()
-                    .cmp(right.downcast::<PyString>().unwrap().to_str().unwrap())
+                    .cmp(
+                        items[right]
+                            .0
+                            .downcast::<PyString>()
+                            .unwrap()
+                            .to_str()
+                            .unwrap(),
+                    )
+                    .then_with(|| left.cmp(&right))
             });
+            for start in 0..order.len() {
+                let mut position = start;
+                while order[position] != start {
+                    let next = order[position];
+                    items.swap(position, next);
+                    order[position] = position;
+                    position = next;
+                }
+                order[position] = position;
+            }
         }
         Ok(Items::Object(items.into_iter()))
     }
@@ -150,7 +214,7 @@ impl<'py> ObjectEncoder<'py> {
                         .to_str()
                         .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
                     if !text.starts_with('_') {
-                        items.push((key, item));
+                        push_field(&mut items, key, item)?;
                     }
                 }
                 items
@@ -158,7 +222,7 @@ impl<'py> ObjectEncoder<'py> {
                 let fields = self.dataclass_fields.call1((value,))?;
                 let fields = fields.downcast::<PyTuple>()?;
                 let mut items = ObjectItems::new();
-                for field in fields.iter() {
+                for field in fields.iter_borrowed() {
                     let name = field.getattr(intern!(py, "name"))?;
                     let text = name
                         .downcast::<PyString>()?
@@ -166,7 +230,7 @@ impl<'py> ObjectEncoder<'py> {
                         .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
                     if !text.starts_with('_') {
                         let item = value.getattr(name.downcast::<PyString>()?)?;
-                        items.push((name, item));
+                        push_field(&mut items, name, item)?;
                     }
                 }
                 items
@@ -209,8 +273,8 @@ impl<'py> ObjectEncoder<'py> {
             } else if value
                 .get_type()
                 .mro()
-                .iter()
-                .any(|base| base.is(&self.enum_type))
+                .iter_borrowed()
+                .any(|base| base.is(self.enum_type))
             {
                 value = value.getattr(intern!(py, "value"))?;
                 continue;
@@ -221,21 +285,15 @@ impl<'py> ObjectEncoder<'py> {
                 value = self.int_base.call1((&value,))?;
                 continue;
             } else if value.is_exact_instance_of::<PyTuple>() {
-                container = Some(Items::Array(
-                    value
-                        .downcast::<PyTuple>()?
-                        .iter()
-                        .collect::<Vec<_>>()
-                        .into_iter(),
-                ));
+                container = Some(array_items(value.downcast::<PyTuple>()?.iter())?);
             } else if (option & PASSTHROUGH_SUBCLASS == 0 || value.is_exact_instance_of::<PyList>())
                 && value.is_instance_of::<PyList>()
             {
                 let list = value.downcast::<PyList>()?;
                 if list.is_empty() {
-                    self.encoder.output.extend_from_slice(b"[]");
+                    self.encoder.extend(b"[]")?;
                 } else {
-                    container = Some(Items::Array(list.iter().collect::<Vec<_>>().into_iter()));
+                    container = Some(array_items(list.iter())?);
                 }
             } else if (option & PASSTHROUGH_SUBCLASS == 0 || value.is_exact_instance_of::<PyDict>())
                 && value.is_instance_of::<PyDict>()
@@ -244,7 +302,7 @@ impl<'py> ObjectEncoder<'py> {
             } else {
                 let value_type = value.get_type();
                 let datetime_or_uuid = self.datetime_types.iter().any(|kind| value_type.is(kind))
-                    || value_type.is(&self.uuid_type);
+                    || value_type.is(self.uuid_type);
                 let attributes = self.class_attributes(&value_type)?;
                 if !datetime_or_uuid
                     && attributes.contains(intern!(py, "__dataclass_fields__"))?
@@ -254,9 +312,12 @@ impl<'py> ObjectEncoder<'py> {
                     container = Some(self.dataclass_items(&value, &attributes)?);
                     limit += 1;
                 } else {
-                    let prepared =
+                    let prepared = if datetime_or_uuid || option & SERIALIZE_NUMPY != 0 {
                         self.special
-                            .call1((&value, option, self.default_provided, depth))?;
+                            .call1((&value, option, self.default_provided, depth))?
+                    } else {
+                        py.None().into_bound(py)
+                    };
                     if prepared.is_none() {
                         if default_depth == 255 {
                             return Err(PyTypeError::new_err(
@@ -270,8 +331,7 @@ impl<'py> ObjectEncoder<'py> {
                     let (encoded, replacement): (bool, Bound<'_, PyAny>) = prepared.extract()?;
                     if encoded {
                         self.encoder
-                            .output
-                            .extend_from_slice(replacement.downcast::<PyBytes>()?.as_bytes());
+                            .extend(replacement.downcast::<PyBytes>()?.as_bytes())?;
                     } else {
                         value = replacement;
                         continue;
@@ -287,9 +347,10 @@ impl<'py> ObjectEncoder<'py> {
                     Items::Object(_) => (b'{', b'}'),
                     Items::Array(_) => (b'[', b']'),
                 };
-                self.encoder.output.push(opening);
+                self.encoder.push(opening)?;
+                stack.try_reserve(1).map_err(|_| allocation_error())?;
                 stack.push(Container {
-                    owner: value.clone(),
+                    owner: value,
                     items,
                     count: 0,
                     closing,
@@ -309,15 +370,15 @@ impl<'py> ObjectEncoder<'py> {
                 if let Some((key, item)) = item {
                     default_depth = frame.default_depth;
                     if frame.count != 0 {
-                        self.encoder.output.push(b',');
+                        self.encoder.push(b',')?;
                     }
                     frame.count += 1;
-                    self.encoder.newline(depth);
+                    self.encoder.newline(depth)?;
                     if let Some(key) = key {
                         self.encoder.key(key.downcast::<PyString>()?)?;
-                        self.encoder.output.push(b':');
+                        self.encoder.push(b':')?;
                         if option & super::INDENT != 0 {
-                            self.encoder.output.push(b' ');
+                            self.encoder.push(b' ')?;
                         }
                     }
                     value = item;
@@ -325,9 +386,9 @@ impl<'py> ObjectEncoder<'py> {
                 }
                 let frame = stack.pop().expect("unfinished container");
                 if frame.count != 0 {
-                    self.encoder.newline(stack.len());
+                    self.encoder.newline(stack.len())?;
                 }
-                self.encoder.output.push(frame.closing);
+                self.encoder.push(frame.closing)?;
             }
         }
     }
@@ -348,7 +409,7 @@ pub(super) fn dumps(
     let default_provided = default.is_some();
     let default = default.unwrap_or_else(|| py.None().into_bound(py));
     Ok(ObjectEncoder::new(
-        encoder,
+        encoder.into_checked(),
         default,
         default_provided,
         helpers.downcast::<PyTuple>()?,
@@ -368,12 +429,13 @@ pub fn _dumps_objects(
     default_provided: bool,
     helpers: Bound<'_, PyTuple>,
 ) -> PyResult<Py<PyBytes>> {
-    let encoder = Encoder {
-        output: Vec::with_capacity(INITIAL_OUTPUT_CAPACITY),
+    let mut encoder = Encoder {
+        output: Vec::new(),
         option,
         base_depth: 0,
         dataclass_root: false,
         keys: Vec::new(),
     };
+    encoder.reserve(INITIAL_OUTPUT_CAPACITY)?;
     ObjectEncoder::new(encoder, default, default_provided, &helpers)?.finish(py, obj)
 }

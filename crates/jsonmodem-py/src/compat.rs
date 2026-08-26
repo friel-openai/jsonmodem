@@ -9,7 +9,7 @@ use jsonmodem::document::{DocumentError, DocumentReader, IntegerToken, plain_str
 pub use objects::_dumps_objects;
 use pyo3::{
     PyTraverseError, PyVisit,
-    exceptions::{PyTypeError, PyValueError},
+    exceptions::{PyMemoryError, PyTypeError, PyValueError},
     prelude::*,
     types::{
         PyBool, PyByteArray, PyBytes, PyDict, PyFloat, PyInt, PyList, PyMemoryView, PyString,
@@ -337,7 +337,9 @@ fn unsigned_integer(value: &Bound<'_, PyInt>) -> PyResult<u64> {
 }
 
 /// Single output buffer and bounded cache of encoded dictionary keys.
-struct Encoder {
+/// Callback serialization checks output growth; the callback-free encoder
+/// retains its existing write operations.
+struct Encoder<const CHECKED: bool = false> {
     output: Vec<u8>,
     option: i32,
     // The Python serializer may already have unfinished parent containers.
@@ -365,7 +367,85 @@ struct EncodeContainer<'py> {
     closing: u8,
 }
 
-impl Encoder {
+#[cold]
+fn allocation_error() -> PyErr {
+    PyMemoryError::new_err("JSON serialization allocation failed")
+}
+
+/// Output writes fail only on allocation; callers construct the Python
+/// exception.
+struct OutputAllocationError;
+
+impl From<OutputAllocationError> for PyErr {
+    fn from(_: OutputAllocationError) -> Self {
+        allocation_error()
+    }
+}
+
+impl<const CHECKED: bool> Encoder<CHECKED> {
+    fn into_checked(self) -> Encoder<true> {
+        Encoder {
+            output: self.output,
+            option: self.option,
+            base_depth: self.base_depth,
+            dataclass_root: self.dataclass_root,
+            keys: self.keys,
+        }
+    }
+
+    #[inline]
+    fn reserve(&mut self, additional: usize) -> Result<(), OutputAllocationError> {
+        if CHECKED {
+            if additional > self.output.capacity() - self.output.len() {
+                self.grow(additional)?;
+            }
+        } else {
+            self.output.reserve(additional);
+        }
+        Ok(())
+    }
+
+    #[cold]
+    fn grow(&mut self, additional: usize) -> Result<(), OutputAllocationError> {
+        self.output
+            .try_reserve(additional)
+            .map_err(|_| OutputAllocationError)
+    }
+
+    #[inline]
+    fn push(&mut self, byte: u8) -> Result<(), OutputAllocationError> {
+        if CHECKED {
+            self.reserve(1)?;
+        }
+        self.output.push(byte);
+        Ok(())
+    }
+
+    #[inline]
+    fn extend(&mut self, bytes: &[u8]) -> Result<(), OutputAllocationError> {
+        if CHECKED {
+            self.reserve(bytes.len())?;
+        }
+        self.output.extend_from_slice(bytes);
+        Ok(())
+    }
+
+    #[inline]
+    fn bytes(&self, py: Python<'_>) -> PyResult<Py<PyBytes>> {
+        let output = self.output.as_slice();
+        let len = pyo3::ffi::Py_ssize_t::try_from(output.len()).map_err(|_| allocation_error())?;
+        // SAFETY: output retains len initialized bytes for the synchronous copy.
+        // Python is attached, and the API returns a new reference or a null
+        // pointer with an exception. PyO3 takes ownership or returns that error.
+        let bytes = unsafe {
+            Bound::from_owned_ptr_or_err(
+                py,
+                pyo3::ffi::PyBytes_FromStringAndSize(output.as_ptr().cast(), len),
+            )
+        }?;
+        Ok(bytes.downcast_into::<PyBytes>()?.unbind())
+    }
+
     #[inline(always)]
     fn key_any(&mut self, key: &Bound<'_, PyAny>) -> PyResult<bool> {
         if let Ok(key) = key.downcast_exact::<PyString>() {
@@ -376,14 +456,14 @@ impl Encoder {
                 || key.is_exact_instance_of::<PyInt>()
                 || key.is_exact_instance_of::<PyFloat>())
         {
-            self.output.push(b'"');
+            self.push(b'"')?;
             let option = self.option;
             // OPT_STRICT_INTEGER applies to values, not converted keys.
             self.option &= !STRICT_INTEGER;
             let result = self.scalar(key);
             self.option = option;
             result?;
-            self.output.push(b'"');
+            self.push(b'"')?;
         } else {
             return Ok(false);
         }
@@ -398,7 +478,11 @@ impl Encoder {
                 .iter()
                 .find(|(owner, _)| owner.as_ptr() == key.as_ptr())
             {
-                self.output.extend_from_within(encoded.clone());
+                let encoded = encoded.clone();
+                if CHECKED {
+                    self.reserve(encoded.len())?;
+                }
+                self.output.extend_from_within(encoded);
                 return Ok(());
             }
         }
@@ -406,76 +490,83 @@ impl Encoder {
             .to_str()
             .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
         let start = self.output.len();
-        self.string(text);
+        self.string(text)?;
         if cache && self.keys.len() < 16 && text.len() <= 64 {
+            if CHECKED {
+                self.keys.try_reserve(1).map_err(|_| allocation_error())?;
+            }
             self.keys
                 .push((key.clone().unbind(), start..self.output.len()));
         }
         Ok(())
     }
 
-    fn string(&mut self, value: &str) {
+    fn string(&mut self, value: &str) -> Result<(), OutputAllocationError> {
         // Avoid growing again just for the closing quote of a long plain prefix.
         if value.len() >= INITIAL_OUTPUT_CAPACITY {
-            self.output.reserve(value.len() + 2);
+            self.reserve(value.len() + 2)?;
         }
-        self.output.push(b'"');
-        self.string_contents(value.as_bytes());
-        self.output.push(b'"');
+        self.push(b'"')?;
+        self.string_contents(value.as_bytes())?;
+        self.push(b'"')
     }
 
-    fn string_contents(&mut self, mut remaining: &[u8]) {
+    fn string_contents(&mut self, mut remaining: &[u8]) -> Result<(), OutputAllocationError> {
         while !remaining.is_empty() {
             let prefix = plain_string_prefix(remaining);
-            self.output.extend_from_slice(&remaining[..prefix]);
+            self.extend(&remaining[..prefix])?;
             remaining = &remaining[prefix..];
             if let Some((&byte, tail)) = remaining.split_first() {
                 match byte {
-                    b'"' => self.output.extend_from_slice(b"\\\""),
-                    b'\\' => self.output.extend_from_slice(b"\\\\"),
-                    b'\n' => self.output.extend_from_slice(b"\\n"),
-                    b'\r' => self.output.extend_from_slice(b"\\r"),
-                    b'\t' => self.output.extend_from_slice(b"\\t"),
-                    8 => self.output.extend_from_slice(b"\\b"),
-                    12 => self.output.extend_from_slice(b"\\f"),
+                    b'"' => self.extend(b"\\\"")?,
+                    b'\\' => self.extend(b"\\\\")?,
+                    b'\n' => self.extend(b"\\n")?,
+                    b'\r' => self.extend(b"\\r")?,
+                    b'\t' => self.extend(b"\\t")?,
+                    8 => self.extend(b"\\b")?,
+                    12 => self.extend(b"\\f")?,
                     _ => {
                         const HEX: &[u8] = b"0123456789abcdef";
-                        self.output.extend_from_slice(&[
+                        self.extend(&[
                             b'\\',
                             b'u',
                             b'0',
                             b'0',
                             HEX[usize::from(byte >> 4)],
                             HEX[usize::from(byte & 15)],
-                        ]);
+                        ])?;
                     }
                 }
                 remaining = tail;
             }
         }
+        Ok(())
     }
 
-    fn newline(&mut self, depth: usize) {
+    fn newline(&mut self, depth: usize) -> Result<(), OutputAllocationError> {
         if self.option & INDENT != 0 {
+            if CHECKED {
+                self.reserve(1 + (depth + self.base_depth) * 2)?;
+            }
             self.output.push(b'\n');
             self.output
                 .resize(self.output.len() + (depth + self.base_depth) * 2, b' ');
         }
+        Ok(())
     }
 
     #[inline(always)]
     fn scalar(&mut self, value: &Bound<'_, PyAny>) -> PyResult<bool> {
         if value.is_none() {
-            self.output.extend_from_slice(b"null");
+            self.extend(b"null")?;
         } else if let Ok(string) = value.downcast_exact::<PyString>() {
             self.string(
                 string
                     .to_str()
                     .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?,
-            );
+            )?;
         } else if let Ok(boolean) = value.downcast_exact::<PyBool>() {
-            self.output
-                .extend_from_slice(if boolean.is_true() { b"true" } else { b"false" });
+            self.extend(if boolean.is_true() { b"true" } else { b"false" })?;
         } else if let Ok(value) = value.downcast_exact::<PyInt>() {
             let mut buffer = itoa::Buffer::new();
             if let Some(integer) = signed_integer(value)? {
@@ -484,50 +575,47 @@ impl Encoder {
                 {
                     return Err(PyTypeError::new_err("Integer exceeds 53-bit range"));
                 }
-                self.output
-                    .extend_from_slice(buffer.format(integer).as_bytes());
+                self.extend(buffer.format(integer).as_bytes())?;
             } else {
                 let integer = unsigned_integer(value)
                     .map_err(|_| PyTypeError::new_err("Integer exceeds 64-bit range"))?;
                 if self.option & STRICT_INTEGER != 0 && integer > 9_007_199_254_740_991 {
                     return Err(PyTypeError::new_err("Integer exceeds 53-bit range"));
                 }
-                self.output
-                    .extend_from_slice(buffer.format(integer).as_bytes());
+                self.extend(buffer.format(integer).as_bytes())?;
             }
         } else if let Ok(float) = value.downcast_exact::<PyFloat>() {
             let number = float.value();
             if number.is_finite() {
-                self.output
-                    .extend_from_slice(zmij::Buffer::new().format_finite(number).as_bytes());
+                self.extend(zmij::Buffer::new().format_finite(number).as_bytes())?;
             } else {
-                self.output.extend_from_slice(b"null");
+                self.extend(b"null")?;
             }
         } else if let Ok(list) = value.downcast_exact::<PyList>() {
             if !list.is_empty() {
                 return Ok(false);
             }
-            self.output.extend_from_slice(b"[]");
+            self.extend(b"[]")?;
         } else if let Ok(tuple) = value.downcast_exact::<PyTuple>() {
             if !tuple.is_empty() {
                 return Ok(false);
             }
-            self.output.extend_from_slice(b"[]");
+            self.extend(b"[]")?;
         } else if value.is_exact_instance_of::<PyDict>() {
             return Ok(false);
         } else if let Ok(fragment) = value.downcast_exact::<Fragment>() {
             let fragment = fragment.get();
             let contents = fragment.contents.bind(value.py());
             if let Ok(bytes) = contents.downcast_exact::<PyBytes>() {
-                self.output.extend_from_slice(bytes.as_bytes());
+                self.extend(bytes.as_bytes())?;
             } else if let Ok(text) = contents.downcast_exact::<PyString>() {
-                self.output.extend_from_slice(
+                self.extend(
                     text.to_str()
                         .map_err(|_| {
                             PyTypeError::new_err("str is not valid UTF-8: surrogates not allowed")
                         })?
                         .as_bytes(),
-                );
+                )?;
             } else {
                 return Err(PyTypeError::new_err(
                     "orjson.Fragment's content is not of type bytes or str",
@@ -591,7 +679,7 @@ impl Encoder {
             } else {
                 return Ok(false);
             };
-            self.output.push(opening);
+            self.push(opening)?;
             stack.push(EncodeContainer {
                 iter,
                 identity,
@@ -606,10 +694,10 @@ impl Encoder {
                 if let EncodeIterator::List(iter) = &mut frame.iter {
                     for item in iter.by_ref() {
                         if frame.count != 0 {
-                            self.output.push(b',');
+                            self.push(b',')?;
                         }
                         frame.count += 1;
-                        self.newline(depth);
+                        self.newline(depth)?;
                         if !self.scalar(&item)? {
                             current = item;
                             continue 'container;
@@ -617,9 +705,9 @@ impl Encoder {
                     }
                     let frame = stack.pop().expect("unfinished list");
                     if frame.count != 0 {
-                        self.newline(stack.len());
+                        self.newline(stack.len())?;
                     }
-                    self.output.push(frame.closing);
+                    self.push(frame.closing)?;
                     continue;
                 }
                 let item = match &mut frame.iter {
@@ -632,17 +720,17 @@ impl Encoder {
                 };
                 if let Some((key, item)) = item {
                     if frame.count != 0 {
-                        self.output.push(b',');
+                        self.push(b',')?;
                     }
                     frame.count += 1;
-                    self.newline(depth);
+                    self.newline(depth)?;
                     if let Some(key) = key {
                         if !self.key_any(&key)? {
                             return Ok(false);
                         }
-                        self.output.push(b':');
+                        self.push(b':')?;
                         if self.option & INDENT != 0 {
-                            self.output.push(b' ');
+                            self.push(b' ')?;
                         }
                     }
                     if !self.scalar(&item)? {
@@ -652,9 +740,9 @@ impl Encoder {
                 } else {
                     let frame = stack.pop().expect("unfinished container");
                     if frame.count != 0 {
-                        self.newline(stack.len());
+                        self.newline(stack.len())?;
                     }
-                    self.output.push(frame.closing);
+                    self.push(frame.closing)?;
                 }
             }
         }
@@ -686,7 +774,7 @@ fn dump_long_string(py: Python<'_>, text: &str, flags: i32) -> PyResult<PyObject
         .into_any()
         .unbind());
     }
-    let mut encoder = Encoder {
+    let mut encoder = Encoder::<false> {
         output: Vec::with_capacity(bytes.len() + 2),
         option: flags,
         base_depth: 0,
@@ -695,7 +783,7 @@ fn dump_long_string(py: Python<'_>, text: &str, flags: i32) -> PyResult<PyObject
     };
     encoder.output.push(b'"');
     encoder.output.extend_from_slice(&bytes[..prefix]);
-    encoder.string_contents(&bytes[prefix..]);
+    encoder.string_contents(&bytes[prefix..])?;
     encoder.output.push(b'"');
     if flags & APPEND_NEWLINE != 0 {
         encoder.output.push(b'\n');
@@ -734,7 +822,7 @@ pub fn dumps(
     } else {
         None
     };
-    let mut encoder = Encoder {
+    let mut encoder = Encoder::<false> {
         output: Vec::with_capacity(INITIAL_OUTPUT_CAPACITY),
         option: flags,
         base_depth: 0,
@@ -742,14 +830,14 @@ pub fn dumps(
         keys: Vec::new(),
     };
     let encoded = if let Some(text) = root_string {
-        encoder.string(text);
+        encoder.string(text)?;
         true
     } else {
         encoder.value(&obj)?
     };
     if encoded {
         if flags & APPEND_NEWLINE != 0 {
-            encoder.output.push(b'\n');
+            encoder.push(b'\n')?;
         }
         return Ok(PyBytes::new(py, &encoder.output).into_any().unbind());
     }
@@ -767,7 +855,7 @@ pub fn _dumps_fields(
     if depth > MAX_ENCODE_DEPTH {
         return Err(PyTypeError::new_err("Recursion limit reached"));
     }
-    let mut encoder = Encoder {
+    let mut encoder = Encoder::<false> {
         output: Vec::with_capacity(INITIAL_OUTPUT_CAPACITY),
         option,
         base_depth: depth,

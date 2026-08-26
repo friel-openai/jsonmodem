@@ -3,12 +3,15 @@
 import dataclasses
 import gc
 import json
+import random
+import sys
 from typing import ClassVar
 import weakref
 
 import pytest
 
 import jsonmodem
+from test_streaming_security import run_python
 
 @pytest.fixture
 def oracle():
@@ -367,13 +370,14 @@ def test_empty_list_subclass_depth_matches_orjson(oracle):
     assert jsonmodem.dumps(value) == oracle.dumps(value)
 
 
-def default_container_chain(module, limit, siblings=1, kind="dataclass"):
+def default_container_chain(module, limit, siblings=1, kind="dataclass", ancestor=0):
     """Alternate callbacks and containers without approaching the container limit."""
     calls = 0
 
     class Unsupported:
-        def __init__(self, step):
+        def __init__(self, step, parent=False):
             self.step = step
+            self.parent = parent
 
     @dataclasses.dataclass
     class Box:
@@ -383,6 +387,10 @@ def default_container_chain(module, limit, siblings=1, kind="dataclass"):
         nonlocal calls
         calls += 1
         step = value.step + 1
+        if value.parent:
+            if step == ancestor:
+                return [Unsupported(0) for _ in range(siblings)]
+            return Unsupported(step, parent=True)
         if step == limit:
             return 0
         next_value = Unsupported(step)
@@ -394,7 +402,7 @@ def default_container_chain(module, limit, siblings=1, kind="dataclass"):
             return {"value": next_value}
         return Box(next_value)
 
-    value = [Unsupported(0) for _ in range(siblings)]
+    value = Unsupported(0, parent=True) if ancestor else [Unsupported(0) for _ in range(siblings)]
     try:
         result = module.dumps(value, default=default)
     except TypeError as error:
@@ -419,11 +427,41 @@ def test_default_counter_is_restored_for_siblings(kind):
     assert calls == 510
 
 
+@pytest.mark.parametrize("ancestor,limit", [(100, 155), (100, 156), (254, 1), (255, 1)])
+def test_default_counter_restores_nonzero_parent_count(ancestor, limit):
+    result, calls = default_container_chain(jsonmodem, limit, siblings=2, ancestor=ancestor)
+    if ancestor + limit <= 255:
+        assert isinstance(result, bytes)
+        assert calls == ancestor + 2 * limit
+    else:
+        assert result == "default serializer exceeds recursion limit"
+        assert calls == 255
+
+
 @pytest.mark.parametrize("limit,siblings", [(255, 1), (256, 1), (255, 2)])
 def test_default_container_counter_matches_orjson(limit, siblings, oracle):
     assert default_container_chain(jsonmodem, limit, siblings) == default_container_chain(
         oracle, limit, siblings
     )
+
+
+@pytest.mark.parametrize("ancestor,limit", [(100, 155), (100, 156), (254, 1), (255, 1)])
+def test_nonzero_default_counter_matches_orjson(ancestor, limit, oracle):
+    assert default_container_chain(
+        jsonmodem, limit, siblings=2, ancestor=ancestor
+    ) == default_container_chain(oracle, limit, siblings=2, ancestor=ancestor)
+
+
+@pytest.mark.parametrize("count", [2, 8, 16, 31, 64, 255])
+def test_sorted_converted_key_duplicates_retain_input_order(count):
+    pairs = [(key, index * 2 + variant) for index in range(count)
+             for variant, key in enumerate((index, str(index)))]
+    random.Random(1729).shuffle(pairs)
+    value = dict(pairs)
+    expected_pairs = sorted(((str(key), item) for key, item in pairs), key=lambda pair: pair[0])
+    expected = "{" + ",".join(json.dumps(key) + ":" + str(item) for key, item in expected_pairs) + "}"
+    option = jsonmodem.OPT_SORT_KEYS | jsonmodem.OPT_NON_STR_KEYS
+    assert jsonmodem.dumps(value, option=option) == expected.encode()
 
 
 @pytest.mark.parametrize("integer", [2**53, -(2**53), 2**64, -(2**63) - 1])
@@ -454,3 +492,109 @@ def test_dataclass_explicit_invalid_default_has_cause(default):
     with pytest.raises(TypeError) as absent:
         jsonmodem.dumps(value)
     assert absent.value.__cause__ is None
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="requires Linux address-space accounting")
+@pytest.mark.parametrize("kind", ["array", "dataclass", "sorted_dict"])
+def test_snapshot_allocation_failure_does_not_abort(kind):
+    code = f"kind = {kind!r}\n" + r'''
+import dataclasses
+import os
+import resource
+import jsonmodem
+
+resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+count = 128 if os.environ.get("JSONMODEM_MEMORY_RUNNER") else 500000
+marker = object()
+option = 0
+if kind == "array":
+    value = [marker] * count
+elif kind == "dataclass":
+    @dataclasses.dataclass
+    class Record:
+        value: object
+    value = Record(marker)
+    value.__dict__.update((f"k{i}", marker) for i in range(count))
+else:
+    class Mapping(dict):
+        pass
+    value = Mapping((f"k{i}", marker) for i in reversed(range(count)))
+    option = jsonmodem.OPT_SORT_KEYS
+
+original = resource.getrlimit(resource.RLIMIT_AS)
+limited = False
+if not os.environ.get("JSONMODEM_MEMORY_RUNNER"):
+    with open("/proc/self/statm") as statm:
+        size = int(statm.read().split()[0]) * os.sysconf("SC_PAGE_SIZE")
+    resource.setrlimit(resource.RLIMIT_AS, (size + 256 * 1024, original[1]))
+    limited = True
+
+def restore():
+    global limited
+    if limited:
+        resource.setrlimit(resource.RLIMIT_AS, original)
+        limited = False
+
+def default(_):
+    # Restoring the limit before output isolates snapshot allocation failures.
+    restore()
+    return None
+
+try:
+    encoded = jsonmodem.dumps(value, default=default, option=option)
+except MemoryError:
+    outcome = "MemoryError"
+else:
+    assert encoded.count(b"null") == count + (kind == "dataclass")
+    outcome = "success"
+finally:
+    restore()
+print(outcome)
+'''
+    result = run_python(code)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() in ("MemoryError", "success")
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="requires Linux address-space accounting")
+@pytest.mark.parametrize("headroom", [2, 4, 8, 16])
+@pytest.mark.parametrize("kind", ["ascii", "escaped", "fragment"])
+def test_callback_output_allocation_failure_does_not_abort(headroom, kind):
+    code = f"headroom = {headroom!r}\nkind = {kind!r}\n" + r'''
+import gc
+import os
+import resource
+import jsonmodem
+
+resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+value = [object()] * 1000
+if kind == "escaped":
+    text = '"\\\n\x00' * 2500
+    expected_size = 30003001
+elif kind == "fragment":
+    text = jsonmodem.Fragment(b'"' + b"a" * 10000 + b'"')
+    expected_size = 10003001
+else:
+    text = "a" * 10000
+    expected_size = 10003001
+gc.collect()
+original = resource.getrlimit(resource.RLIMIT_AS)
+if not os.environ.get("JSONMODEM_MEMORY_RUNNER"):
+    with open("/proc/self/statm") as statm:
+        size = int(statm.read().split()[0]) * os.sysconf("SC_PAGE_SIZE")
+    resource.setrlimit(resource.RLIMIT_AS, (size + headroom * 1024**2, original[1]))
+try:
+    encoded = jsonmodem.dumps(value, default=lambda _: text)
+except MemoryError:
+    outcome = "MemoryError"
+else:
+    assert len(encoded) == expected_size
+    outcome = "success"
+finally:
+    resource.setrlimit(resource.RLIMIT_AS, original)
+assert jsonmodem.dumps({"ok": True}) == b'{"ok":true}'
+print(outcome)
+'''
+    result = run_python(code)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() in ("MemoryError", "success")

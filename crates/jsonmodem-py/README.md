@@ -189,8 +189,8 @@ These behaviors deliberately differ from orjson:
 - NumPy datetime unit multipliers and dates outside the supported range raise
   `TypeError`. Date calculations check for overflow. They do not reproduce
   crashes or arithmetic overflow found in orjson.
-- Before calling a user-provided function, the Python serializer makes a shallow
-  copy of the container's entries. The copy keeps references to the entries;
+- Before a `default` callback, the serializer keeps a shallow copy of each active
+  container's entries. The copy keeps references to the entries;
   it does not copy all nested objects. Changes to the original container during
   the callback do not change which entries the serializer visits.
 - Combining dataclasses with other containers cannot bypass the nesting limit
@@ -222,11 +222,13 @@ without a separate memory allocation. Deeper documents use additional heap
 storage, not recursive Rust calls. Cycle and depth checks run while writing.
 Rust handles sorted dictionaries, Fragments, and primitive non-string keys.
 
-Datetimes, UUIDs, dataclasses, subclasses, sorted converted keys, and callbacks
-can use a slower Python serializer. It writes output directly instead of first
-copying the entire object graph. It does not replace Fragment placeholders.
-It releases Rust container iterators before calling user code. Dataclasses with
-values that need no callback can use Rust to write the copied field entries.
+Dataclasses, subclasses, sorted converted keys, and callback results share one
+Rust output buffer instead of producing one byte string per dataclass. The
+serializer retains parent entries before calling field getters or callbacks.
+Python helpers still format datetimes and UUIDs and prepare NumPy arrays.
+Dataclass fields retain their order under `OPT_SORT_KEYS`; ordinary dictionaries
+inside them are sorted.
+
 Long strings reserve their UTF-8 length and both quotes before writing, avoiding
 a second buffer growth just for the closing quote when no escaping is needed.
 
@@ -250,9 +252,13 @@ CPython. The complete-document writer uses two explicit `unsafe` calls to public
 CPython integer-conversion functions: `PyLong_AsLongLongAndOverflow` and, on
 64-bit targets, `PyLong_AsSize_t`. Both receive retained, exact Python integers
 while Python is attached and check the error sentinel. They do not read Python
-object layouts or retain raw pointers. The complete-document reader has no
-explicit `unsafe` blocks. Other parts of the package and native dependencies
-also use unsafe code. Passing tests is not a proof of memory safety.
+object layouts or retain raw pointers. Callback serialization uses another
+explicit `unsafe` block to copy its owned output with CPython's public bytes
+constructor and check allocation failure. Streaming number conversion uses
+three public CPython constructors, also checking allocation failure. The
+complete-document reader has no explicit `unsafe` blocks. Other parts of the
+package and native dependencies also use unsafe code. Passing tests is not a
+proof of memory safety.
 
 The separate AddressSanitizer runner instruments the Python extension and
 launches subprocess tests with the same runtime. Virtual-address limits apply
