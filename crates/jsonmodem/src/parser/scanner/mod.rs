@@ -700,7 +700,8 @@ impl<'src> Scanner<'src> {
 
         let start = self.byte_idx;
         let bytes = self.batch.as_bytes();
-        if start >= bytes.len() {
+        // The lexer revisits the closing quote after consuming the string body.
+        if start >= bytes.len() || bytes[start] == b'"' {
             return 0;
         }
 
