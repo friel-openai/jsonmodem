@@ -57,8 +57,6 @@ use core::cmp;
 #[cfg(all(test, trace_scanner))]
 use std::eprintln;
 
-use memchr::memchr2;
-
 /// Where the next character comes from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Source {
@@ -707,12 +705,7 @@ impl<'src> Scanner<'src> {
         }
 
         let search = &bytes[start..];
-        let limit = memchr2(b'"', b'\\', search).unwrap_or(search.len());
-        let ascii_limit = search[..limit]
-            .iter()
-            .position(|&b| !(0x20..0x80).contains(&b))
-            .unwrap_or(limit);
-        let consumed = ascii_limit;
+        let consumed = crate::document::ascii_string_prefix(search);
         if consumed == 0 {
             return 0;
         }

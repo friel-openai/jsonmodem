@@ -129,6 +129,36 @@ to immutable bytes before parsing, so their payloads retain the copy. Known
 immutable bytes-backed payloads retain their own export after the temporary
 guard releases its export.
 
+The complete-document writer's integer helpers call the public
+`PyLong_AsLongLongAndOverflow` and `PyLong_AsSize_t` APIs. The second call is
+compiled only on 64-bit targets; other targets keep PyO3's `u64` conversion.
+Both helpers retain exact Python integer owners while Python is attached.
+They distinguish valid `-1` and maximum unsigned values from error sentinels.
+`test_number_conversion.py` checks signed and unsigned bounds, strict-integer
+options, subclass overrides, default callbacks, and successful calls after
+errors. AddressSanitizer runs these tests without requiring orjson. CPython's
+conversion code itself is not instrumented by this script.
+
+Streaming `load_number` uses `PyFloat_FromDouble`, `PyLong_FromLongLong`, and
+`PyLong_FromUnsignedLongLong` after checking the number's range. Each call runs
+while Python is attached and immediately passes the new reference to PyO3's
+`from_owned_ptr_or_err`. A null return becomes a Python exception. Integers
+outside these ranges still use Python's integer parser and its digit limit.
+`test_streaming_numbers.py` covers values, events, byte views, chunk splits,
+signed zero, and the digit limit. The tests do not inject a null return into
+each constructor; those branches also require source review.
+
+`compat/objects.rs` retains container entries before invoking field getters
+or callbacks. Its snapshots, frame storage, class cache, and output buffer use
+fallible growth. The final bytes copy calls `PyBytes_FromStringAndSize` with a
+borrow of the initialized Rust output. The borrow remains valid until the
+synchronous copy returns. PyO3 takes ownership of the new Python object or
+propagates the allocation error. No raw pointer escapes the call.
+`test_dataclass_native.py` checks callback mutation, field ordering, depth,
+cleanup, and allocation failures in subprocesses with address-space limits.
+The callback-free encoder retains its existing allocation policy; these tests
+do not establish catchable allocation failure for every operation in the package.
+
 ## Measuring buffer-copy cost
 
 `benchmarks/bench_buffer_inputs.py` compares two installed release builds using

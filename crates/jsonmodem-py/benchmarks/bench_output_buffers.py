@@ -21,6 +21,24 @@ class Record:
     name: str
 
 
+@dataclasses.dataclass
+class SlotsRecord:
+    """Equivalent declared fields stored in slots instead of an instance dictionary."""
+
+    __slots__ = ("id", "name")
+    id: int
+    name: str
+
+
+@dataclasses.dataclass
+class NestedRecord:
+    """A record with a child dataclass and an ordinary dictionary."""
+
+    id: int
+    child: Record
+    attributes: dict
+
+
 def worker(args):
     package = Path(args.package).resolve()
     sys.path.insert(0, str(package))
@@ -48,10 +66,26 @@ def worker(args):
         ("sorted_medium", benchmark.PAYLOADS["medium"], {"option": 32}),
         ("integer_keys", {i: str(i) for i in range(1000)}, {"option": 4}),
         ("dataclasses", [Record(i, f"item-{i}") for i in range(1000)], {}),
+        ("dataclass_single", Record(123, "record"), {}),
+        ("dataclass_slots_single", SlotsRecord(123, "record"), {}),
+        ("dataclass_slots", [SlotsRecord(i, f"item-{i}") for i in range(1000)], {}),
+        ("dataclass_nested", [NestedRecord(i, Record(i + 1, f"child-{i}"), {"z": i, "a": i + 1}) for i in range(1000)], {}),
+        ("dataclass_indent", [Record(i, f"item-{i}") for i in range(1000)], {"option": 1}),
+        ("dataclass_sorted", [NestedRecord(i, Record(i + 1, f"child-{i}"), {"z": i, "a": i + 1}) for i in range(1000)], {"option": 32}),
+        ("dataclass_default", [Record(i, object()) for i in range(1000)], {"default": lambda _: "converted"}),
         ("numpy_int64", np.arange(100000, dtype=np.int64).reshape(25000, 4), {"option": 16}),
         ("numpy_float32", np.arange(100000, dtype=np.float32).reshape(25000, 4), {"option": 16}),
         ("late_default", ["x" * 256] * 100 + [object()], {"default": lambda _: None}),
     ])
+    for count in (8, 16):
+        record_type = dataclasses.make_dataclass(
+            "Fields" + str(count), [("field_" + str(i), int) for i in range(count)]
+        )
+        cases.append((
+            "dataclass_fields" + str(count),
+            [record_type(*range(i, i + count)) for i in range(1000)],
+            {},
+        ))
     if args.cases:
         unknown = set(args.cases) - {name for name, _, _ in cases}
         if unknown:
@@ -69,17 +103,18 @@ def worker(args):
             "numpy": np.__version__, "cases": results}
 
 
-def compare(args):
+def compare(args, worker_script=__file__):
     packages = {"baseline": args.baseline_package, "candidate": args.candidate_package}
     runs = {name: [] for name in packages}
     for pair in range(args.pairs):
         order = list(packages) if pair % 2 == 0 else list(reversed(packages))
+        environment = dict(os.environ, PYTHONHASHSEED=str(1729 + pair))
         for name in order:
-            command = [sys.executable, __file__, "--package", packages[name],
+            command = [sys.executable, worker_script, "--package", packages[name],
                        "--seconds", str(args.seconds)]
             if args.cases:
                 command.extend(["--cases", *args.cases])
-            runs[name].append(json.loads(subprocess.check_output(command, text=True)))
+            runs[name].append(json.loads(subprocess.check_output(command, text=True, env=environment)))
         print(f"Completed comparison {pair + 1} of {args.pairs}", flush=True)
     summary = {}
     for case in runs["baseline"][0]["cases"]:
@@ -99,7 +134,9 @@ def compare(args):
         }
         print(f"{case}: candidate / baseline = {statistics.median(paired):.3f}", flush=True)
     return {"cpu": min(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else None,
-            "pairs": args.pairs, "seconds": args.seconds, "summary": summary, "runs": runs}
+            "pairs": args.pairs, "seconds": args.seconds,
+            "python_hash_seeds": list(range(1729, 1729 + args.pairs)),
+            "summary": summary, "runs": runs}
 
 
 def main():

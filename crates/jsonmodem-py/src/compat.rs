@@ -1,12 +1,15 @@
 //! Complete-document operations: no streaming events and no Python
 //! preprocessing.
 
+mod objects;
+
 use std::{borrow::Cow, collections::HashMap, ops::Range};
 
-use jsonmodem::document::{DocumentError, DocumentReader, plain_string_prefix};
+use jsonmodem::document::{DocumentError, DocumentReader, IntegerToken, plain_string_prefix};
+pub use objects::_dumps_objects;
 use pyo3::{
     PyTraverseError, PyVisit,
-    exceptions::{PyTypeError, PyValueError},
+    exceptions::{PyMemoryError, PyTypeError, PyValueError},
     prelude::*,
     types::{
         PyBool, PyByteArray, PyBytes, PyDict, PyFloat, PyInt, PyList, PyMemoryView, PyString,
@@ -24,6 +27,7 @@ const SORT_KEYS: i32 = 32;
 const STRICT_INTEGER: i32 = 64;
 const APPEND_NEWLINE: i32 = 1024;
 const INITIAL_OUTPUT_CAPACITY: usize = 256;
+const MAX_RETAINED_STRING_CAPACITY: usize = 64 * 1024;
 
 /// Explicit raw output, retaining its owner without parsing or placeholder
 /// substitution.
@@ -50,7 +54,9 @@ struct Decoder<'py, 'src> {
     py: Python<'py>,
     input: &'src str,
     reader: DocumentReader<'src>,
-    keys: HashMap<Cow<'src, str>, Py<PyString>>,
+    // Python strings and cached escaped keys own their text before this is reused.
+    string_buffer: String,
+    keys: Option<HashMap<Cow<'src, str>, Py<PyString>>>,
     cache_keys: bool,
 }
 
@@ -62,6 +68,8 @@ enum DecodeContainer<'py> {
 }
 
 impl<'py, 'src> Decoder<'py, 'src> {
+    #[cold]
+    #[inline(never)]
     fn error(&self, error: DocumentError) -> PyErr {
         let position = self
             .input
@@ -79,22 +87,42 @@ impl<'py, 'src> Decoder<'py, 'src> {
         self.reader.expect(byte).map_err(|error| self.error(error))
     }
 
+    #[inline]
+    fn release_large_string_buffer(&mut self) {
+        // A large first token must not stay allocated while later containers grow.
+        if self.string_buffer.capacity() > MAX_RETAINED_STRING_CAPACITY {
+            self.string_buffer = String::new();
+        }
+    }
+
     fn key(&mut self) -> PyResult<Py<PyString>> {
-        let text = self.reader.string().map_err(|error| self.error(error))?;
-        let key = if self.cache_keys {
-            match self.keys.get(text.as_ref()) {
+        let borrowed = self
+            .reader
+            .string_with_buffer(&mut self.string_buffer)
+            .map_err(|error| self.error(error))?;
+        let text = borrowed.unwrap_or(&self.string_buffer);
+        let key = if self.cache_keys && text.len() <= 64 {
+            let keys = self.keys.get_or_insert_with(HashMap::new);
+            match keys.get(text) {
                 Some(key) => key.clone_ref(self.py),
                 None => {
-                    let key = PyString::new(self.py, &text).unbind();
-                    if self.keys.len() < 512 && text.len() <= 64 {
-                        self.keys.insert(text, key.clone_ref(self.py));
+                    let key = PyString::new(self.py, text).unbind();
+                    if keys.len() < 512 {
+                        let text = match borrowed {
+                            Some(text) => Cow::Borrowed(text),
+                            None => Cow::Owned(text.to_owned()),
+                        };
+                        keys.insert(text, key.clone_ref(self.py));
                     }
                     key
                 }
             }
         } else {
-            PyString::new(self.py, &text).unbind()
+            PyString::new(self.py, text).unbind()
         };
+        if borrowed.is_none() {
+            self.release_large_string_buffer();
+        }
         self.expect(b':')?;
         Ok(key)
     }
@@ -132,8 +160,17 @@ impl<'py, 'src> Decoder<'py, 'src> {
                     dict.into_any().unbind()
                 }
                 Some(b'"') => {
-                    let text = self.reader.string().map_err(|error| self.error(error))?;
-                    PyString::new(py, &text).into_any().unbind()
+                    let borrowed = self
+                        .reader
+                        .string_with_buffer(&mut self.string_buffer)
+                        .map_err(|error| self.error(error))?;
+                    let value = PyString::new(py, borrowed.unwrap_or(&self.string_buffer))
+                        .into_any()
+                        .unbind();
+                    if borrowed.is_none() {
+                        self.release_large_string_buffer();
+                    }
+                    value
                 }
                 Some(b'n') => {
                     self.reader
@@ -155,28 +192,23 @@ impl<'py, 'src> Decoder<'py, 'src> {
                 }
                 Some(b'-' | b'0'..=b'9') => {
                     let number = self.reader.number().map_err(|error| self.error(error))?;
-                    if number.is_float {
-                        let value: f64 = number
-                            .text
-                            .parse()
-                            .map_err(|_| self.fail("invalid number"))?;
-                        if !value.is_finite() {
-                            return Err(self.fail("number is infinity when parsed as double"));
+                    match number.integer {
+                        Some(IntegerToken::Signed(value)) => {
+                            value.into_pyobject(py)?.into_any().unbind()
                         }
-                        value.into_pyobject(py)?.into_any().unbind()
-                    } else if let Ok(value) = number.text.parse::<i64>() {
-                        value.into_pyobject(py)?.into_any().unbind()
-                    } else if let Ok(value) = number.text.parse::<u64>() {
-                        value.into_pyobject(py)?.into_any().unbind()
-                    } else {
-                        let value = number
-                            .text
-                            .parse::<f64>()
-                            .map_err(|_| self.fail("invalid number"))?;
-                        if !value.is_finite() {
-                            return Err(self.fail("number is infinity when parsed as double"));
+                        Some(IntegerToken::Unsigned(value)) => {
+                            value.into_pyobject(py)?.into_any().unbind()
                         }
-                        value.into_pyobject(py)?.into_any().unbind()
+                        None => {
+                            let value: f64 = number
+                                .text
+                                .parse()
+                                .map_err(|_| self.fail("invalid number"))?;
+                            if !value.is_finite() {
+                                return Err(self.fail("number is infinity when parsed as double"));
+                            }
+                            value.into_pyobject(py)?.into_any().unbind()
+                        }
                     }
                 }
                 _ => return Err(self.fail("expected JSON value")),
@@ -230,7 +262,8 @@ fn decode(py: Python<'_>, input: &str) -> PyResult<PyObject> {
         py,
         input,
         reader: DocumentReader::new(input),
-        keys: HashMap::new(),
+        string_buffer: String::new(),
+        keys: None,
         cache_keys: input.len() >= 1024,
     };
     let value = decoder.value()?;
@@ -266,7 +299,7 @@ pub fn loads(py: Python<'_>, input: Bound<'_, PyAny>) -> PyResult<PyObject> {
             }
         };
         if !input
-            .getattr("c_contiguous")
+            .getattr(pyo3::intern!(py, "c_contiguous"))
             .map_err(view_error)?
             .extract::<bool>()?
         {
@@ -279,7 +312,9 @@ pub fn loads(py: Python<'_>, input: Bound<'_, PyAny>) -> PyResult<PyObject> {
         }
         // CPython copies the view before Rust reads it, including read-only
         // views of mutable storage. Native providers must keep that storage valid.
-        let bytes = input.call_method0("tobytes").map_err(view_error)?;
+        let bytes = input
+            .call_method0(pyo3::intern!(py, "tobytes"))
+            .map_err(view_error)?;
         return decode_bytes(py, bytes.downcast::<PyBytes>()?.as_bytes());
     }
     Err(super::json_decode_error(
@@ -296,8 +331,52 @@ fn decode_bytes(py: Python<'_>, bytes: &[u8]) -> PyResult<PyObject> {
     decode(py, input)
 }
 
+/// Return a signed integer, or select unsigned conversion without an exception.
+#[inline(always)]
+fn signed_integer(value: &Bound<'_, PyInt>) -> PyResult<Option<i64>> {
+    let mut overflow = 0;
+    // SAFETY: Bound retains the integer while Python is attached, and overflow
+    // is a live, initialized C int for the duration of this call.
+    let integer = unsafe { pyo3::ffi::PyLong_AsLongLongAndOverflow(value.as_ptr(), &mut overflow) };
+    match overflow {
+        0 => {
+            if integer == -1 {
+                if let Some(error) = PyErr::take(value.py()) {
+                    return Err(error);
+                }
+            }
+            Ok(Some(integer))
+        }
+        1 => Ok(None),
+        _ => Err(PyTypeError::new_err("Integer exceeds 64-bit range")),
+    }
+}
+
+/// Use native-word conversion where size_t spans the unsigned 64-bit range.
+#[inline(always)]
+fn unsigned_integer(value: &Bound<'_, PyInt>) -> PyResult<u64> {
+    #[cfg(target_pointer_width = "64")]
+    {
+        // SAFETY: Bound retains the integer and keeps Python attached throughout
+        // the call. The public API accepts integer objects and returns no pointer.
+        let integer = unsafe { pyo3::ffi::PyLong_AsSize_t(value.as_ptr()) };
+        if integer == usize::MAX {
+            if let Some(error) = PyErr::take(value.py()) {
+                return Err(error);
+            }
+        }
+        Ok(integer as u64)
+    }
+    #[cfg(not(target_pointer_width = "64"))]
+    {
+        value.extract()
+    }
+}
+
 /// Single output buffer and bounded cache of encoded dictionary keys.
-struct Encoder {
+/// Callback serialization checks output growth; the callback-free encoder
+/// retains its existing write operations.
+struct Encoder<const CHECKED: bool = false> {
     output: Vec<u8>,
     option: i32,
     // The Python serializer may already have unfinished parent containers.
@@ -325,7 +404,85 @@ struct EncodeContainer<'py> {
     closing: u8,
 }
 
-impl Encoder {
+#[cold]
+fn allocation_error() -> PyErr {
+    PyMemoryError::new_err("JSON serialization allocation failed")
+}
+
+/// Output writes fail only on allocation; callers construct the Python
+/// exception.
+struct OutputAllocationError;
+
+impl From<OutputAllocationError> for PyErr {
+    fn from(_: OutputAllocationError) -> Self {
+        allocation_error()
+    }
+}
+
+impl<const CHECKED: bool> Encoder<CHECKED> {
+    fn into_checked(self) -> Encoder<true> {
+        Encoder {
+            output: self.output,
+            option: self.option,
+            base_depth: self.base_depth,
+            dataclass_root: self.dataclass_root,
+            keys: self.keys,
+        }
+    }
+
+    #[inline]
+    fn reserve(&mut self, additional: usize) -> Result<(), OutputAllocationError> {
+        if CHECKED {
+            if additional > self.output.capacity() - self.output.len() {
+                self.grow(additional)?;
+            }
+        } else {
+            self.output.reserve(additional);
+        }
+        Ok(())
+    }
+
+    #[cold]
+    fn grow(&mut self, additional: usize) -> Result<(), OutputAllocationError> {
+        self.output
+            .try_reserve(additional)
+            .map_err(|_| OutputAllocationError)
+    }
+
+    #[inline]
+    fn push(&mut self, byte: u8) -> Result<(), OutputAllocationError> {
+        if CHECKED {
+            self.reserve(1)?;
+        }
+        self.output.push(byte);
+        Ok(())
+    }
+
+    #[inline]
+    fn extend(&mut self, bytes: &[u8]) -> Result<(), OutputAllocationError> {
+        if CHECKED {
+            self.reserve(bytes.len())?;
+        }
+        self.output.extend_from_slice(bytes);
+        Ok(())
+    }
+
+    #[inline]
+    fn bytes(&self, py: Python<'_>) -> PyResult<Py<PyBytes>> {
+        let output = self.output.as_slice();
+        let len = pyo3::ffi::Py_ssize_t::try_from(output.len()).map_err(|_| allocation_error())?;
+        // SAFETY: output retains len initialized bytes for the synchronous copy.
+        // Python is attached, and the API returns a new reference or a null
+        // pointer with an exception. PyO3 takes ownership or returns that error.
+        let bytes = unsafe {
+            Bound::from_owned_ptr_or_err(
+                py,
+                pyo3::ffi::PyBytes_FromStringAndSize(output.as_ptr().cast(), len),
+            )
+        }?;
+        Ok(bytes.downcast_into::<PyBytes>()?.unbind())
+    }
+
     #[inline(always)]
     fn key_any(&mut self, key: &Bound<'_, PyAny>) -> PyResult<bool> {
         if let Ok(key) = key.downcast_exact::<PyString>() {
@@ -336,14 +493,14 @@ impl Encoder {
                 || key.is_exact_instance_of::<PyInt>()
                 || key.is_exact_instance_of::<PyFloat>())
         {
-            self.output.push(b'"');
+            self.push(b'"')?;
             let option = self.option;
             // OPT_STRICT_INTEGER applies to values, not converted keys.
             self.option &= !STRICT_INTEGER;
             let result = self.scalar(key);
             self.option = option;
             result?;
-            self.output.push(b'"');
+            self.push(b'"')?;
         } else {
             return Ok(false);
         }
@@ -358,7 +515,11 @@ impl Encoder {
                 .iter()
                 .find(|(owner, _)| owner.as_ptr() == key.as_ptr())
             {
-                self.output.extend_from_within(encoded.clone());
+                let encoded = encoded.clone();
+                if CHECKED {
+                    self.reserve(encoded.len())?;
+                }
+                self.output.extend_from_within(encoded);
                 return Ok(());
             }
         }
@@ -366,126 +527,132 @@ impl Encoder {
             .to_str()
             .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
         let start = self.output.len();
-        self.string(text);
+        self.string(text)?;
         if cache && self.keys.len() < 16 && text.len() <= 64 {
+            if CHECKED {
+                self.keys.try_reserve(1).map_err(|_| allocation_error())?;
+            }
             self.keys
                 .push((key.clone().unbind(), start..self.output.len()));
         }
         Ok(())
     }
 
-    fn string(&mut self, value: &str) {
+    fn string(&mut self, value: &str) -> Result<(), OutputAllocationError> {
         // Avoid growing again just for the closing quote of a long plain prefix.
         if value.len() >= INITIAL_OUTPUT_CAPACITY {
-            self.output.reserve(value.len() + 2);
+            self.reserve(value.len() + 2)?;
         }
-        self.output.push(b'"');
-        let mut remaining = value.as_bytes();
+        self.push(b'"')?;
+        self.string_contents(value.as_bytes())?;
+        self.push(b'"')
+    }
+
+    fn string_contents(&mut self, mut remaining: &[u8]) -> Result<(), OutputAllocationError> {
         while !remaining.is_empty() {
             let prefix = plain_string_prefix(remaining);
-            self.output.extend_from_slice(&remaining[..prefix]);
+            self.extend(&remaining[..prefix])?;
             remaining = &remaining[prefix..];
             if let Some((&byte, tail)) = remaining.split_first() {
                 match byte {
-                    b'"' => self.output.extend_from_slice(b"\\\""),
-                    b'\\' => self.output.extend_from_slice(b"\\\\"),
-                    b'\n' => self.output.extend_from_slice(b"\\n"),
-                    b'\r' => self.output.extend_from_slice(b"\\r"),
-                    b'\t' => self.output.extend_from_slice(b"\\t"),
-                    8 => self.output.extend_from_slice(b"\\b"),
-                    12 => self.output.extend_from_slice(b"\\f"),
+                    b'"' => self.extend(b"\\\"")?,
+                    b'\\' => self.extend(b"\\\\")?,
+                    b'\n' => self.extend(b"\\n")?,
+                    b'\r' => self.extend(b"\\r")?,
+                    b'\t' => self.extend(b"\\t")?,
+                    8 => self.extend(b"\\b")?,
+                    12 => self.extend(b"\\f")?,
                     _ => {
                         const HEX: &[u8] = b"0123456789abcdef";
-                        self.output.extend_from_slice(&[
+                        self.extend(&[
                             b'\\',
                             b'u',
                             b'0',
                             b'0',
                             HEX[usize::from(byte >> 4)],
                             HEX[usize::from(byte & 15)],
-                        ]);
+                        ])?;
                     }
                 }
                 remaining = tail;
             }
         }
-        self.output.push(b'"');
+        Ok(())
     }
 
-    fn newline(&mut self, depth: usize) {
+    fn newline(&mut self, depth: usize) -> Result<(), OutputAllocationError> {
         if self.option & INDENT != 0 {
+            if CHECKED {
+                self.reserve(1 + (depth + self.base_depth) * 2)?;
+            }
             self.output.push(b'\n');
             self.output
                 .resize(self.output.len() + (depth + self.base_depth) * 2, b' ');
         }
+        Ok(())
     }
 
     #[inline(always)]
     fn scalar(&mut self, value: &Bound<'_, PyAny>) -> PyResult<bool> {
         if value.is_none() {
-            self.output.extend_from_slice(b"null");
+            self.extend(b"null")?;
         } else if let Ok(string) = value.downcast_exact::<PyString>() {
             self.string(
                 string
                     .to_str()
                     .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?,
-            );
+            )?;
         } else if let Ok(boolean) = value.downcast_exact::<PyBool>() {
-            self.output
-                .extend_from_slice(if boolean.is_true() { b"true" } else { b"false" });
-        } else if value.is_exact_instance_of::<PyInt>() {
+            self.extend(if boolean.is_true() { b"true" } else { b"false" })?;
+        } else if let Ok(value) = value.downcast_exact::<PyInt>() {
             let mut buffer = itoa::Buffer::new();
-            if let Ok(integer) = value.extract::<i64>() {
+            if let Some(integer) = signed_integer(value)? {
                 if self.option & STRICT_INTEGER != 0
                     && !(-9_007_199_254_740_991..=9_007_199_254_740_991).contains(&integer)
                 {
                     return Err(PyTypeError::new_err("Integer exceeds 53-bit range"));
                 }
-                self.output
-                    .extend_from_slice(buffer.format(integer).as_bytes());
+                self.extend(buffer.format(integer).as_bytes())?;
             } else {
-                let integer = value
-                    .extract::<u64>()
+                let integer = unsigned_integer(value)
                     .map_err(|_| PyTypeError::new_err("Integer exceeds 64-bit range"))?;
                 if self.option & STRICT_INTEGER != 0 && integer > 9_007_199_254_740_991 {
                     return Err(PyTypeError::new_err("Integer exceeds 53-bit range"));
                 }
-                self.output
-                    .extend_from_slice(buffer.format(integer).as_bytes());
+                self.extend(buffer.format(integer).as_bytes())?;
             }
         } else if let Ok(float) = value.downcast_exact::<PyFloat>() {
             let number = float.value();
             if number.is_finite() {
-                self.output
-                    .extend_from_slice(zmij::Buffer::new().format_finite(number).as_bytes());
+                self.extend(zmij::Buffer::new().format_finite(number).as_bytes())?;
             } else {
-                self.output.extend_from_slice(b"null");
+                self.extend(b"null")?;
             }
         } else if let Ok(list) = value.downcast_exact::<PyList>() {
             if !list.is_empty() {
                 return Ok(false);
             }
-            self.output.extend_from_slice(b"[]");
+            self.extend(b"[]")?;
         } else if let Ok(tuple) = value.downcast_exact::<PyTuple>() {
             if !tuple.is_empty() {
                 return Ok(false);
             }
-            self.output.extend_from_slice(b"[]");
+            self.extend(b"[]")?;
         } else if value.is_exact_instance_of::<PyDict>() {
             return Ok(false);
         } else if let Ok(fragment) = value.downcast_exact::<Fragment>() {
             let fragment = fragment.get();
             let contents = fragment.contents.bind(value.py());
             if let Ok(bytes) = contents.downcast_exact::<PyBytes>() {
-                self.output.extend_from_slice(bytes.as_bytes());
+                self.extend(bytes.as_bytes())?;
             } else if let Ok(text) = contents.downcast_exact::<PyString>() {
-                self.output.extend_from_slice(
+                self.extend(
                     text.to_str()
                         .map_err(|_| {
                             PyTypeError::new_err("str is not valid UTF-8: surrogates not allowed")
                         })?
                         .as_bytes(),
-                );
+                )?;
             } else {
                 return Err(PyTypeError::new_err(
                     "orjson.Fragment's content is not of type bytes or str",
@@ -549,7 +716,7 @@ impl Encoder {
             } else {
                 return Ok(false);
             };
-            self.output.push(opening);
+            self.push(opening)?;
             stack.push(EncodeContainer {
                 iter,
                 identity,
@@ -564,10 +731,10 @@ impl Encoder {
                 if let EncodeIterator::List(iter) = &mut frame.iter {
                     for item in iter.by_ref() {
                         if frame.count != 0 {
-                            self.output.push(b',');
+                            self.push(b',')?;
                         }
                         frame.count += 1;
-                        self.newline(depth);
+                        self.newline(depth)?;
                         if !self.scalar(&item)? {
                             current = item;
                             continue 'container;
@@ -575,9 +742,9 @@ impl Encoder {
                     }
                     let frame = stack.pop().expect("unfinished list");
                     if frame.count != 0 {
-                        self.newline(stack.len());
+                        self.newline(stack.len())?;
                     }
-                    self.output.push(frame.closing);
+                    self.push(frame.closing)?;
                     continue;
                 }
                 let item = match &mut frame.iter {
@@ -590,17 +757,17 @@ impl Encoder {
                 };
                 if let Some((key, item)) = item {
                     if frame.count != 0 {
-                        self.output.push(b',');
+                        self.push(b',')?;
                     }
                     frame.count += 1;
-                    self.newline(depth);
+                    self.newline(depth)?;
                     if let Some(key) = key {
                         if !self.key_any(&key)? {
                             return Ok(false);
                         }
-                        self.output.push(b':');
+                        self.push(b':')?;
                         if self.option & INDENT != 0 {
-                            self.output.push(b' ');
+                            self.push(b' ')?;
                         }
                     }
                     if !self.scalar(&item)? {
@@ -610,9 +777,9 @@ impl Encoder {
                 } else {
                     let frame = stack.pop().expect("unfinished container");
                     if frame.count != 0 {
-                        self.newline(stack.len());
+                        self.newline(stack.len())?;
                     }
-                    self.output.push(frame.closing);
+                    self.push(frame.closing)?;
                 }
             }
         }
@@ -623,6 +790,42 @@ fn supplied_default<'py>(value: &Bound<'py, PyAny>) -> PyResult<Option<Bound<'py
     // Explicit None is an invalid callback; an omitted argument has no callback
     // cause.
     Ok(Some(value.clone()))
+}
+
+/// Write long plain strings into Python's initialized bytes storage directly.
+#[inline(never)]
+fn dump_long_string(py: Python<'_>, text: &str, flags: i32) -> PyResult<PyObject> {
+    let bytes = text.as_bytes();
+    let prefix = plain_string_prefix(bytes);
+    if prefix == bytes.len() {
+        let newline = usize::from(flags & APPEND_NEWLINE != 0);
+        return Ok(PyBytes::new_with(py, bytes.len() + 2 + newline, |output| {
+            output[0] = b'"';
+            output[1..bytes.len() + 1].copy_from_slice(bytes);
+            output[bytes.len() + 1] = b'"';
+            if newline != 0 {
+                output[bytes.len() + 2] = b'\n';
+            }
+            Ok(())
+        })?
+        .into_any()
+        .unbind());
+    }
+    let mut encoder = Encoder::<false> {
+        output: Vec::with_capacity(bytes.len() + 2),
+        option: flags,
+        base_depth: 0,
+        dataclass_root: false,
+        keys: Vec::new(),
+    };
+    encoder.output.push(b'"');
+    encoder.output.extend_from_slice(&bytes[..prefix]);
+    encoder.string_contents(&bytes[prefix..])?;
+    encoder.output.push(b'"');
+    if flags & APPEND_NEWLINE != 0 {
+        encoder.output.push(b'\n');
+    }
+    Ok(PyBytes::new(py, &encoder.output).into_any().unbind())
 }
 
 /// Serialize common JSON types directly, preserving the uncommon-type fallback.
@@ -645,25 +848,37 @@ pub fn dumps(
     if flags < 0 || flags & !4095 != 0 {
         return Err(PyTypeError::new_err("unsupported option bits"));
     }
-    let mut encoder = Encoder {
+    let root_string = if let Ok(string) = obj.downcast_exact::<PyString>() {
+        let text = string
+            .to_str()
+            .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
+        if text.len() >= INITIAL_OUTPUT_CAPACITY {
+            return dump_long_string(py, text, flags);
+        }
+        Some(text)
+    } else {
+        None
+    };
+    let mut encoder = Encoder::<false> {
         output: Vec::with_capacity(INITIAL_OUTPUT_CAPACITY),
         option: flags,
         base_depth: 0,
         dataclass_root: false,
         keys: Vec::new(),
     };
-    if encoder.value(&obj)? {
+    let encoded = if let Some(text) = root_string {
+        encoder.string(text)?;
+        true
+    } else {
+        encoder.value(&obj)?
+    };
+    if encoded {
         if flags & APPEND_NEWLINE != 0 {
-            encoder.output.push(b'\n');
+            encoder.push(b'\n')?;
         }
         return Ok(PyBytes::new(py, &encoder.output).into_any().unbind());
     }
-    drop(encoder);
-    let fallback = py.import("jsonmodem")?.getattr("_dumps_fallback")?;
-    let default_provided = default.is_some();
-    Ok(fallback
-        .call1((obj, default, option, default_provided))?
-        .unbind())
+    objects::dumps(py, encoder, obj, default)
 }
 
 /// Try an owning dataclass field snapshot without invoking any user callback.
@@ -677,7 +892,7 @@ pub fn _dumps_fields(
     if depth > MAX_ENCODE_DEPTH {
         return Err(PyTypeError::new_err("Recursion limit reached"));
     }
-    let mut encoder = Encoder {
+    let mut encoder = Encoder::<false> {
         output: Vec::with_capacity(INITIAL_OUTPUT_CAPACITY),
         option,
         base_depth: depth,

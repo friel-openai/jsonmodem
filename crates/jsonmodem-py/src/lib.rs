@@ -24,8 +24,8 @@ use pyo3::{
     ffi,
     prelude::*,
     types::{
-        PyAny, PyBool, PyBytes, PyDict, PyList, PyMemoryView, PySlice, PyString, PyStringMethods,
-        PyTuple,
+        PyAny, PyBool, PyBytes, PyDict, PyInt, PyList, PyMemoryView, PySlice, PyString,
+        PyStringMethods, PyTuple,
     },
 };
 
@@ -62,22 +62,45 @@ fn json_decode_error(py: Python<'_>, message: &str, doc: &str, pos: usize) -> Py
 }
 
 fn load_number(py: Python<'_>, lexeme: &str) -> PyResult<PyObject> {
-    let builtins = py.import("builtins")?;
     let is_float = lexeme
         .as_bytes()
         .iter()
         .any(|byte| matches!(byte, b'.' | b'e' | b'E'));
-    let constructor = if is_float {
-        builtins.getattr("float")?
-    } else {
-        builtins.getattr("int")?
-    };
-    if is_float && !lexeme.parse::<f64>().is_ok_and(f64::is_finite) {
-        return Err(PyTypeError::new_err(
-            "number is infinity when parsed as double",
-        ));
+    if is_float {
+        let number = match lexeme.parse::<f64>() {
+            Ok(number) if number.is_finite() => number,
+            _ => {
+                return Err(PyTypeError::new_err(
+                    "number is infinity when parsed as double",
+                ));
+            }
+        };
+        // SAFETY: Python is attached. The constructor returns a new reference
+        // or NULL, which the fallible wrapper checks before taking ownership.
+        return unsafe {
+            Bound::from_owned_ptr_or_err(py, ffi::PyFloat_FromDouble(number)).map(Bound::unbind)
+        };
     }
-    let number = constructor.call1((lexeme,))?;
+    // Valid JSON integers longer than twenty bytes cannot fit either type.
+    if lexeme.len() <= 20 {
+        if let Ok(number) = lexeme.parse::<i64>() {
+            // SAFETY: Python is attached. The constructor returns a new
+            // reference or NULL, which is checked before taking ownership.
+            return unsafe {
+                Bound::from_owned_ptr_or_err(py, ffi::PyLong_FromLongLong(number))
+                    .map(Bound::unbind)
+            };
+        }
+        if let Ok(number) = lexeme.parse::<u64>() {
+            // SAFETY: Python is attached. The constructor returns a new
+            // reference or NULL, which is checked before taking ownership.
+            return unsafe {
+                Bound::from_owned_ptr_or_err(py, ffi::PyLong_FromUnsignedLongLong(number))
+                    .map(Bound::unbind)
+            };
+        }
+    }
+    let number = py.get_type::<PyInt>().call1((lexeme,))?;
     Ok(number.into_any().unbind())
 }
 
@@ -3864,7 +3887,11 @@ fn with_readonly_byte_text<T>(
             "{caller} expected bytes or a read-only contiguous memoryview"
         ))
     })?;
-    if source.getattr("ndim")?.extract::<usize>()? != 1 {
+    if source
+        .getattr(pyo3::intern!(py, "ndim"))?
+        .extract::<usize>()?
+        != 1
+    {
         return Err(PyTypeError::new_err(
             "byte views require one-dimensional input",
         ));
@@ -3906,7 +3933,9 @@ fn with_readonly_byte_text<T>(
     if !owner.is_exact_instance_of::<PyBytes>() {
         // Copy through the built-in memoryview before creating a Rust borrow.
         // Unknown exporters may expose mutable storage as read-only.
-        let snapshot = source.call_method0("tobytes")?.downcast_into::<PyBytes>()?;
+        let snapshot = source
+            .call_method0(pyo3::intern!(py, "tobytes"))?
+            .downcast_into::<PyBytes>()?;
         let source = PyMemoryView::from(snapshot.as_any())?;
         let text = core::str::from_utf8(snapshot.as_bytes()).map_err(|err| {
             PyTypeError::new_err(format!("{caller} input bytes are not valid UTF-8: {err}"))
@@ -3984,6 +4013,7 @@ fn jsonmodem(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(compat::loads, m)?)?;
     m.add_function(wrap_pyfunction!(compat::dumps, m)?)?;
     m.add_function(wrap_pyfunction!(compat::_dumps_fields, m)?)?;
+    m.add_function(wrap_pyfunction!(compat::_dumps_objects, m)?)?;
     m.add_class::<compat::Fragment>()?;
     m.add_function(wrap_pyfunction!(numpy::_numpy_dumps, m)?)?;
     let json_decode_error = py.import("json")?.getattr("JSONDecodeError")?;
