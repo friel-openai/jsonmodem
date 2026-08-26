@@ -1,0 +1,35 @@
+{
+  "measure": "Time relative to orjson; lower is better; orjson is 1.0",
+  "method": "For each case, use summary[case].over_orjson[build], the saved median of seven process ratios. Each process ratio is the median of three paired jsonmodem/orjson timings. Compute exp(mean(log(case_ratio))) with equal weight per case.",
+  "scope": "All primary complete-document cases. Input types and call wrappers count separately, including payloads repeated across scripts. Excludes controls, attribution experiments, streaming APIs and rejected candidates. Not application-weighted performance.",
+  "source_files": {
+    "output.json": 28,
+    "frontend.json": 58,
+    "numbers.json": 25,
+    "strings.json": 60
+  },
+  "source_commits": {
+    "PR1": "d98fbe09bcd21a156fac0f8a60e8fe1119c79c4b",
+    "PR2": "9285795ca2ca10570e47a48564d29e12160c2d4d"
+  },
+  "time_relative_to_orjson": {
+    "all": {
+      "cases": 171,
+      "PR1": 1.7633880914746318,
+      "PR2": 1.3414501867084958,
+      "orjson": 1.0
+    },
+    "loads": {
+      "cases": 106,
+      "PR1": 1.432154440199945,
+      "PR2": 1.2607064342173198,
+      "orjson": 1.0
+    },
+    "dumps": {
+      "cases": 65,
+      "PR1": 2.4757171828666684,
+      "PR2": 1.4843661297710047,
+      "orjson": 1.0
+    }
+  }
+}

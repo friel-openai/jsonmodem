@@ -1,13 +1,11 @@
 # Python performance results
 
-This report compares the changes on top of [PR #1](https://github.com/friel-openai/jsonmodem/pull/1)
-with PR #1 and orjson. Streaming measurements compare jsonmodem with its earlier
-build and, for matching partial-document operations, jiter. orjson does not
-provide an incremental parser; its results below are for complete documents.
+This report gives absolute timings and allocation measurements for jsonmodem,
+orjson and jiter. Streaming value snapshots are compared with jiter. orjson
+does not provide an incremental parser, so its results are for complete
+documents. The overall complete-document summary is the only ratio table.
 
-The reference build is
-[`d98fbe0`](https://github.com/friel-openai/jsonmodem/commit/d98fbe09bcd21a156fac0f8a60e8fe1119c79c4b).
-The new runtime is
+The measured jsonmodem runtime is
 [`9285795`](https://github.com/friel-openai/jsonmodem/commit/9285795ca2ca10570e47a48564d29e12160c2d4d).
 The later closing-quote experiment was reverted. The final runtime sources
 and rebuilt extension match this measured revision exactly.
@@ -50,20 +48,21 @@ CPU target flag. Builds, tests and profilers finish before timing starts.
 These measurements describe this host and these inputs, not all machines or
 Python versions.
 
-Each complete-document comparison starts seven pairs of processes, alternating
-which build runs first. Each pair shares a Python hash seed; the seeds are
-1729 through 1735. Each process checks results against orjson before timing,
-then takes three measurements per library in alternating order. A measurement
-times many calls with garbage collection disabled. Both libraries use the same
-call count, calibrated until the slower library's batch takes at least 0.04
-seconds. Input construction and process startup are excluded.
+Each complete-document case uses seven Python processes, with hash seeds 1729
+through 1735. Each process checks results against orjson before timing, then
+takes three measurements per library in alternating order. The reported time
+is the median of those three measurements, followed by the median across the
+seven processes. A measurement times many calls with garbage collection
+disabled. Both libraries use the same call count, calibrated until the slower
+library's batch takes at least 0.04 seconds. Input construction and process
+startup are excluded.
 
-Tables report medians of the seven paired time ratios. A new/PR1 ratio of
-0.75 means 25% less time; 1.10 means 10% more time. New/orjson ratios use
-orjson measured in the same process. A ratio of 2 means twice orjson's time.
-Ranges are observed minimum and maximum ratios, not confidence intervals.
-All samples, including outliers and regressions, are retained in the result
-files.
+Timing tables show microseconds, not ratios. Reference-library times come
+from the same processes as the reported jsonmodem build. Bold marks the
+lowest displayed value in each row; ties at the displayed precision are both
+bold. Small differences do not establish a repeatable lead. All samples,
+including outliers, earlier builds and control repeats, remain in the saved
+results. No measurements were rerun for this presentation change.
 
 `bench_output_buffers.py` and `bench_frontend.py` call both libraries through
 the same keyword-argument wrapper. `bench_numbers.py` and `bench_strings.py`
@@ -73,69 +72,127 @@ compare absolute times across those two methods.
 ## Streaming results
 
 [bench_stream_numbers.py](bench_stream_numbers.py) sends 1,024 numbers in
-chunks that end at complete tokens, targeting 512 bytes per chunk. It consumes
-every event or materializes every cumulative value snapshot. jiter receives
-the same cumulative prefixes; its measurement includes building the contiguous
-prefix that its API requires. Each snapshot's JSON representation is checked
-before timing. Event results are compared only with PR #1 because jiter does
-not produce jsonmodem's events.
+chunks that end at complete tokens, targeting 512 bytes per chunk.
 
-| Number input | Events new/PR1 | Byte-view events new/PR1 | Snapshots new/PR1 | Snapshots new/jiter |
-| --- | ---: | ---: | ---: | ---: |
-| Small integers | 0.379 | 0.435 | 0.177 | 1.721 |
-| Full-width signed integers | 0.417 | 0.473 | 0.163 | 0.559 |
-| Upper-range unsigned integers | 0.434 | 0.478 | 0.184 | 0.549 |
-| Floats | 0.356 | 0.421 | 0.107 | 1.109 |
-| Mixed numeric types | 0.395 | 0.446 | 0.141 | 0.724 |
-| 200-bit integers | 0.610 | 0.644 | 0.426 | 0.922 |
+### Reading the value after every chunk
 
-Unsigned snapshots take 2.111 ms per stream, versus jiter's 3.844 ms.
-Small-integer snapshots still take 0.435 ms versus jiter's 0.252 ms.
+A snapshot is the complete Python value parsed so far. jsonmodem and jiter
+produce a snapshot after every chunk. jiter's time includes building the
+contiguous input that its API requires. Every snapshot is checked for equal
+results before timing.
+
+Time for the entire stream, in microseconds (lower is better):
+
+| Number input | jsonmodem | jiter |
+| --- | ---: | ---: |
+| Small integers | 434.859 | **251.525** |
+| Full-width signed integers | **1,853.584** | 3,304.966 |
+| Upper-range unsigned integers | **2,111.035** | 3,843.946 |
+| Floats | 1,273.699 | **1,140.936** |
+| Mixed numeric types | **1,639.064** | 2,260.592 |
+| 200-bit integers | **17,162.695** | 18,589.356 |
+
+### Consuming number events
+
+An event is a parser notification, such as an array starting or a number being
+read. This benchmark consumes every event from `feed()` and `finish()`.
+The byte-view option returns unescaped string fragments as memoryviews; these
+number-only inputs measure its overhead without any string payloads.
+Neither orjson nor jiter provides jsonmodem's event API.
+
+Time for the entire stream, in microseconds (lower is better). Bold marks
+the faster jsonmodem event mode for each input:
+
+| Number input | Default events | Byte-view events |
+| --- | ---: | ---: |
+| Small integers | **288.955** | 345.570 |
+| Full-width signed integers | **364.893** | 433.669 |
+| Upper-range unsigned integers | **373.508** | 427.491 |
+| Floats | **377.227** | 452.168 |
+| Mixed numeric types | **387.289** | 452.645 |
+| 200-bit integers | **670.353** | 718.737 |
+
+### Consuming string events
 
 [bench_buffer_inputs.py](bench_buffer_inputs.py) consumes all events from
 1,024 strings. Short strings contain four bytes and use 512-byte chunks;
 long strings contain 256 bytes and use 4,096-byte chunks. Each comparison
-uses seven alternating process pairs, with three measurements of 200 streams
-per process. These event comparisons do not set paired Python hash seeds.
+uses seven processes, with three measurements of 200 streams per process.
+These event measurements do not set fixed Python hash seeds.
 
-| Event input | Short strings new/PR1 | Long strings new/PR1 |
-| --- | ---: | ---: |
-| Bytes | 1.110 | 0.930 |
-| Bytes, byte-view events | 1.027 | 0.882 |
-| Python `__buffer__` exporter, byte-view events | 1.013 | 0.894 |
+Default events return decoded strings; byte-view events return memoryviews
+for unescaped fragments. The exporter is a Python `__buffer__` wrapper around
+bytes. The columns compare these configurations, not different libraries.
 
-The short-string bytes regression repeated at 1.093 times PR #1, with identical
-allocation counts and event counts. The report retains both runs. Native
-profiles did not identify a source change that explains the full regression;
-the scanner and its search function account for about 4% of samples in both
-builds. Long-string streaming improved, but short-string streaming did not.
-These stream profiles use py-spy at 99 samples per second, requesting twelve
-seconds while the workload loops run for ten. They contain 1,023 and 981
-workload samples, with zero and one sampling errors respectively.
+Time for the entire stream, in microseconds (lower is better):
+
+| Bytes per string | Default events | Byte-view events | Exporter with byte-view events |
+| --- | ---: | ---: | ---: |
+| 4 | **334.879** | 485.767 | 494.141 |
+| 256 | **445.398** | 629.028 | 688.622 |
 
 ## Complete-document reference results
+
+### Overall geometric mean
+
+This summary includes all **171 cases** from the four primary benchmark
+scripts: 28 output cases, 58 frontend cases, 25 number cases and 60 string
+cases. Each case has equal weight. Input-type variants count separately, and
+some payloads occur in more than one script. Control repeats, attribution
+experiments, rejected candidates and streaming APIs are excluded.
+
+For each case, use the saved median of paired jsonmodem/orjson timing ratios.
+The overall score is `exp(mean(log(case_ratio)))`. This is a benchmark-case
+average, not an estimate for a particular application's workload mix.
+The [calculated scores](data/performance/geomean.json) retain the full precision
+and name the input files.
+
+Time relative to orjson (lower is better). **1.00x is orjson's time**;
+1.34x means 34% more time. This is the only table using ratios:
+
+| Cases | PR #1 | PR #2 | orjson |
+| --- | ---: | ---: | ---: |
+| All 171 cases | 1.76x | 1.34x | **1.00x** |
+| Decoding: 106 cases | 1.43x | 1.26x | **1.00x** |
+| Encoding: 65 cases | 2.48x | 1.48x | **1.00x** |
+
+### Common inputs
 
 These seven inputs come from [bench_orjson_compat.py](bench_orjson_compat.py).
 The mixed input has 1,000 four-field records. Numeric arrays have 10,000
 elements; the integer array contains -5,000 through 4,999, and each float is
 its index divided by seven. The string and escaped-object arrays have 1,000
-elements. The long string has 143,360 UTF-8 bytes. Decoding uses `bytes` input
-in this table.
+elements. The long string has 143,360 UTF-8 bytes. The decoding results below
+use `bytes` input.
 
-| Input | Loads new/PR1 | Loads new/orjson | Dumps new/PR1 | Dumps new/orjson |
-| --- | ---: | ---: | ---: | ---: |
-| Small object | 0.961 | 1.144 | 0.991 | 1.488 |
-| Mixed records | 0.908 | 1.538 | 0.977 | 1.840 |
-| Short integers | 0.956 | 1.511 | 0.964 | 2.625 |
-| Floats | 1.061 | 1.967 | 1.007 | 1.093 |
-| Plain strings | 0.943 | 1.316 | 1.034 | 1.917 |
-| Escaped objects | 0.880 | 1.734 | 0.861 | 2.153 |
-| Long plain string | 0.968 | 0.243 | 0.648 | 1.184 |
+Decoding with `loads()`, in microseconds per document (lower is better):
 
-Long-string decoding already beat orjson in PR #1. Here it takes 22.5
-microseconds, versus PR #1's 23.2 and orjson's 93.8. Earlier runs in
-[PROFILE.md](PROFILE.md) observed substantially different orjson long-string
-times.
+| Input | jsonmodem | orjson |
+| --- | ---: | ---: |
+| Small object | 0.597 | **0.520** |
+| Mixed records | 377.173 | **244.502** |
+| Short integers | 284.240 | **187.325** |
+| Floats | 548.779 | **280.214** |
+| Plain strings | 48.719 | **36.906** |
+| Escaped objects | 249.791 | **143.609** |
+| Long plain string | **22.453** | 93.772 |
+
+Encoding with `dumps()`, in microseconds per document (lower is better):
+
+| Input | jsonmodem | orjson |
+| --- | ---: | ---: |
+| Small object | 0.397 | **0.269** |
+| Mixed records | 162.829 | **88.832** |
+| Short integers | 115.382 | **43.850** |
+| Floats | 320.949 | **292.853** |
+| Plain strings | 25.023 | **13.086** |
+| Escaped objects | 87.958 | **40.956** |
+| Long plain string | 12.241 | **10.333** |
+
+Earlier runs in [PROFILE.md](PROFILE.md) observed substantially different
+orjson long-string decoding times.
+
+### Other output cases
 
 The output cases below use [bench_output_buffers.py](bench_output_buffers.py).
 Full-width arrays contain 10,000 seeded random integers. The unsigned array
@@ -143,114 +200,127 @@ uses only `2**63` through `2**64 - 1`. Dataclass batches contain 1,000 records.
 The eight- and sixteen-field cases have that many declared integer fields per
 record. NumPy arrays have 25,000 rows of four consecutive whole numbers.
 
-| Output | New/PR1 | New/orjson |
-| --- | ---: | ---: |
-| Full-width signed integers | 1.026 | 0.748 |
-| Upper-range unsigned integers | 0.173 | 0.831 |
-| One integer | 0.991 | 0.966 |
-| Five integers | 1.000 | 1.171 |
-| Indented short integers | 1.018 | 1.748 |
-| Strict short integers | 0.950 | 2.607 |
-| Sorted mixed records | 0.847 | 1.997 |
-| Integer dictionary keys | 0.842 | 0.985 |
-| Dataclass batch | 0.119 | 2.612 |
-| One dataclass | 0.388 | 3.537 |
-| One slotted dataclass | 0.554 | 2.401 |
-| Slotted dataclass batch | 0.365 | 1.888 |
-| Nested dataclasses | 0.060 | 2.671 |
-| Indented dataclasses | 0.119 | 2.117 |
-| Dataclasses with sorted dictionaries | 0.063 | 2.540 |
-| Dataclasses with default callbacks | 0.059 | 2.104 |
-| NumPy int64 | 0.996 | 0.691 |
-| NumPy float32 | 0.998 | 0.858 |
-| Default callback after 100 strings | 0.140 | 3.292 |
-| Dataclasses with eight fields | 0.156 | 2.318 |
-| Dataclasses with sixteen fields | 0.190 | 2.376 |
+Encoding with `dumps()`, in microseconds per document (lower is better):
 
-Upper-range unsigned output takes 0.278 ms, versus PR #1's 1.606 ms and
-orjson's 0.332 ms. Dataclass output takes 0.205 ms, versus 1.737 ms and
-0.082 ms. Several inputs still take more than twice orjson's time.
-The signed-integer and NumPy advantages
-over orjson already existed in PR #1.
+| Output | jsonmodem | orjson |
+| --- | ---: | ---: |
+| Full-width signed integers | **265.508** | 354.849 |
+| Upper-range unsigned integers | **277.512** | 331.948 |
+| One integer | **0.161** | 0.166 |
+| Five integers | 0.236 | **0.201** |
+| Indented short integers | 146.953 | **83.246** |
+| Strict short integers | 115.262 | **43.823** |
+| Sorted mixed records | 260.091 | **130.867** |
+| Integer dictionary keys | **35.067** | 35.205 |
+| Dataclass batch | 205.194 | **81.802** |
+| One dataclass | 0.930 | **0.263** |
+| One slotted dataclass | 1.531 | **0.637** |
+| Slotted dataclass batch | 772.375 | **406.752** |
+| Nested dataclasses | 530.375 | **196.676** |
+| Indented dataclasses | 223.854 | **105.693** |
+| Dataclasses with sorted dictionaries | 580.630 | **227.892** |
+| Dataclasses with default callbacks | 274.071 | **130.741** |
+| NumPy int64 | **930.198** | 1,350.747 |
+| NumPy float32 | **2,814.713** | 3,257.625 |
+| Default callback after 100 strings | 9.865 | **2.976** |
+| Dataclasses with eight fields | 410.918 | **177.188** |
+| Dataclasses with sixteen fields | 723.466 | **305.942** |
 
 The frontend comparison also covers bytearrays, bytes-backed memoryviews and
-array-backed memoryviews. Small-object views take 0.803-0.807 times PR #1's
-time. The raw results include Unicode, escaped keys, the 255/256-byte output
-threshold, newline and indentation options. In particular, Unicode-escape
-array decoding still takes 3.526 times orjson, and 600 unique escaped keys
-take 3.861 times orjson.
+array-backed memoryviews. The raw results include Unicode, escaped keys,
+the 255/256-byte output threshold, newline and indentation options.
 
 Additional [numeric](data/performance/numbers.json) and
-[string](data/performance/strings.json) results use direct calls. Integer
-decoding takes 0.552 times PR #1 for upper-range unsigned values and 0.724
-times for mixed integer widths. Escaped-string array decoding takes 0.700
-times PR #1. These fixtures differ from the seven complete-document inputs;
-their result files retain all cases and samples, and the scripts define the
-inputs and options.
+[string](data/performance/strings.json) results use direct calls. Their
+fixtures differ from the seven common inputs. The result files retain all
+cases and samples, and the scripts define the inputs and options.
 
-## Slower cases
-
-Longer repeats use seven process pairs and a minimum batch duration of 0.06
-seconds. Float decoding remains 5-7% slower than PR #1. A root string made
-of 43,690 copies of U+2603 takes 14% more time from bytes. Plain-string array
-output takes about 5% more time. Direct output calls also show increases of
-about 4% for small objects, 5% for randomly distributed small integers and
-6% for five-integer lists. The keyword-wrapper result for five integers is
-unchanged; wrapper and direct-call measurements should not be combined.
+### Unicode and float input
 
 [bench_utf8_inputs.py](bench_utf8_inputs.py) compares bytes with warmed Python
-`str` input. The U+2603 fixture takes 1.138 times PR #1 from bytes and 0.963
-times from `str`; float input takes 1.057 and 1.056 times respectively. The
-initial equality check warms Python's cached UTF-8 representation. `str`
-avoids the reader's initial byte validation, but it also changes ownership
-and alignment. This comparison alone does not measure validation's exact cost.
+`str` input, using a minimum batch duration of 0.06 seconds. The Unicode
+string contains 43,690 copies of U+2603. The initial equality check warms
+Python's cached UTF-8 representation. `str` avoids the reader's initial byte
+validation, but it also changes ownership and alignment. This comparison
+alone does not measure validation's exact cost. The final two rows use the
+escaped-input cases from `bench_frontend.py`.
+
+Decoding with `loads()`, in microseconds per document (lower is better):
+
+| Input | jsonmodem | orjson |
+| --- | ---: | ---: |
+| Floats from bytes | 546.477 | **278.772** |
+| Floats from warmed str | 538.843 | **278.000** |
+| U+2603 string from bytes | 199.437 | **83.042** |
+| U+2603 string from warmed str | 89.381 | **75.112** |
+| Unicode-escape array from bytes | 165.088 | **46.246** |
+| 600 unique escaped keys from bytes | 142.579 | **36.935** |
 
 ## Allocation measurements
 
 Memray 1.20.0 records native and Python allocations separately from timing.
 Inputs are built before tracking. Each complete-document run performs ten
 warmup calls and thirty measured calls, with garbage collection disabled.
-Allocation events count allocation requests; allocated bytes count the total
-requested across the run; peak live bytes count the most tracked memory held
-at once. None of these measures is process RSS. The earlier
-[RSS comparison](MEMORY.md) is separate and was not rerun here.
+The tables below separate allocation counts, total allocated memory and peak
+memory. Each row compares the same thirty calls in both libraries. KiB means
+1,024 bytes; MiB means 1,048,576 bytes. None of these measures is process RSS.
+The earlier [RSS comparison](MEMORY.md) is separate and was not rerun here.
 
-| Thirty calls | Library | Allocation requests | Total allocated bytes | Peak live bytes |
-| --- | --- | ---: | ---: | ---: |
-| 1,000 dataclasses | PR #1 | 1,435,961 | 82,287,958 | 64,085 |
-| 1,000 dataclasses | New | 398 | 3,068,992 | 62,054 |
-| 1,000 dataclasses | orjson | 188 | 1,941,892 | 33,137 |
-| Upper-range unsigned output | PR #1 | 600,368 | 72,998,578 | 471,691 |
-| Upper-range unsigned output | New | 368 | 21,998,578 | 471,691 |
-| Upper-range unsigned output | orjson | 278 | 15,707,398 | 262,489 |
-| Escaped-object input | PR #1 | 176,286 | 19,837,814 | 329,423 |
-| Escaped-object input | New | 146,316 | 17,919,734 | 329,457 |
-| Escaped-object input | orjson | 85,446 | 29,689,784 | 1,004,240 |
-| Large escaped first string | PR #1 | 7,494,638 | 919,819,132 | 11,096,186 |
-| Large escaped first string | New | 7,494,578 | 856,902,772 | 11,096,186 |
-| Large escaped first string | orjson | 7,492,388 | 1,268,800,612 | 42,293,670 |
-| NumPy float32 output | PR #1 | 1,512 | 98,214,220 | 2,293,685 |
-| NumPy float32 output | New | 1,091 | 98,183,428 | 2,292,581 |
-| NumPy float32 output | orjson | 750,968 | 232,185,802 | 4,074,161 |
+### Allocation requests
+
+Number of allocation requests across thirty calls (lower is better):
+
+| Input per call | jsonmodem | orjson |
+| --- | ---: | ---: |
+| 1,000 dataclasses | 398 | **188** |
+| Upper-range unsigned output | 368 | **278** |
+| Escaped-object input | 146,316 | **85,446** |
+| Large escaped first string | 7,494,578 | **7,492,388** |
+| NumPy float32 output | **1,091** | 750,968 |
+
+### Total allocated memory
+
+Memory requested across all thirty calls, in MiB (lower is better). Memory
+that is freed and allocated again counts each time:
+
+| Input per call | jsonmodem | orjson |
+| --- | ---: | ---: |
+| 1,000 dataclasses | 2.93 | **1.85** |
+| Upper-range unsigned output | 20.98 | **14.98** |
+| Escaped-object input | **17.09** | 28.31 |
+| Large escaped first string | **817.21** | 1,210.02 |
+| NumPy float32 output | **93.64** | 221.43 |
+
+### Peak memory
+
+Most tracked memory held at once during the thirty calls, in KiB
+(lower is better):
+
+| Input per call | jsonmodem | orjson |
+| --- | ---: | ---: |
+| 1,000 dataclasses | 60.6 | **32.4** |
+| Upper-range unsigned output | 460.6 | **256.3** |
+| Escaped-object input | **321.7** | 980.7 |
+| Large escaped first string | **10,836.1** | 41,302.4 |
+| NumPy float32 output | **2,238.8** | 3,978.7 |
 
 The large-first-string input contains a 1 MiB escaped string followed by
-250,000 integers. Its peak allocation is unchanged from PR #1, even though
-the new decoder allocates fewer bytes across all calls. The dataclass and
-unsigned-integer cases still allocate more bytes than orjson.
+250,000 integers. The dataclass and unsigned-integer cases allocate more
+bytes than orjson, while the escaped inputs and NumPy float32 output use
+less total and peak tracked memory.
 
 The string-event harness captures allocations separately over 100 streams
 with garbage collection enabled. Short bytes input requests 2,921.46
-allocations per stream in both builds. For long strings, byte-view events
-request 5,820.07 versus PR #1's 5,885.07; the Python `__buffer__` exporter
-requests 6,600.07 versus 6,730.07. These captures use a different call count
-and garbage collection setting from the complete-document table, so their
-peaks are not directly comparable.
+allocations per stream. For long strings, byte-view events request 5,820.07;
+the Python `__buffer__` exporter requests 6,600.07. These captures use a
+different call count and garbage collection setting from the complete-document
+tables, so their peaks are not directly comparable.
 
 ## What the profiles show
 
-For 100 calls writing 1,000 dataclasses, cProfile records 1,902,002 calls in
-PR #1 and 102 in both the new build and orjson. Native traversal removes the
-Python helper calls; cProfile does not count every native function call.
+For 100 calls writing 1,000 dataclasses, cProfile records 102 calls in both
+jsonmodem and orjson. Dataclass traversal runs in native code; cProfile does
+not count every native function call.
 
 Complete-document native samples use py-spy 0.4.2 at 49 samples per second,
 outside benchmark timing. Profiles request eight seconds while the measured
@@ -260,16 +330,15 @@ stripped, so attribution uses source-qualified Rust frames. Inclusive sample
 counts include called functions and can overlap.
 
 For the U+2603 byte input, initial Rust UTF-8 validation appears in 143 of 272
-new-build samples and 138 of 309 PR #1 samples. Python string construction
-appears in 109 and 149 respectively. This identifies byte validation as a
-candidate for improvement; the different sample shares are not direct timing
-comparisons. Two attempts to profile warmed `str` input in the new build lost
+jsonmodem samples. Python string construction appears in 109. These sample
+counts identify byte validation as a candidate for improvement but do not
+measure its exact cost. Two attempts to profile warmed `str` input lost
 most samples to unwinding errors and are excluded.
 
 Float profiles include both `DocumentReader::number()` and Rust's decimal-to-
 float conversion. The new reader also computes an integer prefix before
 discarding it on finding a decimal point. That is extra executed work, but
-these profiles do not establish how much of the float regression it explains.
+these profiles do not establish its share of the total decoding time.
 
 ## Experiments removed
 
