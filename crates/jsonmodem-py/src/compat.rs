@@ -57,7 +57,7 @@ struct Decoder<'py, 'src> {
 /// Unfinished containers use bounded inline storage, spilling to the heap
 /// without recursive calls.
 enum DecodeContainer<'py> {
-    Array(SmallVec<[PyObject; 8]>),
+    Array(Bound<'py, PyList>),
     Object(Bound<'py, PyDict>, Py<PyString>),
 }
 
@@ -109,12 +109,13 @@ impl<'py, 'src> Decoder<'py, 'src> {
                         return Err(self.fail("recursion depth exceeded"));
                     }
                     self.expect(b'[')?;
+                    let list = PyList::empty(py);
                     if self.reader.peek() != Some(b']') {
-                        stack.push(DecodeContainer::Array(SmallVec::new()));
+                        stack.push(DecodeContainer::Array(list));
                         continue;
                     }
                     self.expect(b']')?;
-                    PyList::empty(py).into_any().unbind()
+                    list.into_any().unbind()
                 }
                 Some(b'{') => {
                     if stack.len() >= MAX_DECODE_DEPTH {
@@ -184,7 +185,7 @@ impl<'py, 'src> Decoder<'py, 'src> {
                 match stack.last_mut() {
                     None => return Ok(value),
                     Some(DecodeContainer::Array(list)) => {
-                        list.push(value);
+                        list.append(value)?;
                         match self.reader.peek() {
                             Some(b',') => {
                                 self.expect(b',')?;
@@ -208,7 +209,7 @@ impl<'py, 'src> Decoder<'py, 'src> {
                     }
                 }
                 value = match stack.pop().expect("unfinished container") {
-                    DecodeContainer::Array(list) => PyList::new(py, list)?.into_any().unbind(),
+                    DecodeContainer::Array(list) => list.into_any().unbind(),
                     DecodeContainer::Object(dict, _) => dict.into_any().unbind(),
                 };
             }

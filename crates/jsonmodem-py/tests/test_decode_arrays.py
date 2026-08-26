@@ -1,6 +1,9 @@
-"""Check array construction across inline and allocated storage sizes."""
+"""Check decoded array boundaries, error cleanup, and allocation failures."""
 
 import json
+import os
+import subprocess
+import sys
 
 import pytest
 
@@ -22,3 +25,38 @@ def test_array_error_discards_partial_result(length):
         with pytest.raises(json.JSONDecodeError):
             jsonmodem.loads(prefix + ending)
     assert jsonmodem.loads(b"[1,2,3]") == [1, 2, 3]
+
+
+@pytest.mark.skipif(
+    sys.platform != "linux" or bool(os.environ.get("JSONMODEM_MEMORY_RUNNER")),
+    reason="requires Linux address-space limits without ASan's shadow memory",
+)
+@pytest.mark.parametrize("headroom", [512 * 1024, 2 * 1024**2, 14 * 1024**2])
+def test_array_allocation_failure_is_catchable(headroom):
+    code = f'''
+import gc, os, resource
+import jsonmodem
+resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+count = 1000000
+document = b"[" + b"null," * (count - 1) + b"null]"
+assert jsonmodem.loads(b"[null]") == [None]
+gc.collect()
+with open("/proc/self/statm") as status:
+    virtual_bytes = int(status.read().split()[0]) * os.sysconf("SC_PAGE_SIZE")
+previous = resource.getrlimit(resource.RLIMIT_AS)
+resource.setrlimit(resource.RLIMIT_AS, (virtual_bytes + {headroom}, previous[1]))
+try:
+    try:
+        value = jsonmodem.loads(document)
+        assert len(value) == count
+        del value
+    except MemoryError:
+        pass
+finally:
+    resource.setrlimit(resource.RLIMIT_AS, previous)
+assert jsonmodem.loads(b"[1,2,3]") == [1, 2, 3]
+'''
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, timeout=15,
+    )
+    assert result.returncode == 0, result.stderr
