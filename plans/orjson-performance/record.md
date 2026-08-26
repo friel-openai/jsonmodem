@@ -1,12 +1,23 @@
 # Performance and security evidence
 
+These results describe the initial performance work. Later changes and tests
+are in the [compatibility record](../orjson-compatibility/record.md) and
+[speedup record](../orjson-speedups/record.md).
+
 ## Result at 887f0ee
 
 CPython 3.12.13, orjson 3.11.9, AMD EPYC 7763, Linux x86_64, CPU 0.
-Release build with thin LTO and one codegen unit. Eleven alternating rounds,
-calibrated batches of at least 0.1 seconds for the slower implementation.
-Artifact: /tmp/jsonmodem-final-887f0ee.json. Ratios are medians of paired samples,
-not ratios of the two median columns.
+Release build with thin LTO and one codegen unit. Each library was measured
+11 times. Each measurement timed many calls, using the same call count for both
+libraries. The benchmark increased that count until the slower library's batch
+took at least 0.1 seconds. The libraries alternated running first.
+
+For each pair of measurements, the benchmark divided jsonmodem's time by
+orjson's time. The table reports the median ratio: the middle value after sorting
+the 11 ratios. Below 1.0 means jsonmodem took less time; 2.0 means twice as long.
+The time columns give median nanoseconds per call (ns). Dividing those two
+columns can differ from the reported ratio because the medians are calculated
+separately. Artifact: /tmp/jsonmodem-final-887f0ee.json.
 
 | Operation | Workload | jsonmodem ns | orjson ns | Ratio |
 | --- | --- | ---: | ---: | ---: |
@@ -49,8 +60,9 @@ No runtime dependency on orjson is permitted. Inputs are generated locally,
 with no private datasets or private project references.
 
 cProfile on 100 medium dumps calls: 0.666 seconds total, 0.585 seconds in
-_prepare and 0.078 seconds in the standard-library encoder. Profiling timings
-are evidence about attribution, not latency benchmark results.
+_prepare and 0.078 seconds in the standard-library encoder. These measurements
+show where the program spends time under cProfile; they are not unprofiled
+call times.
 
 The binding has abi3-py39 enabled. Local PyO3 source string.rs shows to_cow
 allocates under that limited ABI. A per-interpreter build can use the public
@@ -68,8 +80,9 @@ cannot exhaust the development machine.
 
 ## Next experiment: native complete-document frontend
 
-First native results, paired medians on the same CPU: small loads 1.30x,
-small dumps 1.98x, medium loads 1.81x, medium dumps 2.37x. With thin LTO and
+First Rust implementation results, using the timing ratios defined above on
+the same CPU: small loads 1.30x, small dumps 1.98x, medium loads 1.81x, medium
+dumps 2.37x. With thin LTO and
 one codegen unit: 1.13x, 1.62x, 1.53x, 2.10x respectively. The original
 CPU-pinned baseline was 7.05x, 31.08x, 12.48x, 23.24x. All 26 existing frontend
 tests pass. This does not yet meet the dumps target. Additional misses include
@@ -79,7 +92,7 @@ Artifacts: /tmp/jsonmodem-baseline.json, /tmp/jsonmodem-native-v1.json,
 
 Question: Can eliminating input re-parsing, event/path objects, Python number
 constructor calls for common numbers, and Python serialization preprocessing
-reach a paired median ratio <=2.0 relative to orjson?
+bring the median time ratio to at most 2.0 relative to orjson?
 
 Method: Release build in the checkout's .venv; CPU-pinned, alternating library
 order; calibrated timing batches; save raw samples and metadata as JSON.
@@ -94,15 +107,15 @@ workload misses must remain visible. Generated artifacts: /tmp/jsonmodem-*.json.
 
 Threat model: Untrusted JSON bytes and ordinary Python objects, including
 subclasses and default callbacks. Arbitrary native buffer exporters are outside
-the accepted input API; mutable built-in buffers require snapshots before Rust
-borrowing. Streaming tests remain separate because a non-streaming implementation
+the accepted input API; mutable built-in buffers must be copied before Rust
+reads them. Streaming tests remain separate because a non-streaming implementation
 does not establish safety of feed(). Miri of the core does not validate PyO3.
 
 ## 2026-08-25: native implementation, third measurement
 
-Artifact: /tmp/jsonmodem-native-v3.json. Eleven alternating rounds, CPU 0.
-loads/dumps paired ratios respectively: small 1.03/1.52, medium 1.73/1.83,
-integers 1.53/3.00, floats 1.99/1.50, strings 1.42/1.80,
+Artifact: /tmp/jsonmodem-native-v3.json. Eleven measurements per library, CPU 0,
+using the timing method above. Median loads/dumps ratios: small 1.03/1.52,
+medium 1.73/1.83, integers 1.53/3.00, floats 1.99/1.50, strings 1.42/1.80,
 escaped 2.04/2.21, long_string 0.56/1.88. The original targets pass; the broader
 results do not support a universal 2x claim. Bounded identity-based encoded key
 reuse reduced medium dumps from 2.14x to 1.83x. Owners remain retained.

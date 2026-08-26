@@ -1,16 +1,20 @@
 # Compatibility and allocation evidence
 
-Starting commit: b84ba61. Oracle: orjson 3.11.9 on CPython 3.12.13.
+Starting commit: b84ba61. Reference implementation: orjson 3.11.9 on CPython 3.12.13.
+These results describe the compatibility changes through b145ac3. Later timing
+and allocation measurements are in [the speedup record](../orjson-speedups/record.md).
 
 ## First experiment
 
-Question: What exact behavior does the oracle require for the user's named
-differences, and which allocations can be removed without changing it?
+Question: How does orjson handle integer overflow, nesting, Fragments, dictionary
+keys, floats, exceptions, NumPy, and Python objects? Which allocations can be
+removed while matching that behavior?
 
 Method: Run identical synthetic values through both modules, compare exact bytes,
 types, and exceptions. Inspect the matching public release's tests and source.
-Profile native and fallback operations with an allocation profiler, then repeat
-CPU-pinned alternating timing batches. Retain changes only when compatibility
+Profile Rust serialization and the Python fallback with Memray. Measure time
+separately, fixing the process to one CPU and alternating which library runs
+first. Retain changes only when compatibility
 regressions pass, memory/stack limits remain effective, and measured allocation
 or latency improves. Raw artifacts belong under /tmp/jsonmodem-compat-*.
 
@@ -22,12 +26,13 @@ accepted as completed compatibility work.
 
 ## Duplicate-check experiment (before changing the fallback)
 
-The user requested measurements before deciding whether optional rejection is
-worth supporting. Measure only the existing `_prepare` membership check with
+Measure the cost of duplicate rejection before deciding whether to support it.
+Compare the existing `_prepare` membership check with
 two otherwise identical functions, using an AST transformation to remove that
 one statement. Compare unique string keys, unique integer keys, and repeated
-record dictionaries. Pin CPU 0, alternate 15 rounds of 500 calls, and use Memray
-with Python allocator tracing for 100 calls per variant. This isolates the
+record dictionaries. Fix the process to CPU 0 and time 15 batches of 500 calls
+per variant, alternating which variant runs first. Separately, use Memray with
+Python allocator tracing for 100 calls per variant. This isolates the
 current check; it does not predict the cost of a new standalone tracking set in
 a serializer that no longer builds a prepared dictionary. Raw experiment:
 /tmp/jsonmodem-compat-duplicate-cost.py and .json.
@@ -37,8 +42,8 @@ integer keys, and 2.02% for 1,000 two-field records. Memray allocation event
 counts were identical or within 78 events over 100 calls (out of 0.5-4.5 million)
 and bytes within 10 KiB. The existing prepared dictionary supplies the lookup;
 there is no additional set allocation. This is preprocessing overhead, not
-end-to-end dumps overhead. The user prefers no duplicate-rejection extension;
-the replacement preserves duplicate output keys without a tracking set.
+end-to-end dumps overhead. No duplicate-rejection option was added. The
+replacement preserves duplicate output keys without a tracking set.
 
 Baseline differential evidence: the targeted public release suite had 63 failures,
 312 passes, 3 skips. Three failures concern this package's name/version rather
@@ -48,7 +53,8 @@ Raw logs: /tmp/jsonmodem-compat-upstream-before.log and
 
 ## Native NumPy and direct fallback
 
-The new formatter snapshots NumPy bytes and decodes checked byte chunks in Rust.
+The new formatter copies NumPy storage to immutable bytes, then reads those
+bytes in Rust with bounds checks.
 All 106 applicable NumPy release tests pass (one optional skip). Full upstream
 testing excluding long-running memory and Faker tests produced 1,610 passes,
 five skips, and eight failures: four package identity/version assertions and four
@@ -65,12 +71,13 @@ records as a list. Compare small/medium, sorted, Fragment, dataclass, and NumPy.
 Candidate optimizations after measurement: borrow unescaped decoder cache keys
 instead of allocating String; cache encoded-key output offsets instead of
 allocating a Vec for every key; return root NumPy output without copying it into
-a second bytearray. Each must retain parity and improve measured allocations.
+a second bytearray. Each must preserve the tested behavior and reduce measured
+allocations.
 
-The oracle also has process faults for some NumPy datetime descriptors and
-overflowing calendar arithmetic. Do not reproduce process faults or integer
+orjson also crashes for some NumPy datetime descriptors and overflowing
+calendar arithmetic. Do not reproduce crashes or integer
 overflow; use checked arithmetic and report those cases explicitly. Rust never
-borrows a NumPy data pointer. The NumPy snapshot assumes well-formed NumPy
+borrows a NumPy data pointer. The byte copy assumes well-formed NumPy
 storage, not arrays forged with unsafe foreign-memory interfaces.
 
 ## Primitive dictionary keys
@@ -83,7 +90,8 @@ mixed-type keys in the existing fallback. Retain this change only if exact outpu
 and strict-integer/key regressions pass and the same benchmark improves.
 
 Dataclass profiling also shows 133,866 allocation events per call despite lower
-peak memory. Try serializing each owning field snapshot in one native call,
+peak memory. Try making a shallow copy of each dataclass's fields and serializing
+that copy in one Rust call,
 instead of calling native dumps separately for every field key/value. Preserve
 field order, nested dictionary sorting, parent indentation, and the remaining
 depth budget. Native code must return without invoking callbacks for unsupported
@@ -98,11 +106,12 @@ the reference counter. Do not recreate the bypass in the heap-based serializer.
 
 ## Allocation results
 
-CPython 3.12.13, NumPy 2.5.2, Memray 1.20.0, CPU 0. Each process warms ten
-calls, then profiles 30 complete calls with Python allocator tracing enabled.
+CPython 3.12.13, NumPy 2.5.2, Memray 1.20.0, CPU 0. Each process makes ten
+unmeasured calls before profiling 30 complete calls with Python allocator tracing.
 Inputs are created before profiling; results are discarded. Counts include
-benchmark-loop overhead. Peak means simultaneously live tracked allocations,
-not process RSS. Timing runs do not enable Memray.
+benchmark-loop overhead. An allocation event is a request for memory. Peak bytes
+are the most tracked memory held at once, not the sum of all allocations or the
+whole process's RAM usage (RSS). Timing runs do not enable Memray.
 
 Baseline b84ba61 was built separately and imported from an extracted wheel,
 without replacing the current editable install. Raw profiles and JSON summaries:
@@ -123,16 +132,18 @@ measured separately below.
 
 Borrowed decoder cache keys and encoder output ranges remove three allocations
 per medium call. Returning root NumPy bytes directly removes eight allocation
-events per call and about 1.68 MB of cumulative allocated bytes. Dataclass field
-snapshots reduce allocation events from the first direct-writer version's
-133,866/call to 48,868/call, with a small increase in peak memory (59.9 to 62.4 KB).
+events per call and about 1.68 MB of cumulative allocated bytes. Serializing each
+dataclass's copied fields in one call reduces allocation events from the first
+direct-writer version's 133,866/call to 48,868/call, with a small increase in peak
+memory (59.9 to 62.4 KB).
 These changes are retained. Dataclasses still allocate far more often than orjson.
 
 ## Validation
 
 The local suite passes 223 tests, including independent NumPy metadata checks,
-10,000 random float bit patterns, mixed-object options, snapshot depth/cycles,
-and the existing generated-input, memory-limit, and small-stack regressions.
+10,000 random float bit patterns, mixed-object options, depth and cycles in
+copied containers, and the existing generated-input, memory-limit, and
+small-stack regressions.
 The public orjson 3.11.9 suite passes 1,626 tests, with six optional skips and
 four package-name/version assertions deselected. No behavioral tests are hidden
 by the package identity filter. The checked-in check_orjson_release.py validates
@@ -146,7 +157,7 @@ pdoc retains three pre-existing hash-stub warnings. Publication and implementati
 CI completed successfully; see Publication below.
 
 The final ordinary benchmark found a small-dumps regression to 2.17x after native
-field snapshots. Before accepting it, avoid the PyO3 Fragment type lookup for
+field copies. Before accepting it, avoid the PyO3 Fragment type lookup for
 ordinary containers in Encoder::scalar and inline primitive key dispatch. These
 changes retain all validation and remove work that a known list/dict cannot need.
 Rerun the same CPU-pinned small/medium batches; acceptance still requires <=2x.
@@ -159,8 +170,17 @@ workload (2.08x before). This does not borrow an external buffer or add unsafe c
 ## Final ordinary timings
 
 Release build, CPython 3.12.13, orjson 3.11.9, AMD EPYC 7763, CPU 0.
-Eleven alternating rounds with calibrated 0.1-second batches. Reported ratios
-are medians of paired samples, not ratios of the two marginal medians.
+Each library was measured 11 times. Each measurement timed many calls, using
+the same call count for both libraries. The benchmark increased that count
+until the slower library's batch took at least 0.1 seconds. The libraries
+alternated running first to reduce bias from run order.
+
+For each pair of measurements, the benchmark divided jsonmodem's time by
+orjson's time. The table reports the median ratio: the middle value after sorting
+the 11 ratios. Below 1.0 means jsonmodem took less time; 2.0 means twice as long.
+The time columns give median nanoseconds per call (ns). Dividing those two
+columns can differ from the reported ratio because the medians are calculated
+separately.
 Raw data: /tmp/jsonmodem-compat-timings-inline.json. All output bytes matched.
 Earlier runs, including the rejected 2.17x small-dumps regression, remain in
 /tmp/jsonmodem-compat-timings-{v2,final,v5}.json.
@@ -183,12 +203,12 @@ Earlier runs, including the rejected 2.17x small-dumps regression, remain in
 | dumps | long string | 21,234 | 10,043 | 2.16x |
 
 The original small/medium target is retained. Integer-array and string-heavy
-serialization still exceed 2x; these results do not establish universal parity
-in throughput. The float formatter change improves both compatibility and time.
+serialization still exceed 2x; jsonmodem is not within twice orjson's time for
+every input. The float formatter change improves both compatibility and time.
 
 ## Final object and option timings
 
-Same timing procedure; NumPy arrays contain 100,000 elements shaped 25,000x4.
+Same timing procedure; NumPy arrays contain 100,000 elements in 25,000 rows of four.
 All output bytes match the reference. Raw data:
 /tmp/jsonmodem-compat-objects-{baseline,v2,v3,final,inline}.json. The table uses
 the inline-stack build, including release of unused output before callbacks.
@@ -205,9 +225,9 @@ the inline-stack build, including release of unused output before callbacks.
 
 Primitive key formatting improved from 25.52x to 1.12x without duplicate
 tracking. The frozen Fragment accessor improved its workload from 2.08x to
-1.43x. Dataclass field snapshots roughly halved time versus the first direct
-serializer (43.40x), but Python object handling remains expensive. No claim is
-made that all supported types meet 2x.
+1.43x. Serializing each dataclass's copied fields in one Rust call roughly halved
+time versus the first direct serializer (43.40x), but Python object handling
+remains expensive. Not all supported types meet the 2x target.
 
 The inline-stack build improves the original small workload but sorted medium
 regresses from the previous run's 1.94x to 2.36x. Keep the allocation reduction
@@ -243,10 +263,10 @@ stack tests, pass. The late-default peak drops from 76,243,699 to 42,672,883 byt
 (44.0%) with exactly the same 254,786 events and 1,116,881,443 allocated bytes
 over three calls. Artifacts: /tmp/jsonmodem-compat-late-{before,after}.json.
 
-A separate 15-round confirmation on published b145ac3 returns small loads/dumps
-1.24x/1.77x and medium loads/dumps 1.76x/1.88x. Raw samples:
-/tmp/jsonmodem-compat-b145ac3-confirmation.json. This confirms margin below 2x
-on the original workloads rather than selecting the earlier favorable run.
+A separate test with 15 measurements per library on published b145ac3 returns
+small loads/dumps 1.24x/1.77x and medium loads/dumps 1.76x/1.88x. Raw samples:
+/tmp/jsonmodem-compat-b145ac3-confirmation.json. It used the timing method
+described above. Both original workloads remained below twice orjson's time.
 
 ## Publication
 
@@ -258,9 +278,7 @@ GitHub's check-runs API reports all 21 checks successful on
 This includes Python 3.9/3.13, Miri, fuzzing, flamegraph, and all six benchmark
 jobs. Final local .agent/check.sh and .agent/check-py.sh also pass on b145ac3.
 
-The completion commit changes only this evidence and plan.md. Its checks are
-verified separately before completing the goal; no further source changes or
-optional tests are needed unless final validation finds a defect.
+The documentation completion commit b372ba6 also passed all 21 checks.
 
 ## Follow-up: direct memory comparisons
 
@@ -270,18 +288,20 @@ It compares the existing Memray results directly with orjson, rather than only
 comparing jsonmodem before and after optimization. Runtime source is unchanged.
 
 The missing orjson late-default comparison uses the existing synthetic workload,
-ten warmups, three calls, and the same profiler settings. It measures 56 events,
+ten unmeasured calls followed by three recorded calls, with the same profiler
+settings. It measures 56 events,
 201,135,601 allocated bytes, and 33,555,105 peak live bytes, versus jsonmodem's
 254,786 events, 1,116,881,443 allocated bytes, and 42,672,883 peak live bytes.
 Artifact: /tmp/jsonmodem-memory-orjson-late.json.
 
-RSS is a separate experiment, without Memray. The question is whole-process
-resident memory, including imports and inputs; the decision is to report both
-libraries without treating baseline subtraction as allocation measurement.
-Five fresh workers per library/workload make ten calls each. Library order
-alternates and a CPU is pinned. Inputs are synthetic; decode fixture generation
-runs in another process. Startup, pre-call, first-call, and final readings are
-retained. The reproducible script is benchmarks/bench_rss.py.
+RSS (resident set size) measures RAM held by the whole process. This experiment
+runs without Memray and includes memory for imports and inputs. Subtracting
+memory measured before the call does not give the memory allocated by that call.
+Five fresh processes per library and workload make ten calls each. The benchmark
+alternates library order and fixes each process to one CPU. Inputs are synthetic;
+JSON for decoding is generated in another process. The script keeps readings at
+startup, before calls, after the first call, and after the last call. Reproduce
+the test with benchmarks/bench_rss.py.
 
 The initial script run is /tmp/jsonmodem-rss-results.json. The repository script
 adds isolated temporary fixtures and argument checks; its full repeat is

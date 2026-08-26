@@ -1,20 +1,21 @@
 # Measure additional complete-document speedups
 
-Status: completed (2026-08-26). Follow PLANS.md and the plans-md skill. This plan continues the
-completed orjson-compatibility plan without reopening its API decisions.
+Status: completed (2026-08-26). This plan follows PLANS.md and the plans-md skill.
+It builds on the completed orjson-compatibility plan and keeps the same API behavior.
 
 ## Purpose / Big Picture
 
-Make jsonmodem faster than orjson on additional, reproducible synthetic workloads.
-Keep jsonmodem's streaming APIs, borrowed tokens, bounded stacks, and separate
-complete-document frontend. Preserve grammar, ownership, numeric, and callback
-checks. Do not add an orjson runtime dependency or publish private information.
+Make `loads()` or `dumps()` faster than orjson on more test inputs. Keep the
+streaming APIs unchanged and continue reusing input text where it is safe to
+do so. Keep nesting limits and the checks for invalid JSON, invalid memory,
+number errors, and user callbacks. Do not call orjson from the implementation
+or publish private information.
 
 ## Progress
 
 - [x] (2026-08-26) Inspect clean baseline 6bb32dd, benchmarks, and native writers.
 - [x] Measure a fresh baseline and identify repeated work in native serialization.
-- [x] Implement typed NumPy row loops and long-string capacity reservation; 281 binding tests pass.
+- [x] Choose the NumPy formatter once per array and reserve output space for long strings; 281 binding tests pass.
 - [x] Repeat timings, check allocations, and preserve streaming behavior.
 - [x] (2026-08-26) Publish implementation 4516f73 to PR #1; all 21 checks pass.
 
@@ -23,29 +24,31 @@ checks. Do not add an orjson runtime dependency or publish private information.
 Work in /home/dev-user/code/jsonmodem on dev/friel/orjson-frontend. Existing PR #1
 in friel-openai/jsonmodem is ready for review. Baseline 6bb32dd has all 21 CI
 checks passing. Complete-document loads/dumps live in crates/jsonmodem-py/src/compat.rs;
-NumPy snapshot formatting lives in crates/jsonmodem-py/src/numpy.rs. The optional
+NumPy formatting lives in crates/jsonmodem-py/src/numpy.rs. It reads an immutable
+copy of each array's bytes. The optional
 Python adapters are in crates/jsonmodem-py/python/jsonmodem. Streaming code is
 independent. No streaming API redesign is needed for this work.
 
-The previous measurements place NumPy at 1.11x-1.26x orjson time and long-string
-loads at 0.47x. The objective is additional measured wins, not relabeling an
-existing win. The original small/medium <=2x results must remain true. Dataclasses
+The earlier NumPy tests took 1.11 to 1.26 times as long as orjson. Long-string
+loads took 0.47 times as long, so that was already a faster case. This plan
+required additional improvements. Small and medium documents must still take
+no more than twice orjson's time. Dataclasses
 and other slower workloads must remain reported, not removed from comparisons.
 
 ## Plan of Work
 
-First repeat the existing complete-document and object benchmarks against the
-pinned orjson 3.11.9 wheel. Record hypotheses before editing. NumPy formatting
-currently dispatches dtype and updates its dimension stack per scalar. Test
-dispatch once per snapshot and a bounded loop over the innermost dimension.
-Keep immutable bytes and checked dimension products. Also inspect output growth
-and escaping before choosing any second change.
+First repeat the existing benchmarks against orjson 3.11.9. Record what each
+proposed change should improve before editing. The starting NumPy writer checked
+the number type and updated its position in the outer array for every element.
+Test choosing the formatter once per array and processing each row together.
+Continue reading an immutable byte copy and checking array-size arithmetic.
+Also inspect output-buffer growth and string escaping before choosing a second change.
 
-Use existing helpers rather than a second serializer. Add differential cases
-for changed loops, including empty axes, shapes, indentation, non-finite numbers,
-and malformed snapshot metadata. Run complete-document and streaming tests.
-Retain changes only with repeatable timing improvement and no compatibility or
-security regression. Publish measurements that include unchanged and slower cases.
+Use the existing writer. Add tests that compare its bytes with orjson, including
+empty dimensions, different array layouts, indentation, NaN, and infinity.
+Also test incorrect array sizes and byte lengths. Run complete-document and
+streaming tests. Keep a change only if its improvement repeats and it preserves
+compatibility and security checks. Report unchanged and slower cases too.
 
 ## Concrete Steps
 
@@ -66,10 +69,13 @@ may need approved escalation because sandbox PID visibility differs.
 
 ## Validation and Acceptance
 
-Require exact output equality before timing. Use CPU-pinned alternating batches,
-at least eleven rounds, and a separate confirmation run. Report paired median
-jsonmodem/orjson ratios and raw sample locations. Seek at least two additional
-representative cases below 1.0 in both runs; prefer a margin of ten percent.
+Check exact output bytes before timing. Use one CPU core and take at least
+11 measurements per library, alternating which runs first. Each measurement
+must time many calls on the same input, then divide elapsed time by call count.
+For each pair, divide jsonmodem's time per call by orjson's and report the
+median, or middle, ratio. Repeat the experiment separately and keep all raw data.
+Require at least two additional inputs below 1.0 in both experiments; prefer
+at least ten percent less time than orjson.
 Keep every original benchmark and report regressions rather than selecting only
 favorable inputs. Measure Memray independently of timing, compared with orjson.
 All existing tests and final-commit CI must pass before completion.
@@ -77,13 +83,13 @@ All existing tests and final-commit CI must pass before completion.
 ## Surprises & Discoveries
 
 The Python adapter already returns a top-level NumPy result directly. There is
-no extra Python bytearray copy to remove there. Repeated native element dispatch
-and dimension bookkeeping are the first hypothesis instead.
+no extra Python bytearray copy to remove there. Repeated number-type checks
+and array-position updates were the first operations investigated instead.
 
 Exploratory NumPy ratios improve from 1.27x/1.18x/1.11x to
 0.68x/0.87x/0.86x for existing int64/float32/float64 arrays. Flat and wide arrays
-remain slower. Reserving for every string regresses small writes, so the final
-candidate reserves only strings at least 256 bytes long.
+remain slower. Reserving output space for every string slowed small writes,
+so the final code reserves it only for strings at least 256 bytes long.
 
 ## Decision Log
 
@@ -104,28 +110,31 @@ changes, test results, and publication. Temporary raw profiles stay under /tmp.
 
 ## Interfaces and Dependencies
 
-Keep loads/dumps, streaming methods, and NumPy optional-import behavior unchanged.
-Do not weaken native-exporter restrictions or replace checked snapshot reads
-with borrowed foreign pointers. Retain iterative depth handling and callbacks
-only after releasing native container iterators.
+Keep loads/dumps and streaming methods unchanged. NumPy must remain optional.
+Do not accept additional native buffer owners or replace checked reads of copied
+bytes with reads from arbitrary native pointers. Continue tracking nesting
+without recursive Rust calls, and release Rust container iterators before
+calling user code.
 
 ## Outcomes & Retrospective
 
-Two independent full runs confirm NumPy int64, float32, and float64 at
-0.69x, 0.86x, and 0.86x orjson time on the existing 25,000x4 arrays. All fifteen
-paired confirmation samples beat orjson in each case. Flat and wider-row controls
-remain slower and are included in record.md. No streaming implementation,
-public API, unsafe code, or dependency changes were required.
+Two separate experiments found that writing the tested NumPy arrays took
+31% less time than orjson for int64, and 14% less for float32 and float64.
+Each array contained 100,000 numbers in 25,000 rows of four. jsonmodem beat
+orjson in every one of the repeat experiment's 15 comparisons for each type.
+One-dimensional arrays and arrays with 100 elements per row remained slower;
+record.md includes those results. Streaming code and public APIs are unchanged.
+No new unsafe code or dependency was added.
 
-The long-string reservation removes one allocation per call and reduces peak
-tracked bytes 33.3%, without a consistent below-2x timing result. Original
-small/medium limits are preserved in both full and confirmation runs. Local
+Reserving output space for long strings removes one allocation per call and
+reduces the most memory held at once, as tracked by Memray, by 33.3%.
+Long-string serialization still sometimes takes more than twice as long as orjson.
+Small and medium documents stay below twice orjson's time in both experiments. Local
 validation passes 281 binding tests and 1,626 public release tests, plus core
 checks. All 21 CI checks pass on implementation 4516f73, including Miri,
 Python 3.9/3.13, fuzzing, flamegraph, and all six benchmark jobs. PR #1 remains
-ready for review. The completion commit changes only this plan and record;
-its checks are verified separately before completing the goal.
+ready for review. Documentation commit `456eec5` also passed all 21 checks.
 
 Created 2026-08-26 to record and validate the requested additional speed pass.
 Updated 2026-08-26 after implementation CI passed, preserving both the measured
-wins and the slower controls rather than claiming universal throughput parity.
+wins and the slower cases. The results do not establish a speed advantage on all inputs.

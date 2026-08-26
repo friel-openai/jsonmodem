@@ -6,7 +6,7 @@ the original small/medium timing targets but did not establish drop-in behavior.
 
 ## Purpose / Big Picture
 
-Make the complete-document Python frontend match orjson 3.11.9 for integer
+Make Python loads and dumps match orjson 3.11.9 for integer
 overflow, nesting boundaries, Fragment, converted dictionary keys, float bytes,
 input exceptions, NumPy, and supported Python objects/options. Preserve the
 independent streaming fixes and avoid new allocation or native-stack hazards.
@@ -14,7 +14,7 @@ Measure allocations and timing rather than assuming compatibility costs speed.
 
 ## Plan Layout
 
-This file tracks implementation and completion. record.md records oracle cases,
+This file tracks implementation and completion. record.md records comparisons with orjson,
 test results, allocation experiments, timings, and remaining discrepancies.
 Raw profiles and upstream reference checkouts stay under /tmp. No private
 project information or private datasets belong in any public artifact.
@@ -41,12 +41,12 @@ differ, and some mixed dataclass nesting wraps its recursion counter.
 ## Decision Log
 
 Decision: Use the installed orjson 3.11.9 wheel and that release's public source
-and tests as the behavioral oracle, including exact bytes and exception classes.
+and tests as the reference for expected behavior, including exact bytes and exception classes.
 Rationale: Tests of ordinary JSON value equality missed public API differences.
 Date: 2026-08-25.
 
-Decision: Replace previous policy differences with orjson behavior when the user
-explicitly requested parity. Keep malformed native exporter restrictions unless
+Decision: Match orjson behavior for the listed incompatibilities. Keep restrictions
+on native buffer exporters unless
 an equally safe compatible implementation is established. Fragment is an
 explicit raw-output API, not untrusted JSON parsing.
 Rationale: Compatibility and security require an explicit input contract, not
@@ -59,8 +59,9 @@ cost 2-10% in preprocessing, and a new serializer needs no tracking set.
 Date: 2026-08-25.
 
 Decision: Keep checked NumPy calendar arithmetic and bounded mixed dataclass
-nesting instead of reproducing reference process faults and counter overflow.
-Keep owning snapshots before callbacks. These restrictions are documented.
+nesting instead of reproducing orjson crashes and counter overflow.
+Before callbacks, make shallow copies of container entries and hold references
+to those entries. Document these differences from orjson.
 Date: 2026-08-25.
 
 ## Outcomes & Retrospective
@@ -73,12 +74,17 @@ Allocation profiling, timing confirmation, and implementation publication are
 complete. All 21 CI checks pass on b145ac3, including Python 3.9/3.13, Miri,
 fuzzing, flamegraph, and all six benchmark jobs. PR #1 remains ready for review.
 
-The 15-round confirmation measures small loads/dumps at 1.24x/1.77x and medium
-loads/dumps at 1.76x/1.88x. NumPy measures 1.11x-1.26x. The late-callback peak
+The final timing test measured each library 15 times. Each measurement timed
+many calls, with the same call count for both libraries and alternating which
+library ran first. The reported ratio is the middle of the 15 jsonmodem/orjson
+time ratios after sorting. A ratio of 2.0 means jsonmodem took twice as long.
+Small loads/dumps measured 1.24x/1.77x; medium loads/dumps measured 1.76x/1.88x.
+NumPy measured 1.11x-1.26x. The late-callback peak
 falls 44%, and shallow native calls allocate once less. This is not universal
 2x performance: dataclasses remain 21.20x, sorted dictionaries 2.36x, and integer
-arrays 2.76x. Buffer-owner restrictions, callback snapshots, and checked handling
-of reference overflow/fault cases remain documented compatibility restrictions.
+arrays 2.76x. The README documents the remaining differences: rejected external
+buffer exporters, shallow copies before callbacks, and errors for inputs that
+crash or overflow orjson's counters.
 
 ## Context and Orientation
 
@@ -95,8 +101,8 @@ First obtain public release tests and write a local differential harness that
 compares output bytes, decoded types, and exception classes. Record boundaries
 instead of inferring them from prose. Then correct native loads and replace
 Fragment placeholders and dictionary preprocessing with direct output. Keep
-callback execution outside native iterators or take owning snapshots before
-callbacks. Implement uncommon object conversion explicitly, and handle NumPy
+callback execution outside Rust iterators or make shallow copies of container
+entries before callbacks. Implement uncommon object conversion explicitly, and handle NumPy
 using checked access and native formatting rather than a blanket tolist().
 
 Profile allocations for small/medium JSON, sorted keys, Fragment, callback,
@@ -124,7 +130,7 @@ float bytes, integer boundaries, nesting, malformed input, cycles, and callback
 mutation. Retain memory-limited streaming and small-stack native regressions.
 Preserve the original small/medium <=2x timings and report other measurements.
 Record allocation counts or peak memory with the profiler and its limitations.
-Do not claim parity for any untested or unresolved behavior. Required CI must
+Do not claim matching behavior for untested or unresolved cases. Required CI must
 pass on the final published commit before completing the goal.
 
 ## Idempotence and Recovery
@@ -146,6 +152,5 @@ do not interpret unchecked third-party buffer metadata as trusted Rust slices.
 Interpreter-specific wheels are packaging, not an API incompatibility; test the
 supported interpreter range and document the build choice precisely.
 
-Updated 2026-08-26: implementation CI passed all 21 checks. The completed plan
-and record preserve measured limitations; the goal's last check is CI on the
-documentation-only completion commit.
+Updated 2026-08-26: all 21 checks passed for implementation b145ac3 and the
+documentation completion commit b372ba6.

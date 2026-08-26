@@ -4,18 +4,24 @@ These are complete-document `loads()` and `dumps()` measurements, not streaming
 benchmarks. The inputs are synthetic. Lower memory use on one workload does not
 establish lower memory use for other inputs or options.
 
-Runtime source: jsonmodem commit `b145ac3` (also used by documentation commit
-`b372ba6`). Environment: Linux x86-64, CPython 3.12.13, orjson 3.11.9,
+These measurements describe the code in jsonmodem commit `b145ac3`, which
+was unchanged in documentation commit `b372ba6`. Later allocation results are
+in the [speedup record](../../../plans/orjson-speedups/record.md#allocation-confirmation).
+This earlier experiment used Linux x86-64, CPython 3.12.13, orjson 3.11.9,
 NumPy 2.5.2, Memray 1.20.0. Timing results are in the
 [compatibility record](../../../plans/orjson-compatibility/record.md).
 
 ## Memray: allocation events and peak live bytes
 
-`bench_allocations.py` warms each operation ten times, then profiles 30 calls
-with `trace_python_allocators=True`. Inputs are constructed before profiling;
-each result is discarded. Events include the Python loop and call machinery.
-Peak live bytes are the maximum simultaneous tracked allocation, not the sum
-of allocations and not RSS. Do not divide peak bytes by the call count.
+`bench_allocations.py` runs each operation ten times before it starts recording,
+then measures 30 calls with `trace_python_allocators=True`. Inputs are built
+before recording starts, and each result is discarded. An allocation event is
+a request for memory. Counts include requests made by the Python benchmark loop
+and call machinery, not just the JSON library.
+
+Peak live bytes means the largest amount of tracked memory held at once.
+It is not the total amount requested over all calls or the whole process's
+resident memory (RSS). Do not divide peak bytes by the call count.
 The large `late_default` case uses three measured calls instead of 30.
 
 | Workload | jsonmodem events/call | orjson events/call | jsonmodem peak bytes | orjson peak bytes |
@@ -29,11 +35,12 @@ The large `late_default` case uses three measured calls instead of 30.
 | dumps, float32 array, 25,000 x 4 | 52.3 | 25,034.2 | 2,292,773 | 4,073,865 |
 | dumps, late default callback | 84,928.7 | 18.7 | 42,672,883 | 33,555,105 |
 
-jsonmodem uses fewer peak live bytes on these loads, small dumps, and NumPy
-cases. It uses more on the other cases. Dataclass and late-callback allocation
-counts remain much higher than orjson even after reducing temporary storage.
-The late-callback input is 5,000 references to a 4 KiB string followed by an
-unsupported object; its callback returns `None`.
+jsonmodem's peak tracked memory is lower for these loads, small dumps, and
+NumPy cases. It is higher for the other cases. Dataclasses and the late-callback
+case still make far more allocation requests than orjson. The late-callback
+input is a list containing 5,000 references to a 4 KiB string, followed by an
+unsupported object. The serializer reaches that object after writing the
+strings, then calls a user-provided function that returns `None`.
 
 From the repository root, with both libraries and Memray installed:
 
@@ -46,20 +53,25 @@ Use `--workload late_default --calls 3` for that row. The all-workload command
 also includes `late_default`, with the selected call count. Choose unused output
 names because Memray does not overwrite its binary profiles.
 
-## RSS: whole-process resident memory
+## RSS: memory held by the whole process
 
-`bench_rss.py` starts five fresh processes per library and workload, alternating
-library order and pinning a CPU where supported. Each worker imports only the
-target JSON library, imports NumPy only for its array case, constructs its input,
-then makes ten calls without warmup. Decoding fixtures are generated in another
-process so their construction cannot raise the worker's memory high-water mark.
-Memray is not loaded in these workers.
+RSS, or resident set size, measures memory currently held in RAM by a process.
+`bench_rss.py` starts five new processes for each library and input. Each process
+imports only the JSON library being tested, plus NumPy when needed, prepares its
+input, and makes ten calls. It makes no preliminary calls. The benchmark
+alternates which library runs first and uses one CPU core where supported.
+For decoding, another process creates the JSON input so building it cannot
+increase the test process's recorded peak. These processes do not load Memray.
 
-The table reports median pre-call `VmRSS` and final `VmHWM` from Linux
-`/proc/self/status`, in MiB (1,048,576 bytes). Whole-process memory includes the
-interpreter, imports, input, allocator retention, and serialization. A peak equal
-to the pre-call RSS does not mean the operation allocated nothing. Subtracting
-the baseline does not produce an operation-only allocation measurement.
+The table reports memory before the first call and the highest amount recorded
+by the end of the test. Each value is the median, or middle reading, among the
+five processes. The Linux fields are `VmRSS` and `VmHWM` in `/proc/self/status`;
+units are MiB (1,048,576 bytes).
+
+These numbers include the interpreter, imports, input, serialization, and memory
+the allocator keeps for reuse. An unchanged peak does not mean there were no
+allocations. Subtracting the starting value does not isolate the JSON operation's
+memory use.
 
 | Workload | jsonmodem pre-call | jsonmodem peak | orjson pre-call | orjson peak |
 | --- | ---: | ---: | ---: | ---: |
@@ -71,7 +83,7 @@ the baseline does not produce an operation-only allocation measurement.
 | dumps, float32 array, 25,000 x 4 | 32.83 | 35.09 | 32.23 | 35.77 |
 | dumps, late default callback | 18.23 | 58.90 | 16.98 | 37.59 |
 
-The largest within-run peak range was orjson's 100,000-dictionary decode:
+The largest variation among the five processes was orjson's 100,000-dictionary decode:
 70.53-74.42 MiB, compared with jsonmodem's 54.91-55.21 MiB. RSS and Memray
 answer different questions: jsonmodem's medium decode has lower tracked live
 allocations but higher whole-process RSS here.

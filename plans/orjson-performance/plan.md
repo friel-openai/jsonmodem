@@ -1,15 +1,12 @@
 # Make the document frontend competitive with orjson
 
-This living plan follows PLANS.md and the plans-md skill. Keep Progress, Surprises & Discoveries,
-Decision Log, and Outcomes & Retrospective current.
-
 Status: completed. The original small/medium performance targets and security
 regressions are satisfied. Additional workload and compatibility limits remain
 documented rather than being included in the completion claim.
 
-Follow-up: ../orjson-compatibility/plan.md now owns the user's request to remove
-those compatibility differences and reduce allocations. This completed plan
-remains the baseline measurement record, not the current compatibility contract.
+Follow-up: [the compatibility plan](../orjson-compatibility/plan.md) addresses
+the remaining compatibility differences and allocations. This completed plan
+describes the earlier implementation; use the Python README for current behavior.
 
 ## Purpose / Big Picture
 
@@ -43,7 +40,7 @@ repository convention keeps plans under plans/. No additional tracker is used.
 - [x] Bound streaming depth before path/event allocation, including iterable feeds.
 - [x] Preserve exact integer types and reject non-finite numbers in streaming APIs.
 - [x] Fix finish() at numeric EOF and number capture across chunk boundaries.
-- [x] Restrict borrowed buffers to built-in immutable owners; snapshot mutable inputs.
+- [x] Restrict borrowed buffers to built-in immutable owners; copy mutable inputs before reading them in Rust.
 - [x] Add subprocess resource-limit tests and Python-binding fuzz/property coverage.
 - [x] Run differential, adversarial, and mutation/callback regression tests.
 - [x] Meet the two original workload targets; document other workloads.
@@ -112,7 +109,7 @@ EOF, buffer ownership, long-key memory, and small-thread-stack regressions pass.
 The existing PR has been updated. All 21 checks passed for implementation commit
 887f0ee, including Python 3.9/3.13, Miri, fuzzing, and benchmarks. Final
 documentation and additional indentation/shared-container tests do not change
-the measured implementation. The goal supervisor verifies their final CI run.
+the measured implementation. Final CI results are available in PR #1.
 
 ## Context and Orientation
 
@@ -163,8 +160,10 @@ and serialization behavior. Compare randomized outputs with orjson for the
 shared contract and with explicit expectations for documented differences.
 Malformed inputs must raise Python exceptions, not abort or panic. Benchmark
 both libraries in the same process with alternating order and CPU affinity.
-The primary acceptance test is median paired time ratios at most 2.0 for
-both operations on small and medium. Report each additional workload without
+For each pair of timing measurements, divide jsonmodem's time by orjson's time.
+The middle ratio after sorting must be at most 2.0 for loads and dumps on both
+small and medium inputs: jsonmodem must take no more than twice as long.
+Report each additional workload without
 averaging away regressions. Do not weaken validation to pass this target.
 
 ## Idempotence and Recovery
