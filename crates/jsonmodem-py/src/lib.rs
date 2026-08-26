@@ -87,7 +87,8 @@ fn load_number(py: Python<'_>, lexeme: &str) -> PyResult<PyObject> {
             // SAFETY: Python is attached. The constructor returns a new
             // reference or NULL, which is checked before taking ownership.
             return unsafe {
-                Bound::from_owned_ptr_or_err(py, ffi::PyLong_FromLongLong(number)).map(Bound::unbind)
+                Bound::from_owned_ptr_or_err(py, ffi::PyLong_FromLongLong(number))
+                    .map(Bound::unbind)
             };
         }
         if let Ok(number) = lexeme.parse::<u64>() {

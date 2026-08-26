@@ -295,16 +295,23 @@ impl<'a> DocumentReader<'a> {
     }
 
     fn digits(&mut self) -> usize {
-        let start = self.offset;
-        while self
-            .input
-            .as_bytes()
-            .get(self.offset)
-            .is_some_and(u8::is_ascii_digit)
-        {
-            self.offset += 1;
+        let bytes = &self.input.as_bytes()[self.offset..];
+        let mut count = 0;
+        while let Some(chunk) = bytes.get(count..count + 8) {
+            let word = u64::from_ne_bytes(chunk.try_into().expect("eight-byte slice"));
+            // Rust's double parser uses this predicate for eight ASCII digits.
+            let upper = word.wrapping_add(0x4646_4646_4646_4646);
+            let lower = word.wrapping_sub(0x3030_3030_3030_3030);
+            if (upper | lower) & 0x8080_8080_8080_8080 != 0 {
+                break;
+            }
+            count += 8;
         }
-        self.offset - start
+        while bytes.get(count).is_some_and(u8::is_ascii_digit) {
+            count += 1;
+        }
+        self.offset += count;
+        count
     }
 }
 
@@ -483,6 +490,45 @@ mod tests {
         ] {
             let error = DocumentReader::new(input).number().err();
             assert_eq!(error, Some(DocumentError { message, offset }));
+        }
+    }
+
+    #[test]
+    fn digit_scans_match_scalar_for_ascii_and_utf8() {
+        let lengths = if cfg!(miri) { 12 } else { 96 };
+        for length in 0..lengths {
+            let start = length % 16;
+            let prefix = format!("{}{}", " ".repeat(start), "9".repeat(length));
+            let mut reader = DocumentReader::new(&prefix);
+            reader.offset = start;
+            assert_eq!(reader.digits(), length);
+            assert_eq!(reader.offset(), prefix.len());
+            for position in 0..length {
+                for byte in 0..=u8::MAX {
+                    let input = format!(
+                        "{}{}{}",
+                        &prefix[..start + position],
+                        char::from(byte),
+                        &prefix[start + position + 1..],
+                    );
+                    let expected = input.as_bytes()[start..]
+                        .iter()
+                        .take_while(|byte| byte.is_ascii_digit())
+                        .count();
+                    let mut reader = DocumentReader::new(&input);
+                    reader.offset = start;
+                    assert_eq!(reader.digits(), expected, "{input:?}");
+                    assert_eq!(reader.offset(), start + expected);
+                }
+            }
+        }
+        for suffix in ["\u{800}", "\u{ffff}", "\u{10000}", "\u{10ffff}"] {
+            for length in 0..32 {
+                let input = format!("{}{suffix}7", "0".repeat(length));
+                let mut reader = DocumentReader::new(&input);
+                assert_eq!(reader.digits(), length);
+                assert_eq!(reader.offset(), length);
+            }
         }
     }
 }
