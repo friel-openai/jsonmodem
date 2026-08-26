@@ -2,6 +2,7 @@
 
 import dataclasses
 import gc
+import json
 from typing import ClassVar
 import weakref
 
@@ -296,6 +297,13 @@ def test_field_owner_survives_until_its_default_callback():
     assert calls == ["serialized", "released"]
 
 
+def test_native_output_key_ranges_are_cleared_before_callback_traversal():
+    prefix = [{"id": i, "name": "x" * 300} for i in range(20)]
+    value = prefix + [Record(1, 2), {"id": 3}]
+    expected = prefix + [{"z": 1, "a": 2}, {"id": 3}]
+    assert jsonmodem.dumps(value) == json.dumps(expected, separators=(",", ":")).encode()
+
+
 def test_default_can_return_a_dataclass_and_reenter_encoder():
     first, second = object(), object()
     calls = []
@@ -330,6 +338,92 @@ def test_dataclass_and_builtin_depth_share_one_counter(option):
     value = Record([value], None)
     with pytest.raises(TypeError, match="Recursion"):
         jsonmodem.dumps(value, option=option)
+
+
+def test_empty_list_subclass_does_not_count_toward_depth_limit():
+    class EmptyList(list):
+        def __len__(self):
+            raise AssertionError("use the builtin list length")
+
+        def __bool__(self):
+            raise AssertionError("do not invoke a list subclass's truthiness")
+
+    value = EmptyList()
+    for _ in range(254):
+        value = [value]
+    assert jsonmodem.dumps(value) == b"[" * 255 + b"]" * 255
+    assert jsonmodem.dumps(
+        value, default=lambda _: None, option=jsonmodem.OPT_PASSTHROUGH_SUBCLASS
+    ) == b"[" * 254 + b"null" + b"]" * 254
+
+
+def test_empty_list_subclass_depth_matches_orjson(oracle):
+    class EmptyList(list):
+        pass
+
+    value = EmptyList()
+    for _ in range(254):
+        value = [value]
+    assert jsonmodem.dumps(value) == oracle.dumps(value)
+
+
+def default_container_chain(module, limit, siblings=1, kind="dataclass"):
+    """Alternate callbacks and containers without approaching the container limit."""
+    calls = 0
+
+    class Unsupported:
+        def __init__(self, step):
+            self.step = step
+
+    @dataclasses.dataclass
+    class Box:
+        value: object
+
+    def default(value):
+        nonlocal calls
+        calls += 1
+        step = value.step + 1
+        if step == limit:
+            return 0
+        next_value = Unsupported(step)
+        if step % 2:
+            return next_value
+        if kind == "list":
+            return [next_value]
+        if kind == "dict":
+            return {"value": next_value}
+        return Box(next_value)
+
+    value = [Unsupported(0) for _ in range(siblings)]
+    try:
+        result = module.dumps(value, default=default)
+    except TypeError as error:
+        return str(error), calls
+    return result, calls
+
+
+@pytest.mark.parametrize("kind", ["dataclass", "list", "dict"])
+def test_default_counter_is_inherited_by_container_children(kind):
+    result, calls = default_container_chain(jsonmodem, 255, kind=kind)
+    assert isinstance(result, bytes)
+    assert calls == 255
+    result, calls = default_container_chain(jsonmodem, 256, kind=kind)
+    assert result == "default serializer exceeds recursion limit"
+    assert calls == 255
+
+
+@pytest.mark.parametrize("kind", ["dataclass", "list", "dict"])
+def test_default_counter_is_restored_for_siblings(kind):
+    result, calls = default_container_chain(jsonmodem, 255, siblings=2, kind=kind)
+    assert isinstance(result, bytes)
+    assert calls == 510
+
+
+@pytest.mark.parametrize("limit,siblings", [(255, 1), (256, 1), (255, 2)])
+def test_default_container_counter_matches_orjson(limit, siblings, oracle):
+    assert default_container_chain(jsonmodem, limit, siblings) == default_container_chain(
+        oracle, limit, siblings
+    )
 
 
 @pytest.mark.parametrize("integer", [2**53, -(2**53), 2**64, -(2**63) - 1])

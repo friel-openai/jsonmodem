@@ -19,6 +19,8 @@ struct Container<'py> {
     items: Items<'py>,
     count: usize,
     closing: u8,
+    // Callback replacements inherit this count; siblings restore it.
+    default_depth: usize,
 }
 
 /// Every remaining item is owned before attribute access or a default callback.
@@ -56,19 +58,13 @@ struct ClassAttributes<'py> {
 
 impl<'py> ObjectEncoder<'py> {
     fn new(
+        encoder: Encoder,
         default: Bound<'py, PyAny>,
         default_provided: bool,
-        option: i32,
         helpers: &Bound<'py, PyTuple>,
     ) -> PyResult<Self> {
         Ok(Self {
-            encoder: Encoder {
-                output: Vec::with_capacity(INITIAL_OUTPUT_CAPACITY),
-                option,
-                base_depth: 0,
-                dataclass_root: false,
-                keys: Vec::new(),
-            },
+            encoder,
             default,
             default_provided,
             enum_type: helpers.get_item(0)?,
@@ -87,6 +83,14 @@ impl<'py> ObjectEncoder<'py> {
             type_dict: helpers.get_item(11)?,
             classes: SmallVec::new(),
         })
+    }
+
+    fn finish(mut self, py: Python<'py>, obj: Bound<'py, PyAny>) -> PyResult<Py<PyBytes>> {
+        self.value(obj)?;
+        if self.encoder.option & APPEND_NEWLINE != 0 {
+            self.encoder.output.push(b'\n');
+        }
+        Ok(PyBytes::new(py, &self.encoder.output).unbind())
     }
 
     fn class_attributes(&mut self, class: &Bound<'py, PyType>) -> PyResult<Bound<'py, PyAny>> {
@@ -227,13 +231,12 @@ impl<'py> ObjectEncoder<'py> {
             } else if (option & PASSTHROUGH_SUBCLASS == 0 || value.is_exact_instance_of::<PyList>())
                 && value.is_instance_of::<PyList>()
             {
-                container = Some(Items::Array(
-                    value
-                        .downcast::<PyList>()?
-                        .iter()
-                        .collect::<Vec<_>>()
-                        .into_iter(),
-                ));
+                let list = value.downcast::<PyList>()?;
+                if list.is_empty() {
+                    self.encoder.output.extend_from_slice(b"[]");
+                } else {
+                    container = Some(Items::Array(list.iter().collect::<Vec<_>>().into_iter()));
+                }
             } else if (option & PASSTHROUGH_SUBCLASS == 0 || value.is_exact_instance_of::<PyDict>())
                 && value.is_instance_of::<PyDict>()
             {
@@ -290,10 +293,10 @@ impl<'py> ObjectEncoder<'py> {
                     items,
                     count: 0,
                     closing,
+                    default_depth,
                 });
             }
 
-            default_depth = 0;
             loop {
                 let depth = stack.len();
                 let Some(frame) = stack.last_mut() else {
@@ -304,6 +307,7 @@ impl<'py> ObjectEncoder<'py> {
                     Items::Array(items) => items.next().map(|item| (None, item)),
                 };
                 if let Some((key, item)) = item {
+                    default_depth = frame.default_depth;
                     if frame.count != 0 {
                         self.encoder.output.push(b',');
                     }
@@ -329,6 +333,30 @@ impl<'py> ObjectEncoder<'py> {
     }
 }
 
+/// The first traversal cannot invoke callbacks, so its storage can be reused.
+pub(super) fn dumps(
+    py: Python<'_>,
+    mut encoder: Encoder,
+    obj: Bound<'_, PyAny>,
+    default: Option<Bound<'_, PyAny>>,
+) -> PyResult<PyObject> {
+    encoder.output.clear();
+    encoder.keys.clear();
+    let helpers = py
+        .import(intern!(py, "jsonmodem._compat"))?
+        .getattr(intern!(py, "_ENCODER_HELPERS"))?;
+    let default_provided = default.is_some();
+    let default = default.unwrap_or_else(|| py.None().into_bound(py));
+    Ok(ObjectEncoder::new(
+        encoder,
+        default,
+        default_provided,
+        helpers.downcast::<PyTuple>()?,
+    )?
+    .finish(py, obj)?
+    .into_any())
+}
+
 /// Continue through dataclasses and callbacks without restarting serialized
 /// values.
 #[pyfunction]
@@ -340,10 +368,12 @@ pub fn _dumps_objects(
     default_provided: bool,
     helpers: Bound<'_, PyTuple>,
 ) -> PyResult<Py<PyBytes>> {
-    let mut encoder = ObjectEncoder::new(default, default_provided, option, &helpers)?;
-    encoder.value(obj)?;
-    if option & APPEND_NEWLINE != 0 {
-        encoder.encoder.output.push(b'\n');
-    }
-    Ok(PyBytes::new(py, &encoder.encoder.output).unbind())
+    let encoder = Encoder {
+        output: Vec::with_capacity(INITIAL_OUTPUT_CAPACITY),
+        option,
+        base_depth: 0,
+        dataclass_root: false,
+        keys: Vec::new(),
+    };
+    ObjectEncoder::new(encoder, default, default_provided, &helpers)?.finish(py, obj)
 }

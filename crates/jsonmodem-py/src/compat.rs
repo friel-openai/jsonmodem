@@ -753,12 +753,7 @@ pub fn dumps(
         }
         return Ok(PyBytes::new(py, &encoder.output).into_any().unbind());
     }
-    drop(encoder);
-    let fallback = py.import("jsonmodem")?.getattr("_dumps_fallback")?;
-    let default_provided = default.is_some();
-    Ok(fallback
-        .call1((obj, default, option, default_provided))?
-        .unbind())
+    objects::dumps(py, encoder, obj, default)
 }
 
 /// Try an owning dataclass field snapshot without invoking any user callback.
