@@ -29,6 +29,7 @@ const STRICT_INTEGER: i32 = 64;
 const APPEND_NEWLINE: i32 = 1024;
 const INITIAL_OUTPUT_CAPACITY: usize = 256;
 const MAX_RETAINED_STRING_CAPACITY: usize = 64 * 1024;
+const MAX_RETAINED_SORTED_CAPACITY: usize = 64;
 
 // Keep the float parser out of the container loop's instruction footprint.
 #[inline(never)]
@@ -400,10 +401,11 @@ struct Encoder<const CHECKED: bool = false> {
     keys: Vec<(Py<PyString>, Range<usize>)>,
 }
 
-/// Owning iterators keep each container alive without native recursion.
+/// Owning iteration state keeps pending Python values alive without native
+/// recursion.
 enum EncodeIterator<'py> {
     Dict(BoundDictIterator<'py>),
-    Sorted(std::vec::IntoIter<(Bound<'py, PyAny>, Bound<'py, PyAny>)>),
+    Sorted(Vec<(Bound<'py, PyAny>, Bound<'py, PyAny>)>),
     List(BoundListIterator<'py>),
     Tuple(BoundTupleIterator<'py>),
 }
@@ -684,6 +686,7 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
             return Ok(true);
         }
         let mut stack: SmallVec<[EncodeContainer<'_>; 2]> = SmallVec::new();
+        let mut sorted_items = Vec::new();
         let mut current = value.clone();
         'container: loop {
             if stack.len() + self.base_depth >= MAX_ENCODE_DEPTH
@@ -703,7 +706,13 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
             }
             let (iter, opening, closing) = if let Ok(dict) = current.downcast_exact::<PyDict>() {
                 if self.option & SORT_KEYS != 0 && (!self.dataclass_root || !stack.is_empty()) {
-                    let mut items: Vec<_> = dict.iter().collect();
+                    let mut items = std::mem::take(&mut sorted_items);
+                    // A larger spare must not inflate every active parent in nested input.
+                    if !dict.is_empty() && items.capacity() > dict.len() {
+                        items = Vec::new();
+                    }
+                    items.reserve_exact(dict.len());
+                    items.extend(dict.iter());
                     for (key, _) in &items {
                         let Ok(key) = key.downcast_exact::<PyString>() else {
                             return Ok(false);
@@ -711,14 +720,17 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                         key.to_str()
                             .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
                     }
+                    // Exact string keys are unique. Descending order lets pop() emit ascending
+                    // keys.
                     items.sort_unstable_by(|(left, _), (right, _)| {
-                        left.downcast::<PyString>()
+                        right
+                            .downcast::<PyString>()
                             .unwrap()
                             .to_str()
                             .unwrap()
-                            .cmp(right.downcast::<PyString>().unwrap().to_str().unwrap())
+                            .cmp(left.downcast::<PyString>().unwrap().to_str().unwrap())
                     });
-                    (EncodeIterator::Sorted(items.into_iter()), b'{', b'}')
+                    (EncodeIterator::Sorted(items), b'{', b'}')
                 } else {
                     (EncodeIterator::Dict(dict.iter()), b'{', b'}')
                 }
@@ -762,8 +774,8 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                 }
                 let item = match &mut frame.iter {
                     EncodeIterator::Dict(iter) => iter.next().map(|(key, item)| (Some(key), item)),
-                    EncodeIterator::Sorted(iter) => {
-                        iter.next().map(|(key, item)| (Some(key), item))
+                    EncodeIterator::Sorted(items) => {
+                        items.pop().map(|(key, item)| (Some(key), item))
                     }
                     EncodeIterator::List(iter) => iter.next().map(|item| (None, item)),
                     EncodeIterator::Tuple(iter) => iter.next().map(|item| (None, item)),
@@ -793,6 +805,13 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                         self.newline(stack.len())?;
                     }
                     self.push(frame.closing)?;
+                    if let EncodeIterator::Sorted(items) = frame.iter {
+                        debug_assert!(items.is_empty());
+                        // Reuse only empty storage, bounded independently of the input size.
+                        if items.capacity() <= MAX_RETAINED_SORTED_CAPACITY {
+                            sorted_items = items;
+                        }
+                    }
                 }
             }
         }
