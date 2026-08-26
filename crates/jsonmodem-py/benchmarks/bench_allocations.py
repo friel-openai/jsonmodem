@@ -37,6 +37,7 @@ def main():
         ("loads_medium", module.loads, orjson.dumps(medium), {}),
         ("dumps_small", module.dumps, small, {}),
         ("dumps_medium", module.dumps, medium, {}),
+        ("long_string", module.dumps, "abcdefghijklmnopqrstuvxyz0123456789" * 4096, {}),
         ("sorted_medium", module.dumps, medium, {"option": module.OPT_SORT_KEYS}),
         ("fragments_1000", module.dumps, [fragment] * 1000, {}),
         ("dataclasses_1000", module.dumps, [Record(i, f"item-{i}") for i in range(1000)], {}),

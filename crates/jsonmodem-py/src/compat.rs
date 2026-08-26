@@ -23,6 +23,7 @@ const NON_STR_KEYS: i32 = 4;
 const SORT_KEYS: i32 = 32;
 const STRICT_INTEGER: i32 = 64;
 const APPEND_NEWLINE: i32 = 1024;
+const INITIAL_OUTPUT_CAPACITY: usize = 256;
 
 /// Explicit raw output, retaining its owner without parsing or placeholder
 /// substitution.
@@ -382,6 +383,10 @@ impl Encoder {
     }
 
     fn string(&mut self, value: &str) {
+        // Avoid growing again just for the closing quote of a long plain prefix.
+        if value.len() >= INITIAL_OUTPUT_CAPACITY {
+            self.output.reserve(value.len() + 2);
+        }
         self.output.push(b'"');
         let mut remaining = value.as_bytes();
         while !remaining.is_empty() {
@@ -649,7 +654,7 @@ pub fn dumps(
         return Err(PyTypeError::new_err("unsupported option bits"));
     }
     let mut encoder = Encoder {
-        output: Vec::with_capacity(256),
+        output: Vec::with_capacity(INITIAL_OUTPUT_CAPACITY),
         option: flags,
         base_depth: 0,
         dataclass_root: false,
@@ -681,7 +686,7 @@ pub fn _dumps_fields(
         return Err(PyTypeError::new_err("Recursion limit reached"));
     }
     let mut encoder = Encoder {
-        output: Vec::with_capacity(256),
+        output: Vec::with_capacity(INITIAL_OUTPUT_CAPACITY),
         option,
         base_depth: depth,
         dataclass_root: true,

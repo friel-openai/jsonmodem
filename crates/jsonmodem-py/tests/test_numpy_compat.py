@@ -43,6 +43,23 @@ def test_empty_dimensions(shape):
         assert jsonmodem.dumps(value, option=option) == orjson.dumps(value, option=option)
 
 
+@pytest.mark.parametrize("shape", [(1,), (17,), (3, 1), (3, 17), (2, 3, 17), (1, 2, 1, 3)])
+@pytest.mark.parametrize("dtype", ["int8", "uint64", "float16", "float32", "float64"])
+def test_innermost_rows(shape, dtype):
+    orjson = pytest.importorskip("orjson")
+    size = int(np.prod(shape))
+    values = np.arange(size).astype(dtype)
+    if dtype.startswith("float"):
+        values /= 7
+        values[::5] = np.nan
+        values[1::5] = -np.inf
+        values[2::5] = -0.0
+    array = values.reshape(shape)
+    for option in (16, 17, 16 | 1024):
+        for value in (array, {"nested": [array]}):
+            assert jsonmodem.dumps(value, option=option) == orjson.dumps(value, option=option)
+
+
 def test_layout_and_default():
     array = np.arange(12).reshape(3, 4)[:, ::2]
     with pytest.raises(TypeError, match="C contiguous"):
@@ -69,6 +86,8 @@ def test_checked_datetime_arithmetic():
     (b"\0", (1,), "i", 1, 255),
     (b"", (sys.maxsize, 8), "i", 8, 0),
     (b"\0", (), "unknown", 1, 0),
+    (b"\0" * 47, (2, 3), "i", 8, 0),
+    (b"\0", (2, 0, 3), "i", 1, 0),
 ])
 def test_native_metadata_is_checked(data, shape, kind, size, depth):
     with pytest.raises(TypeError):

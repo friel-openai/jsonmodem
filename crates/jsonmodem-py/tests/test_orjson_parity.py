@@ -183,3 +183,12 @@ def test_primitive_keys_ignore_strict_integer():
     value = {2**64 - 1: "integer", None: 0, float("nan"): 1, "null": 2}
     option = orjson.OPT_NON_STR_KEYS | orjson.OPT_STRICT_INTEGER
     assert jsonmodem.dumps(value, option=option) == orjson.dumps(value, option=option)
+
+
+@pytest.mark.parametrize("length", [0, 1, 7, 8, 31, 32, 63, 64, 255, 256, 257, 4096, 131072])
+@pytest.mark.parametrize("pattern", ["abcdefgh", "quote\"slash\\\n\u2603"])
+def test_string_capacity_boundaries(length, pattern):
+    value = (pattern * (length // len(pattern) + 1))[:length]
+    for obj in (value, {"text": value, "items": [value, value]}):
+        for option in (0, 1, 1024):
+            assert jsonmodem.dumps(obj, option=option) == orjson.dumps(obj, option=option)

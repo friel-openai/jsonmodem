@@ -84,60 +84,66 @@ fn write_datetime(output: &mut Vec<u8>, value: i64, unit: &str, option: i32) -> 
     Ok(())
 }
 
-fn item(output: &mut Vec<u8>, bytes: &[u8], kind: &str, unit: &str, option: i32) -> PyResult<()> {
-    let mut integer = itoa::Buffer::new();
-    let mut float = zmij::Buffer::new();
-    match (kind, bytes.len()) {
-        ("b", 1) => output.extend_from_slice(if bytes[0] == 1 { b"true" } else { b"false" }),
-        ("i", size) => {
-            let value = match size {
-                1 => i64::from(i8::from_ne_bytes(bytes.try_into().unwrap())),
-                2 => i64::from(i16::from_ne_bytes(bytes.try_into().unwrap())),
-                4 => i64::from(i32::from_ne_bytes(bytes.try_into().unwrap())),
-                8 => i64::from_ne_bytes(bytes.try_into().unwrap()),
-                _ => return Err(PyTypeError::new_err("unsupported numpy integer size")),
-            };
-            output.extend_from_slice(integer.format(value).as_bytes());
+/// Format checked snapshot bytes with one numeric formatter selected for the
+/// call.
+fn write_values<const N: usize>(
+    data: &[u8],
+    shape: &[usize],
+    option: i32,
+    depth: usize,
+    mut item: impl FnMut(&mut Vec<u8>, [u8; N]) -> PyResult<()>,
+) -> PyResult<Vec<u8>> {
+    let mut output = Vec::with_capacity(data.len().min(65536));
+    if shape.is_empty() {
+        item(&mut output, data.try_into().expect("checked scalar size"))?;
+    } else {
+        let mut indices = vec![0usize];
+        let mut offset = 0;
+        output.push(b'[');
+        while let Some(&index) = indices.last() {
+            let axis = indices.len() - 1;
+            if index == shape[axis] {
+                indices.pop();
+                if option & 1 != 0 && index != 0 {
+                    output.push(b'\n');
+                    output.resize(output.len() + 2 * (depth + indices.len()), b' ');
+                }
+                output.push(b']');
+                continue;
+            }
+            if axis + 1 == shape.len() {
+                for column in 0..shape[axis] {
+                    if column != 0 {
+                        output.push(b',');
+                    }
+                    if option & 1 != 0 {
+                        output.push(b'\n');
+                        output.resize(output.len() + 2 * (depth + indices.len()), b' ');
+                    }
+                    item(
+                        &mut output,
+                        data[offset..offset + N]
+                            .try_into()
+                            .expect("checked item size"),
+                    )?;
+                    offset += N;
+                }
+                *indices.last_mut().unwrap() = shape[axis];
+                continue;
+            }
+            if index != 0 {
+                output.push(b',');
+            }
+            if option & 1 != 0 {
+                output.push(b'\n');
+                output.resize(output.len() + 2 * (depth + indices.len()), b' ');
+            }
+            *indices.last_mut().unwrap() += 1;
+            output.push(b'[');
+            indices.push(0);
         }
-        ("u", size) => {
-            let value = match size {
-                1 => u64::from(bytes[0]),
-                2 => u64::from(u16::from_ne_bytes(bytes.try_into().unwrap())),
-                4 => u64::from(u32::from_ne_bytes(bytes.try_into().unwrap())),
-                8 => u64::from_ne_bytes(bytes.try_into().unwrap()),
-                _ => return Err(PyTypeError::new_err("unsupported numpy integer size")),
-            };
-            output.extend_from_slice(integer.format(value).as_bytes());
-        }
-        ("f", 2 | 4) => {
-            let value = if bytes.len() == 2 {
-                half::f16::from_bits(u16::from_ne_bytes(bytes.try_into().unwrap())).to_f32()
-            } else {
-                f32::from_ne_bytes(bytes.try_into().unwrap())
-            };
-            output.extend_from_slice(if value.is_finite() {
-                float.format_finite(value).as_bytes()
-            } else {
-                b"null"
-            });
-        }
-        ("f", 8) => {
-            let value = f64::from_ne_bytes(bytes.try_into().unwrap());
-            output.extend_from_slice(if value.is_finite() {
-                float.format_finite(value).as_bytes()
-            } else {
-                b"null"
-            });
-        }
-        ("M", 8) => write_datetime(
-            output,
-            i64::from_ne_bytes(bytes.try_into().unwrap()),
-            unit,
-            option,
-        )?,
-        _ => return Err(PyTypeError::new_err("unsupported datatype in numpy array")),
     }
-    Ok(())
+    Ok(output)
 }
 
 /// Format only a snapshot whose dimensions and byte length agree.
@@ -160,51 +166,65 @@ pub fn _numpy_dumps(
         .iter()
         .try_fold(1usize, |count, size| count.checked_mul(*size))
         .ok_or_else(|| PyTypeError::new_err("numpy shape exceeds addressable memory"))?;
-    if count.checked_mul(itemsize) != Some(data.as_bytes().len()) {
+    let bytes = data.as_bytes();
+    if count.checked_mul(itemsize) != Some(bytes.len()) {
         return Err(PyTypeError::new_err(
             "numpy snapshot length does not match shape",
         ));
     }
-    let mut output = Vec::with_capacity(data.as_bytes().len().min(65536));
-    if shape.is_empty() {
-        item(&mut output, data.as_bytes(), kind, unit, option)?;
-    } else {
-        let mut indices = vec![0usize];
-        let mut offset = 0;
-        output.push(b'[');
-        while let Some(&index) = indices.last() {
-            let axis = indices.len() - 1;
-            if index == shape[axis] {
-                indices.pop();
-                if option & 1 != 0 && index != 0 {
-                    output.push(b'\n');
-                    output.resize(output.len() + 2 * (depth + indices.len()), b' ');
-                }
-                output.push(b']');
-                continue;
-            }
-            if index != 0 {
-                output.push(b',');
-            }
-            if option & 1 != 0 {
-                output.push(b'\n');
-                output.resize(output.len() + 2 * (depth + indices.len()), b' ');
-            }
-            *indices.last_mut().unwrap() += 1;
-            if axis + 1 == shape.len() {
-                item(
-                    &mut output,
-                    &data.as_bytes()[offset..offset + itemsize],
-                    kind,
-                    unit,
-                    option,
-                )?;
-                offset += itemsize;
-            } else {
-                output.push(b'[');
-                indices.push(0);
-            }
-        }
+    macro_rules! integer {
+        ($type:ty) => {
+            write_values::<{ size_of::<$type>() }>(bytes, &shape, option, depth, |out, raw| {
+                out.extend_from_slice(
+                    itoa::Buffer::new()
+                        .format(<$type>::from_ne_bytes(raw))
+                        .as_bytes(),
+                );
+                Ok(())
+            })?
+        };
     }
+    macro_rules! float {
+        ($size:literal, $decode:expr) => {
+            write_values::<$size>(bytes, &shape, option, depth, |out, raw| {
+                let value = ($decode)(raw);
+                let mut buffer = zmij::Buffer::new();
+                out.extend_from_slice(if value.is_finite() {
+                    buffer.format_finite(value).as_bytes()
+                } else {
+                    b"null"
+                });
+                Ok(())
+            })?
+        };
+    }
+    let output = if count == 0 {
+        write_values::<1>(bytes, &shape, option, depth, |_, _| {
+            unreachable!("empty array")
+        })?
+    } else {
+        match (kind, itemsize) {
+            ("b", 1) => write_values::<1>(bytes, &shape, option, depth, |out, raw| {
+                out.extend_from_slice(if raw[0] == 1 { b"true" } else { b"false" });
+                Ok(())
+            })?,
+            ("i", 1) => integer!(i8),
+            ("i", 2) => integer!(i16),
+            ("i", 4) => integer!(i32),
+            ("i", 8) => integer!(i64),
+            ("u", 1) => integer!(u8),
+            ("u", 2) => integer!(u16),
+            ("u", 4) => integer!(u32),
+            ("u", 8) => integer!(u64),
+            ("f", 2) => float!(2, |raw| half::f16::from_bits(u16::from_ne_bytes(raw))
+                .to_f32()),
+            ("f", 4) => float!(4, f32::from_ne_bytes),
+            ("f", 8) => float!(8, f64::from_ne_bytes),
+            ("M", 8) => write_values::<8>(bytes, &shape, option, depth, |out, raw| {
+                write_datetime(out, i64::from_ne_bytes(raw), unit, option)
+            })?,
+            _ => return Err(PyTypeError::new_err("unsupported datatype in numpy array")),
+        }
+    };
     Ok(PyBytes::new(py, &output).into_any().unbind())
 }

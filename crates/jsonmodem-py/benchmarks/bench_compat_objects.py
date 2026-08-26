@@ -29,6 +29,7 @@ def main():
     parser.add_argument("--output", required=True)
     parser.add_argument("--rounds", type=int, default=11)
     parser.add_argument("--seconds", type=float, default=0.1)
+    parser.add_argument("--numpy-shapes", nargs="+", choices=("rows4", "flat", "rows100"), default=["rows4"])
     args = parser.parse_args()
     cpu = min(os.sched_getaffinity(0))
     os.sched_setaffinity(0, {cpu})
@@ -37,8 +38,11 @@ def main():
         ("dataclasses_1000", [Record(i, f"item-{i}") for i in range(1000)], 0),
         ("non_str_keys", {i: str(i) for i in range(1000)}, 4),
     ]
+    shapes = {"rows4": (25000, 4), "flat": (100000,), "rows100": (1000, 100)}
     for dtype in ("int64", "float32", "float64"):
-        cases.append(("numpy_" + dtype, np.arange(100000, dtype=dtype).reshape(25000, 4), 16))
+        for shape in args.numpy_shapes:
+            suffix = "" if shape == "rows4" else "_" + shape
+            cases.append(("numpy_" + dtype + suffix, np.arange(100000, dtype=dtype).reshape(shapes[shape]), 16))
     results = {"python": platform.python_version(), "numpy": np.__version__,
                "orjson": orjson.__version__, "cpu": cpu, "rounds": args.rounds, "cases": []}
     for name, value, option in cases:

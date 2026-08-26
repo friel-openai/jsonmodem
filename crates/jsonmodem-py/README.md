@@ -216,10 +216,14 @@ or replacing Fragment placeholders. User callbacks run only after native
 iterators are released. This serializer does not have native throughput.
 Primitive non-string keys are written natively. Dataclass field snapshots also
 use the native writer when their values need no Python callback.
+Long strings reserve their UTF-8 length and both quotes before writing, avoiding
+a second buffer growth just for the closing quote when no escaping is needed.
 
 With `OPT_SERIALIZE_NUMPY`, supported contiguous, native-endian NumPy arrays and
 scalars are formatted from immutable byte snapshots, preserving float16/float32
 precision without `tolist()` or a Python object per element. NumPy is optional.
+The native writer selects a dtype formatter once per snapshot and formats each
+innermost row without updating the dimension stack for every element.
 This assumes valid NumPy storage, not arrays forged from invalid foreign pointers.
 
 Wheels are interpreter-specific rather than `abi3-py39`. This lets PyO3 use
@@ -254,10 +258,17 @@ See [the compatibility experiment record](../../plans/orjson-compatibility/recor
 results and workloads that exceed 2x. Measurements are not a guarantee for other
 inputs, options, machines, or Python versions.
 
+The [subsequent speedup record](../../plans/orjson-speedups/record.md) reports
+repeatable wins over orjson on the existing 25,000x4 NumPy int64, float32, and
+float64 workloads: 0.69x, 0.86x, and 0.86x its time in a separate 15-round
+confirmation. Flat and wider-row arrays remain slower. These are synthetic
+complete-document results, not streaming throughput or a universal NumPy claim.
+
 For NumPy, dataclass, Fragment, and option timings, install NumPy and run
 `benchmarks/bench_compat_objects.py --output /tmp/jsonmodem-objects.json` from
-this package directory. For allocation counts and peak live bytes, install
-Memray and run `benchmarks/bench_allocations.py --output /tmp/jsonmodem-alloc.json`.
+this package directory. Add `--numpy-shapes rows4 flat rows100` for shape controls.
+For allocation counts and peak live bytes, install Memray and run
+`benchmarks/bench_allocations.py --output /tmp/jsonmodem-alloc.json`.
 Repeat with `--module orjson`. Allocation profiling is separate from timing.
 
 See [memory compared with orjson](benchmarks/MEMORY.md) for direct Memray
