@@ -246,9 +246,13 @@ Tests exercise the compiled Python extension with generated documents, malformed
 bytes, numeric chunk splits, callback mutation, restricted buffers, resource
 limits, and small thread stacks. Miri checks the Rust core for certain kinds of
 invalid memory access. It does not check the Python binding or its calls into
-CPython. The complete-document reader and writers contain no explicit `unsafe`
-blocks, but other parts of the package and its native dependencies use unsafe
-code. Passing tests is not a proof of memory safety.
+CPython. The complete-document writer uses two explicit `unsafe` calls to public
+CPython integer-conversion functions: `PyLong_AsLongLongAndOverflow` and, on
+64-bit targets, `PyLong_AsSize_t`. Both receive retained, exact Python integers
+while Python is attached and check the error sentinel. They do not read Python
+object layouts or retain raw pointers. The complete-document reader has no
+explicit `unsafe` blocks. Other parts of the package and native dependencies
+also use unsafe code. Passing tests is not a proof of memory safety.
 
 The separate AddressSanitizer runner instruments the Python extension and
 launches subprocess tests with the same runtime. Virtual-address limits apply

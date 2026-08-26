@@ -129,6 +129,16 @@ to immutable bytes before parsing, so their payloads retain the copy. Known
 immutable bytes-backed payloads retain their own export after the temporary
 guard releases its export.
 
+The complete-document writer's integer helpers call the public
+`PyLong_AsLongLongAndOverflow` and `PyLong_AsSize_t` APIs. The second call is
+compiled only on 64-bit targets; other targets keep PyO3's `u64` conversion.
+Both helpers retain exact Python integer owners while Python is attached.
+They distinguish valid `-1` and maximum unsigned values from error sentinels.
+`test_number_conversion.py` checks signed and unsigned bounds, strict-integer
+options, subclass overrides, default callbacks, and successful calls after
+errors. AddressSanitizer runs these tests without requiring orjson. CPython's
+conversion code itself is not instrumented by this script.
+
 ## Measuring buffer-copy cost
 
 `benchmarks/bench_buffer_inputs.py` compares two installed release builds using

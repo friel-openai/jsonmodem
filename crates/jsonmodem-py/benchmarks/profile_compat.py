@@ -31,7 +31,8 @@ class Record:
 
 
 WORKLOADS = (
-    "loads_medium", "loads_integers", "loads_floats", "loads_small_view", "dumps_medium", "dumps_integers",
+    "loads_medium", "loads_integers", "loads_floats", "loads_strings", "loads_escaped",
+    "loads_small_view", "dumps_medium", "dumps_integers",
     "dumps_escaped", "dumps_long_string", "sorted_medium", "dataclasses_1000",
     "numpy_float32", "late_default",
 )
@@ -85,32 +86,39 @@ def main():
         for _ in range(args.calls):
             function(value, **kwargs)
 
-    if args.mode == "loop":
-        deadline = time.monotonic() + args.seconds
-        while time.monotonic() < deadline:
-            run()
-    elif args.mode == "cprofile":
-        profiler = cProfile.Profile()
-        profiler.runcall(run)
-        profiler.dump_stats(args.output)
-    else:
-        import memray
+    enabled = gc.isenabled()
+    gc.disable()
+    try:
+        if args.mode == "loop":
+            deadline = time.monotonic() + args.seconds
+            while time.monotonic() < deadline:
+                run()
+        elif args.mode == "cprofile":
+            profiler = cProfile.Profile()
+            profiler.runcall(run)
+            profiler.dump_stats(args.output)
+        else:
+            import memray
 
-        with memray.Tracker(args.output, native_traces=True, trace_python_allocators=True):
-            run()
-        reader = memray.FileReader(args.output)
-        events = allocated = 0
-        for record in reader.get_allocation_records():
-            if record.size > 0:
-                events += record.n_allocations
-                allocated += record.size
-        peak = sum(record.size for record in reader.get_high_watermark_allocation_records())
-        result = {"module": args.module, "version": module.__version__,
-                  "workload": args.workload, "calls": args.calls,
-                  "allocation_events": events, "allocated_bytes": allocated,
-                  "peak_live_bytes": peak}
-        Path(args.output + ".json").write_text(json.dumps(result, indent=2) + "\n")
-        print(json.dumps(result))
+            with memray.Tracker(args.output, native_traces=True, trace_python_allocators=True):
+                run()
+            reader = memray.FileReader(args.output)
+            events = allocated = 0
+            for record in reader.get_allocation_records():
+                if record.size > 0:
+                    events += record.n_allocations
+                    allocated += record.size
+            peak = sum(record.size for record in reader.get_high_watermark_allocation_records())
+            result = {"module": args.module, "version": module.__version__,
+                      "module_file": module.__file__, "gc_disabled": True,
+                      "workload": args.workload, "calls": args.calls,
+                      "allocation_events": events, "allocated_bytes": allocated,
+                      "peak_live_bytes": peak}
+            Path(args.output + ".json").write_text(json.dumps(result, indent=2) + "\n")
+            print(json.dumps(result))
+    finally:
+        if enabled:
+            gc.enable()
 
 
 if __name__ == "__main__":
