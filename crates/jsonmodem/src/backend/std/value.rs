@@ -18,6 +18,8 @@ pub enum Value {
     Boolean(bool),
     /// JSON number value represented as `f64`.
     Number(f64),
+    /// Original number text for adapters that preserve integer precision.
+    NumberText(String),
     /// JSON string value.
     String(String),
     /// JSON array value.
@@ -130,6 +132,7 @@ impl core::fmt::Display for Value {
             Self::Null => f.write_str("null"),
             Self::Boolean(value) => f.write_str(if *value { "true" } else { "false" }),
             Self::Number(value) => f.write_str(&value.to_string()),
+            Self::NumberText(value) => f.write_str(value),
             Self::String(value) => {
                 write!(f, "\"")?;
                 write_escaped_string(value, f)?;

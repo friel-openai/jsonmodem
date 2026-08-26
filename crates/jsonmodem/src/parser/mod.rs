@@ -156,6 +156,8 @@ impl From<ParseState> for LexState {
 /// JSON tokens and structural events.
 pub struct JsonModem<Ctx: EventCtx> {
     end_of_input: bool,
+    // Bound path cloning before an event reaches a buffering adapter.
+    container_depth: usize,
 
     /// Current *global* character position.
     pos: usize,
@@ -326,6 +328,7 @@ impl<Ctx: EventCtx> JsonModem<Ctx> {
     pub fn new_with_factory(f: &mut Ctx, options: ParserOptions) -> JsonModem<Ctx> {
         Self {
             end_of_input: false,
+            container_depth: 0,
             partial_lex: false,
 
             pos: 0,
@@ -471,6 +474,18 @@ impl<Ctx: EventCtx> JsonModem<Ctx> {
             let is_eof = token.is_eof();
             match self.dispatch_parse_state(token, f, path) {
                 Ok(Some(evt)) => {
+                    match &evt {
+                        ParseEvent::ArrayBegin { .. } | ParseEvent::ObjectBegin { .. } => {
+                            if self.container_depth == 256 {
+                                return Some(Err(self.syntax_error(SyntaxError::DepthLimit)));
+                            }
+                            self.container_depth += 1;
+                        }
+                        ParseEvent::ArrayEnd { .. } | ParseEvent::ObjectEnd { .. } => {
+                            self.container_depth = self.container_depth.saturating_sub(1);
+                        }
+                        _ => {}
+                    }
                     return Some(Ok(evt));
                 }
                 Ok(None) => {}
@@ -622,6 +637,23 @@ impl<Ctx: EventCtx> JsonModem<Ctx> {
             DecimalExponentSign, DecimalFraction, DecimalInteger, DecimalPoint, Default, End,
             Error, Sign, Start, StringEscape, StringEscapeUnicode, Value, ValueLiteral, Zero,
         };
+
+        if self.end_of_input && scanner.peek().is_none() {
+            match lex_state {
+                Zero | DecimalInteger | DecimalFraction | DecimalExponentInteger => {
+                    let token = match scanner.emit() {
+                        scanner::Capture::Borrowed(text) => Token::NumberBorrowed(text),
+                        scanner::Capture::Owned(text) => Token::Number(text),
+                        scanner::Capture::Raw(_) => return Err(self.invalid_eof()),
+                    };
+                    return Ok(Some(self.new_token(token, false)));
+                }
+                Sign | DecimalPoint | DecimalExponent | DecimalExponentSign => {
+                    return Err(self.invalid_eof());
+                }
+                _ => {}
+            }
+        }
 
         match lex_state {
             Error => Ok(None),
@@ -817,12 +849,6 @@ impl<Ctx: EventCtx> JsonModem<Ctx> {
             DecimalPoint => {
                 if let Some(g) = scanner.peek_guard() {
                     let c = g.ch();
-                    if matches!(c, 'e' | 'E') {
-                        let unit = g.consume();
-                        self.apply_advanced_unit(unit);
-                        self.lex_state = DecimalExponent;
-                        return Ok(None);
-                    }
                     if c.is_ascii_digit() {
                         let unit = g.consume();
                         self.apply_advanced_unit(unit);
@@ -891,7 +917,7 @@ impl<Ctx: EventCtx> JsonModem<Ctx> {
                         let unit = g.consume();
                         self.apply_advanced_unit(unit);
                         self.lex_state = DecimalExponentInteger;
-                        let consumed = scanner.consume_while_ascii(|d| d.is_ascii_digit());
+                        let consumed = scanner.consume_digits_ascii_fast();
                         self.column += consumed;
                         self.pos += consumed;
                         return Ok(None);
@@ -908,7 +934,7 @@ impl<Ctx: EventCtx> JsonModem<Ctx> {
                         let unit = g.consume();
                         self.apply_advanced_unit(unit);
                         self.lex_state = DecimalExponentInteger;
-                        let consumed = scanner.consume_while_ascii(|d| d.is_ascii_digit());
+                        let consumed = scanner.consume_digits_ascii_fast();
                         self.column += consumed;
                         self.pos += consumed;
                         return Ok(None);

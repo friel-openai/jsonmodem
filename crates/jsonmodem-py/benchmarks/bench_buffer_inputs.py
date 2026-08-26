@@ -6,10 +6,12 @@ pointing to environments containing the two wheels. Results are JSON on stdout.
 Each of seven pairs alternates which interpreter runs first. Each timing is the
 median of three measurements of 200 complete streams. Allocation tracking is a
 separate measurement of 100 streams after ten warmup streams.
+Use --cases to select input modes supported by both versions.
 """
 
 import argparse
 import json
+import os
 from pathlib import Path
 import runpy
 import statistics
@@ -19,12 +21,17 @@ import tempfile
 import timeit
 
 
-def measure(mode):
+CASES = ("bytes", "bytearray", "memoryview", "byte_views_bytes", "byte_views_exporter")
+
+
+def measure(mode, selected, string_length, chunk_size):
     import memray
     from jsonmodem import JsonModem
 
     bench = runpy.run_path(str(Path(__file__).with_name("bench_jiter_chunked.py")))
-    chunks = bench["chunk_bytes"](bench["make_array_strings"](1024), 512)
+    text = ("abcd" * ((string_length + 3) // 4))[:string_length]
+    document = json.dumps([text] * 1024, separators=(",", ":")).encode()
+    chunks = bench["chunk_bytes"](document, chunk_size)
 
     class Exporter:
         """A valid read-only exporter whose owner is not directly visible."""
@@ -53,6 +60,8 @@ def measure(mode):
     }
     results = {}
     for name, (function, data) in cases.items():
+        if name not in selected:
+            continue
         def run():
             return function(data)
 
@@ -79,11 +88,14 @@ def measure(mode):
     return results
 
 
-def compare(baseline, candidate):
+def compare(baseline, candidate, selected, string_length, chunk_size):
     interpreters = {"baseline": baseline, "candidate": candidate}
 
     def invoke(python, mode):
-        output = subprocess.check_output([python, __file__, "--worker", mode], text=True)
+        output = subprocess.check_output([
+            python, __file__, "--worker", mode, "--cases", *selected,
+            "--string-length", str(string_length), "--chunk-size", str(chunk_size),
+        ], text=True)
         return json.loads(output)
 
     timings = {name: [] for name in interpreters}
@@ -104,21 +116,33 @@ def compare(baseline, candidate):
             "paired_ratio_range": [min(ratios), max(ratios)],
             "allocations": {name: results[case] for name, results in allocations.items()},
         }
-    return {"summary": summary, "timings": timings}
+    return {"string_length": string_length, "chunk_size": chunk_size,
+            "summary": summary, "timings": timings}
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline-python")
     parser.add_argument("--candidate-python", default=sys.executable)
+    parser.add_argument("--cases", nargs="+", choices=CASES, default=CASES)
+    parser.add_argument("--string-length", type=int, default=4)
+    parser.add_argument("--chunk-size", type=int, default=512)
     parser.add_argument("--worker", choices=["time", "memory"], help=argparse.SUPPRESS)
     args = parser.parse_args()
+    if args.string_length < 1 or args.chunk_size < 1:
+        parser.error("string length and chunk size must be positive")
+    cpu = None
+    if hasattr(os, "sched_getaffinity"):
+        cpu = min(os.sched_getaffinity(0))
+        os.sched_setaffinity(0, {cpu})
     if sys.version_info < (3, 12):
         parser.error("Python 3.12 or later is required for the Python exporter case")
     if args.worker:
-        result = measure(args.worker)
+        result = measure(args.worker, args.cases, args.string_length, args.chunk_size)
     else:
         if not args.baseline_python:
             parser.error("--baseline-python is required")
-        result = compare(args.baseline_python, args.candidate_python)
+        result = compare(args.baseline_python, args.candidate_python, args.cases,
+                         args.string_length, args.chunk_size)
+        result["cpu"] = cpu
     print(json.dumps(result, indent=2))

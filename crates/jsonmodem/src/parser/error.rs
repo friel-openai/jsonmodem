@@ -41,6 +41,8 @@ pub enum ErrorSource<Ctx: EventCtx> {
 
 #[derive(Debug, Error, PartialEq)]
 pub enum SyntaxError {
+    #[error("container depth exceeds 256")]
+    DepthLimit,
     #[error("invalid character '{0}'")]
     InvalidCharacter(char),
     #[error("invalid unicode escape sequence at character: '{0}'")]

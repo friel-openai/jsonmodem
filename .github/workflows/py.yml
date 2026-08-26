@@ -8,6 +8,10 @@ on:
 jobs:
   py:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.9', '3.13']
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -20,7 +24,7 @@ jobs:
           go-version: 'stable'
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: ${{ matrix.python }}
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@v6
         with:

@@ -175,7 +175,7 @@ fn reconstruct_values(
     let mut building_root = false;
 
     for evt in events {
-        eprintln!("event: {:?}", &evt);
+        eprintln!("event: {evt:?}");
         match evt {
             ParseEvent::ArrayBegin { path } => {
                 insert_at_path(&mut current_root, &path, Value::Array(Vec::new()));
@@ -415,13 +415,13 @@ fn test_continue_string_with_escape() {
     // Feed the opening quote of the string – this is not enough to complete
     // a JSON value, so we should not receive any events yet.
     let evts: Vec<_> = parser.feed("\"").to_iter().filter_map(Result::ok).collect();
-    assert!(evts.is_empty());
+    assert_eq!(evts.as_slice(), []);
 
     // Feed a backslash – still inside the string escape sequence, which is
     // incomplete at this point. Again, we must not observe any completed
     // events.
     let evts: Vec<_> = parser.feed("\\").to_iter().filter_map(Result::ok).collect();
-    assert!(evts.is_empty());
+    assert_eq!(evts.as_slice(), []);
 }
 
 #[test]
@@ -498,5 +498,5 @@ fn test_streaming_multiple_values() {
         .to_iter()
         .filter_map(Result::ok)
         .collect();
-    assert!(evts.is_empty());
+    assert_eq!(evts.as_slice(), []);
 }

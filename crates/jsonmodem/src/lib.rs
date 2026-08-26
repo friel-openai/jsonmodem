@@ -20,6 +20,7 @@ extern crate std;
 mod backend;
 mod buffer_options;
 mod context;
+pub mod document;
 mod event;
 mod jsonmodem_buffers;
 mod jsonmodem_values;
@@ -31,7 +32,7 @@ mod value_tree;
 
 #[doc(hidden)]
 pub use backend::raw::RawBufferAssembler;
-pub use backend::{RawContext, StdBackend};
+pub use backend::{LexemeBackend, RawContext, StdBackend};
 pub use buffer_options::BufferOptions;
 // Expose core parser types publicly for users building custom adapters, while
 // keeping the low-level `JsonModem` constructor out of the docs surface.

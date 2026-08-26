@@ -1,0 +1,43 @@
+diff --git a/crates/jsonmodem-py/src/compat.rs b/crates/jsonmodem-py/src/compat.rs
+index bea8b94..5295392 100644
+--- a/crates/jsonmodem-py/src/compat.rs
++++ b/crates/jsonmodem-py/src/compat.rs
+@@ -328,0 +329,28 @@ impl Encoder {
++    fn integer(&mut self, mut value: u64, negative: bool) {
++        const PAIRS: &[u8; 200] = b"00010203040506070809101112131415161718192021222324252627282930313233343536373839404142434445464748495051525354555657585960616263646566676869707172737475767778798081828384858687888990919293949596979899";
++        let digits = if value == 0 {
++            1
++        } else {
++            value.ilog10() as usize + 1
++        };
++        let start = self.output.len();
++        self.output.resize(start + digits + usize::from(negative), b'0');
++        let output = &mut self.output[start..];
++        let mut cursor = output.len();
++        while value >= 100 {
++            let pair = (value % 100) as usize * 2;
++            value /= 100;
++            cursor -= 2;
++            output[cursor..cursor + 2].copy_from_slice(&PAIRS[pair..pair + 2]);
++        }
++        if value < 10 {
++            output[cursor - 1] = b'0' + value as u8;
++        } else {
++            let pair = value as usize * 2;
++            output[cursor - 2..cursor].copy_from_slice(&PAIRS[pair..pair + 2]);
++        }
++        if negative {
++            output[0] = b'-';
++        }
++    }
++
+@@ -437 +464,0 @@ impl Encoder {
+-            let mut buffer = itoa::Buffer::new();
+@@ -444,2 +471 @@ impl Encoder {
+-                self.output
+-                    .extend_from_slice(buffer.format(integer).as_bytes());
++                self.integer(integer.unsigned_abs(), integer < 0);
+@@ -453,2 +479 @@ impl Encoder {
+-                self.output
+-                    .extend_from_slice(buffer.format(integer).as_bytes());
++                self.integer(integer, false);

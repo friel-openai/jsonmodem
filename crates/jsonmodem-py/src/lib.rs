@@ -1,3 +1,6 @@
+mod compat;
+mod numpy;
+
 use std::{
     borrow::Cow,
     cell::RefCell,
@@ -9,10 +12,10 @@ use std::{
 
 use ::jsonmodem::{
     DecodeMode as CoreDecodeMode, JsonModem as CoreJsonModem,
-    JsonModemValues as CoreJsonModemValues, ParseEvent, ParserOptions as CoreParserOptions, Path,
-    PathItem, StdBackend, StreamingValue as CoreStreamingValue, Value as CoreValue,
-    ValuesError as CoreValuesError, ValuesOptions as CoreValuesOptions,
-    lending_iterator::LendingIterator as CoreLendingIterator,
+    JsonModemValues as CoreJsonModemValues, LexemeBackend as StdBackend, ParseEvent,
+    ParserOptions as CoreParserOptions, Path, PathItem, StdBackend as LegacyBackend,
+    StreamingValue as CoreStreamingValue, Value as CoreValue, ValuesError as CoreValuesError,
+    ValuesOptions as CoreValuesOptions, lending_iterator::LendingIterator as CoreLendingIterator,
 };
 use pyo3::{
     class::basic::CompareOp,
@@ -47,9 +50,42 @@ impl DecodeMode {
 create_exception!(jsonmodem._jsonmodem, JsonModemSyntaxError, PyException);
 create_exception!(jsonmodem._jsonmodem, JsonModemStateError, PyException);
 
+fn json_decode_error(py: Python<'_>, message: &str, doc: &str, pos: usize) -> PyErr {
+    match py
+        .import("json")
+        .and_then(|module| module.getattr("JSONDecodeError"))
+        .and_then(|class| class.call1((message, doc, pos)))
+    {
+        Ok(error) => PyErr::from_value(error),
+        Err(error) => error,
+    }
+}
+
+fn load_number(py: Python<'_>, lexeme: &str) -> PyResult<PyObject> {
+    let builtins = py.import("builtins")?;
+    let is_float = lexeme
+        .as_bytes()
+        .iter()
+        .any(|byte| matches!(byte, b'.' | b'e' | b'E'));
+    let constructor = if is_float {
+        builtins.getattr("float")?
+    } else {
+        builtins.getattr("int")?
+    };
+    if is_float && !lexeme.parse::<f64>().is_ok_and(f64::is_finite) {
+        return Err(PyTypeError::new_err(
+            "number is infinity when parsed as double",
+        ));
+    }
+    let number = constructor.call1((lexeme,))?;
+    Ok(number.into_any().unbind())
+}
+
+/// Retained paths share object keys with the parser instead of copying each key
+/// per event.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 enum OwnedPathComponent {
-    Key(String),
+    Key(Arc<str>),
     Index(usize),
 }
 
@@ -113,7 +149,7 @@ struct ByteViewStringFragment {
 enum ByteViewPayload {
     None,
     Bool(bool),
-    Number(f64),
+    Number(String),
     String(ByteViewStringFragment),
 }
 
@@ -140,7 +176,7 @@ type PathPattern = Vec<PathPatternComponent>;
 fn convert_path(path: Path) -> Vec<OwnedPathComponent> {
     path.into_iter()
         .map(|component| match component {
-            PathItem::Key(key) => OwnedPathComponent::Key(key.to_string()),
+            PathItem::Key(key) => OwnedPathComponent::Key(key),
             PathItem::Index(index) => OwnedPathComponent::Index(index),
         })
         .collect()
@@ -149,7 +185,7 @@ fn convert_path(path: Path) -> Vec<OwnedPathComponent> {
 fn convert_borrowed_path(path: &Path) -> Vec<OwnedPathComponent> {
     path.iter()
         .map(|component| match component {
-            PathItem::Key(key) => OwnedPathComponent::Key(key.to_string()),
+            PathItem::Key(key) => OwnedPathComponent::Key(Arc::clone(key)),
             PathItem::Index(index) => OwnedPathComponent::Index(*index),
         })
         .collect()
@@ -230,7 +266,7 @@ fn borrowed_parse_event_to_view_event(
             py,
             OwnedEventKind::Number,
             convert_borrowed_path(path),
-            value.into_pyobject(py)?.into_any().unbind(),
+            load_number(py, value.as_ref())?,
             interns,
         ),
         ParseEvent::String {
@@ -294,7 +330,7 @@ fn build_byte_view_payload_with_interns<'py>(
     match payload {
         ByteViewPayload::None => Ok(py.None().into_bound(py)),
         ByteViewPayload::Bool(value) => Ok(PyBool::new(py, *value).to_owned().into_any()),
-        ByteViewPayload::Number(value) => Ok(value.into_pyobject(py)?.into_any()),
+        ByteViewPayload::Number(value) => Ok(load_number(py, value)?.into_bound(py)),
         ByteViewPayload::String(fragment) => {
             let dict = PyDict::new(py);
             dict.set_item(interns.fragment_key(py), fragment.fragment.clone_ref(py))?;
@@ -867,7 +903,7 @@ impl PyPathView {
             }
             match component {
                 OwnedPathComponent::Key(key) => {
-                    if !pair.get_item(0)?.eq("key")? || !pair.get_item(1)?.eq(key)? {
+                    if !pair.get_item(0)?.eq("key")? || !pair.get_item(1)?.eq(key.as_ref())? {
                         return Ok(false);
                     }
                 }
@@ -920,7 +956,7 @@ impl PyPathView {
             let text = <Bound<'_, PyString> as PyStringMethods<'_>>::to_cow(text)?;
             return Ok(matches!(
                 self.path.last(),
-                Some(OwnedPathComponent::Key(key)) if key == text.as_ref()
+                Some(OwnedPathComponent::Key(key)) if key.as_ref() == text.as_ref()
             ));
         }
 
@@ -1326,7 +1362,7 @@ enum ValueRecord {
     unsendable
 )]
 struct PyJsonModemValues {
-    parser: Option<CoreJsonModemValues<StdBackend>>,
+    parser: Option<CoreJsonModemValues<LegacyBackend>>,
     finished: bool,
 }
 
@@ -1633,7 +1669,7 @@ impl PyJsonModemValueView {
                     if !map.contains_key(key.as_str()) {
                         return Err(PyIndexError::new_err(format!("missing object key {key:?}")));
                     }
-                    path.push(OwnedPathComponent::Key(key));
+                    path.push(OwnedPathComponent::Key(key.into()));
                 }
                 CoreValue::Array(values) => {
                     let index: usize = key.extract()?;
@@ -1678,7 +1714,7 @@ impl PyJsonModemValueView {
         match core_value_at_path(&root, &self.path) {
             Some(CoreValue::Null) => "null",
             Some(CoreValue::Boolean(_)) => "bool",
-            Some(CoreValue::Number(_)) => "number",
+            Some(CoreValue::Number(_) | CoreValue::NumberText(_)) => "number",
             Some(CoreValue::String(_)) => "string",
             Some(CoreValue::Array(_)) => "array",
             Some(CoreValue::Object(_)) => "object",
@@ -2537,7 +2573,7 @@ fn collect_filtered_view_finish_events(
 
 fn collect_value_feed(
     py: Python<'_>,
-    parser: &mut CoreJsonModemValues<StdBackend>,
+    parser: &mut CoreJsonModemValues<LegacyBackend>,
     chunk: &str,
     records: &mut Vec<ValueRecord>,
 ) -> PyResult<()> {
@@ -2555,7 +2591,7 @@ fn collect_value_feed(
 
 fn collect_value_finish(
     py: Python<'_>,
-    parser: CoreJsonModemValues<StdBackend>,
+    parser: CoreJsonModemValues<LegacyBackend>,
     records: &mut Vec<ValueRecord>,
 ) -> PyResult<()> {
     for item in parser.finish() {
@@ -2584,7 +2620,7 @@ fn streaming_value_record(
     Ok(ValueRecord::Value(tuple.into_any().unbind()))
 }
 
-fn values_error_record(err: CoreValuesError<StdBackend>) -> ValueRecord {
+fn values_error_record(err: CoreValuesError<LegacyBackend>) -> ValueRecord {
     let err = match err {
         CoreValuesError::Parser(err) => OwnedParserError {
             message: err.to_string(),
@@ -2605,6 +2641,7 @@ fn value_to_py(py: Python<'_>, value: &CoreValue) -> PyResult<PyObject> {
         CoreValue::Null => Ok(py.None()),
         CoreValue::Boolean(value) => Ok(PyBool::new(py, *value).to_owned().into_any().unbind()),
         CoreValue::Number(value) => Ok(value.into_pyobject(py)?.into_any().unbind()),
+        CoreValue::NumberText(value) => load_number(py, value),
         CoreValue::String(value) => Ok(PyString::new(py, value).into_any().unbind()),
         CoreValue::Array(values) => {
             let list = PyList::empty(py);
@@ -2943,12 +2980,7 @@ fn mutable_apply_event(
         }
         ParseEvent::Number { path, value } => {
             let path = convert_borrowed_path(path);
-            py_assign_at_path(
-                py,
-                root,
-                &path,
-                value.into_pyobject(py)?.into_any().unbind(),
-            )?;
+            py_assign_at_path(py, root, &path, load_number(py, value.as_ref())?)?;
             let is_final = path.is_empty();
             Ok(Some((path, is_final)))
         }
@@ -3019,7 +3051,7 @@ fn py_value_at_path(
         current = match component {
             OwnedPathComponent::Key(key) => {
                 let dict = current_bound.downcast::<PyDict>()?;
-                let Some(value) = dict.get_item(key)? else {
+                let Some(value) = dict.get_item(key.as_ref())? else {
                     return Ok(None);
                 };
                 value.into_any().unbind()
@@ -3060,11 +3092,11 @@ fn py_assign_at_path(
         current = match component {
             OwnedPathComponent::Key(key) => {
                 let dict = current_bound.downcast::<PyDict>()?;
-                if let Some(value) = dict.get_item(key)? {
+                if let Some(value) = dict.get_item(key.as_ref())? {
                     value.into_any().unbind()
                 } else {
                     let container = py_container_for_next(py, next_component);
-                    dict.set_item(key, container.clone_ref(py))?;
+                    dict.set_item(key.as_ref(), container.clone_ref(py))?;
                     container
                 }
             }
@@ -3091,7 +3123,9 @@ fn py_assign_at_path(
     let current_bound = current.bind(py);
     match last {
         OwnedPathComponent::Key(key) => {
-            current_bound.downcast::<PyDict>()?.set_item(key, value)?;
+            current_bound
+                .downcast::<PyDict>()?
+                .set_item(key.as_ref(), value)?;
         }
         OwnedPathComponent::Index(index) => {
             let list = current_bound.downcast::<PyList>()?;
@@ -3134,7 +3168,7 @@ fn core_apply_event(
         }
         ParseEvent::Number { path, value } => {
             let path = convert_borrowed_path(path);
-            core_assign_at_path(root, &path, CoreValue::Number(value));
+            core_assign_at_path(root, &path, CoreValue::NumberText(value.into_owned()));
             let is_final = path.is_empty();
             Some((path, is_final))
         }
@@ -3190,7 +3224,7 @@ fn core_value_at_path<'a>(
     let mut current = root.as_ref()?;
     for component in path {
         current = match (component, current) {
-            (OwnedPathComponent::Key(key), CoreValue::Object(map)) => map.get(key.as_str())?,
+            (OwnedPathComponent::Key(key), CoreValue::Object(map)) => map.get(key.as_ref())?,
             (OwnedPathComponent::Index(index), CoreValue::Array(values)) => values.get(*index)?,
             _ => return None,
         };
@@ -3206,7 +3240,7 @@ fn core_value_at_path_mut<'a>(
     for component in path {
         current = match component {
             OwnedPathComponent::Key(key) => match current {
-                CoreValue::Object(map) => map.get_mut(key.as_str())?,
+                CoreValue::Object(map) => map.get_mut(key.as_ref())?,
                 _ => return None,
             },
             OwnedPathComponent::Index(index) => match current {
@@ -3237,7 +3271,7 @@ fn core_assign_inside(current: &mut CoreValue, path: &[OwnedPathComponent], valu
         match &path[0] {
             OwnedPathComponent::Key(key) => {
                 let map = ensure_core_object(current);
-                map.insert(key.as_str().into(), value);
+                map.insert(key.as_ref().into(), value);
             }
             OwnedPathComponent::Index(index) => {
                 let values = ensure_core_array(current);
@@ -3258,9 +3292,10 @@ fn core_assign_inside(current: &mut CoreValue, path: &[OwnedPathComponent], valu
     match &path[0] {
         OwnedPathComponent::Key(key) => {
             let map = ensure_core_object(current);
-            let child = map
-                .entry(key.as_str().into())
-                .or_insert_with(|| core_container_for_next(next));
+            if !map.contains_key(key.as_ref()) {
+                map.insert(key.as_ref().into(), core_container_for_next(next));
+            }
+            let child = map.get_mut(key.as_ref()).expect("key was inserted");
             core_assign_inside(child, &path[1..], value);
         }
         OwnedPathComponent::Index(index) => {
@@ -3389,7 +3424,7 @@ fn byte_view_error_record(message: String, line: usize, column: usize) -> ByteVi
 
 fn byte_view_event_record(
     py: Python<'_>,
-    event: ParseEvent,
+    event: ParseEvent<'_, Path, StdBackend>,
     input: &str,
     source: Option<&Bound<'_, PyMemoryView>>,
 ) -> PyResult<ByteViewRecord> {
@@ -3407,7 +3442,7 @@ fn byte_view_event_record(
         ParseEvent::Number { path, value } => ByteViewEvent {
             kind: OwnedEventKind::Number,
             path: convert_path(path),
-            payload: ByteViewPayload::Number(value),
+            payload: ByteViewPayload::Number(value.into_owned()),
         },
         ParseEvent::String {
             path,
@@ -3472,7 +3507,7 @@ fn borrowed_byte_view_event_record(
         ParseEvent::Number { path, value } => ByteViewEvent {
             kind: OwnedEventKind::Number,
             path: convert_borrowed_path(path),
-            payload: ByteViewPayload::Number(value),
+            payload: ByteViewPayload::Number(value.into_owned()),
         },
         ParseEvent::String {
             path,
@@ -3814,7 +3849,11 @@ fn with_readonly_byte_text<T>(
             "{caller} cannot return no-copy memoryview payloads from str input; pass bytes or a read-only memoryview"
         )));
     }
-
+    if data.is_instance_of::<PyBytes>() && !data.is_exact_instance_of::<PyBytes>() {
+        return Err(PyTypeError::new_err(
+            "byte views require exact bytes or a read-only buffer",
+        ));
+    }
     const PYBUF_SIMPLE: c_int = 0;
 
     // Acquire the retained export before validating or borrowing any text.
@@ -3825,6 +3864,11 @@ fn with_readonly_byte_text<T>(
             "{caller} expected bytes or a read-only contiguous memoryview"
         ))
     })?;
+    if source.getattr("ndim")?.extract::<usize>()? != 1 {
+        return Err(PyTypeError::new_err(
+            "byte views require one-dimensional input",
+        ));
+    }
     let mut view = PyBufferView::new();
     // SAFETY: source is a built-in memoryview retaining the acquired export.
     let status = unsafe { PyObject_GetBuffer(source.as_ptr(), &mut view, PYBUF_SIMPLE) };
@@ -3937,6 +3981,14 @@ fn jsonmodem(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
         ),
     )?;
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
+    m.add_function(wrap_pyfunction!(compat::loads, m)?)?;
+    m.add_function(wrap_pyfunction!(compat::dumps, m)?)?;
+    m.add_function(wrap_pyfunction!(compat::_dumps_fields, m)?)?;
+    m.add_class::<compat::Fragment>()?;
+    m.add_function(wrap_pyfunction!(numpy::_numpy_dumps, m)?)?;
+    let json_decode_error = py.import("json")?.getattr("JSONDecodeError")?;
+    m.add("JSONDecodeError", json_decode_error)?;
+    m.add("JSONEncodeError", py.get_type::<PyTypeError>())?;
     m.add_class::<PyDecodeMode>()?;
     register_decode_mode_constants(py)?;
     m.add_class::<PyParserOptions>()?;
