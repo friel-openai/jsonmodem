@@ -76,6 +76,8 @@ struct ObjectEncoder<'helpers, 'py> {
     get_attribute: Borrowed<'helpers, 'py, PyAny>,
     type_dict: Borrowed<'helpers, 'py, PyAny>,
     classes: SmallVec<[ClassAttributes<'py>; 4]>,
+    // Completed root output stays owned until finish returns it.
+    root_bytes: Option<Py<PyBytes>>,
 }
 
 /// A live class dictionary view reflects changes made during callbacks.
@@ -110,11 +112,13 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
             get_attribute: helpers.get_borrowed_item(10)?,
             type_dict: helpers.get_borrowed_item(11)?,
             classes: SmallVec::new(),
+            root_bytes: None,
         })
     }
 
     fn finish(mut self, py: Python<'py>, obj: Bound<'py, PyAny>) -> PyResult<Py<PyBytes>> {
-        if let Some(bytes) = self.value(obj)? {
+        self.value(obj)?;
+        if let Some(bytes) = self.root_bytes.take() {
             return Ok(bytes);
         }
         if self.encoder.option & APPEND_NEWLINE != 0 {
@@ -263,7 +267,7 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
         }
     }
 
-    fn value(&mut self, value: Bound<'py, PyAny>) -> PyResult<Option<Py<PyBytes>>> {
+    fn value(&mut self, value: Bound<'py, PyAny>) -> PyResult<()> {
         let py = value.py();
         let option = self.encoder.option;
         let mut value = value;
@@ -337,7 +341,8 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                     if encoded {
                         let bytes = replacement.downcast_into::<PyBytes>()?;
                         if depth == 0 && option & APPEND_NEWLINE == 0 {
-                            return Ok(Some(bytes.unbind()));
+                            self.root_bytes = Some(bytes.unbind());
+                            return Ok(());
                         }
                         self.encoder.extend(bytes.as_bytes())?;
                     } else {
@@ -369,7 +374,7 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
             loop {
                 let depth = stack.len();
                 let Some(frame) = stack.last_mut() else {
-                    return Ok(None);
+                    return Ok(());
                 };
                 let item = match &mut frame.items {
                     Items::Object(items) => items.next().map(|(key, item)| (Some(key), item)),
