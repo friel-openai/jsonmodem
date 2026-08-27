@@ -233,6 +233,40 @@ impl<'a> DocumentReader<'a> {
     }
 
     fn hex4(&mut self) -> Result<u32, DocumentError> {
+        const HEX_VALUES: [u8; 256] = {
+            let mut values = [u8::MAX; 256];
+            let mut digit = 0_u8;
+            while digit < 10 {
+                values[(b'0' + digit) as usize] = digit;
+                digit += 1;
+            }
+            digit = 0;
+            while digit < 6 {
+                values[(b'a' + digit) as usize] = digit + 10;
+                values[(b'A' + digit) as usize] = digit + 10;
+                digit += 1;
+            }
+            values
+        };
+        let Some(bytes) = self
+            .input
+            .as_bytes()
+            .get(self.offset..)
+            .and_then(|remaining| remaining.first_chunk::<4>())
+        else {
+            return self.hex4_scalar();
+        };
+        let [a, b, c, d] = bytes.map(|byte| HEX_VALUES[usize::from(byte)]);
+        // Invalid bytes set the high bits, allowing one check for all four digits.
+        if (a | b | c | d) > 0x0f {
+            return self.hex4_scalar();
+        }
+        self.offset += 4;
+        Ok((u32::from(a) << 12) | (u32::from(b) << 8) | (u32::from(c) << 4) | u32::from(d))
+    }
+
+    // Keep the original error offset and cursor for short or malformed escapes.
+    fn hex4_scalar(&mut self) -> Result<u32, DocumentError> {
         let mut value = 0;
         for _ in 0..4 {
             let byte = *self
@@ -441,7 +475,7 @@ fn scalar_string_prefix<const ASCII_ONLY: bool>(bytes: &[u8]) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use alloc::{format, vec};
+    use alloc::{format, string::ToString, vec};
 
     use super::*;
 
@@ -550,6 +584,66 @@ mod tests {
                 DocumentReader::new(token).string_with_buffer(&mut buffer),
                 Err(DocumentError { message, offset }),
             );
+        }
+    }
+
+    #[test]
+    fn four_hex_digits_match_every_code_unit() {
+        let limit = if cfg!(miri) { 256 } else { 65536 };
+        for value in 0..limit {
+            for digits in [format!("{value:04x}"), format!("{value:04X}")] {
+                let input = format!("x{digits}tail");
+                let mut reader = DocumentReader::new(&input);
+                reader.offset = 1;
+                assert_eq!(reader.hex4(), Ok(value));
+                assert_eq!(reader.offset(), 5);
+            }
+        }
+        for byte in b"0123456789abcdefABCDEF" {
+            for position in 0..4 {
+                let mut input = String::from("0000");
+                input.replace_range(position..=position, &char::from(*byte).to_string());
+                assert_eq!(
+                    DocumentReader::new(&input).hex4(),
+                    Ok(u32::from_str_radix(&input, 16).unwrap()),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn four_hex_digits_preserve_error_cursor() {
+        for offset in [0, 1, 7, 8, 15, 16, 31] {
+            for byte in 0..=u8::MAX {
+                for position in 0..4 {
+                    let prefix = "x".repeat(offset);
+                    let input = format!(
+                        "{prefix}{}{}{}",
+                        "0".repeat(position),
+                        char::from(byte),
+                        "0".repeat(3 - position),
+                    );
+                    let mut reader = DocumentReader::new(&input);
+                    let mut scalar = DocumentReader::new(&input);
+                    reader.offset = offset;
+                    scalar.offset = offset;
+                    assert_eq!(reader.hex4(), scalar.hex4_scalar(), "{input:?}");
+                    assert_eq!(reader.offset(), scalar.offset(), "{input:?}");
+                }
+            }
+            for length in 0..4 {
+                let input = "x".repeat(offset) + &"0".repeat(length);
+                let mut reader = DocumentReader::new(&input);
+                reader.offset = offset;
+                assert_eq!(
+                    reader.hex4(),
+                    Err(DocumentError {
+                        message: "incomplete Unicode escape",
+                        offset: offset + length,
+                    }),
+                );
+                assert_eq!(reader.offset(), offset + length);
+            }
         }
     }
 

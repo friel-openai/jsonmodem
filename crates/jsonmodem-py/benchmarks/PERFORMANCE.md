@@ -5,6 +5,9 @@ orjson and jiter. Streaming value snapshots are compared with jiter. orjson
 does not provide an incremental parser, so its results are for complete
 documents. The overall complete-document summary is the only ratio table.
 
+The [decoding follow-up](PERFORMANCE_FOLLOWUP.md) measures the next changes
+against this report's jsonmodem build and orjson.
+
 The measured jsonmodem runtime is
 [`9285795`](https://github.com/friel-openai/jsonmodem/commit/9285795ca2ca10570e47a48564d29e12160c2d4d).
 The later closing-quote experiment was reverted. The final runtime sources

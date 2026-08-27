@@ -1,0 +1,39 @@
+{
+  "measure": "Time relative to orjson; lower is better; orjson is 1.0",
+  "method": "Equal-weight geometric mean of each case's saved median paired jsonmodem/orjson ratio. No diagnostic repeats replace primary results.",
+  "scope": "All 171 primary complete-document cases, including repeated payloads and input variants. Excludes streaming and rejected experiments. Not application-weighted performance.",
+  "source_files": {
+    "output.json": 28,
+    "frontend.json": 58,
+    "numbers.json": 25,
+    "strings.json": 60
+  },
+  "source_commits": {
+    "PR2": "a44e49c154987ee861ba65b2b889ddc1c5e76cdb",
+    "update": "16ebeba5d7b8e834dc0772f2b7df9c4d9aff6eec"
+  },
+  "time_relative_to_orjson": {
+    "all": {
+      "cases": 171,
+      "PR2": 1.3385346232440913,
+      "update": 1.3084090929478855,
+      "orjson": 1.0
+    },
+    "loads": {
+      "cases": 106,
+      "PR2": 1.2579156774185352,
+      "update": 1.2083241838987444,
+      "orjson": 1.0
+    },
+    "dumps": {
+      "cases": 65,
+      "PR2": 1.4812372716350395,
+      "update": 1.4897146146802238,
+      "orjson": 1.0
+    }
+  },
+  "cases_faster_than_orjson": {
+    "PR2": 41,
+    "update": 40
+  }
+}

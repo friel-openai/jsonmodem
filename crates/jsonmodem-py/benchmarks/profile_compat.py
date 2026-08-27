@@ -32,7 +32,8 @@ class Record:
 
 WORKLOADS = (
     "loads_medium", "loads_integers", "loads_floats", "loads_strings", "loads_escaped",
-    "loads_small_view", "loads_escaped_first", "loads_bmp", "dumps_medium", "dumps_integers",
+    "loads_small_view", "loads_escaped_first", "loads_bmp", "loads_unicode_escapes",
+    "loads_invalid_utf8", "dumps_medium", "dumps_integers",
     "dumps_escaped", "dumps_long_string", "sorted_medium", "dataclasses_1000",
     "numpy_float32", "late_default",
 )
@@ -41,6 +42,22 @@ WORKLOADS = (
 def workload(module, name):
     if name == "loads_bmp":
         return module.loads, orjson.dumps("\u2603" * 43690), {}
+    if name == "loads_unicode_escapes":
+        return module.loads, json.dumps(["\u2603\U0001f600"] * 1000).encode(), {}
+    if name == "loads_invalid_utf8":
+        valid_bytes = 8 * 1024 * 1024 - 3
+        value = (b'"' + b"\xe2\x98\x83" * (valid_bytes // 3)
+                 + b"x" * (valid_bytes % 3) + b'\xff"')
+
+        def reject(document):
+            try:
+                module.loads(document)
+            except module.JSONDecodeError as error:
+                assert error.doc == "" and error.pos == 0
+            else:
+                raise AssertionError("invalid UTF-8 was accepted")
+
+        return reject, value, {}
     if name == "loads_escaped_first":
         value = ["x" * (1 << 20) + "\n", *range(250000)]
         return module.loads, orjson.dumps(value), {}
@@ -85,6 +102,8 @@ def main():
     function, value, kwargs = workload(module, args.workload)
     reference, reference_value, reference_kwargs = workload(orjson, args.workload)
     if args.text_input:
+        if args.workload == "loads_invalid_utf8":
+            parser.error("malformed UTF-8 has no str representation")
         if not args.workload.startswith("loads_") or not isinstance(value, bytes):
             parser.error("--text-input requires a byte-based loads workload")
         value = value.decode("utf-8")
