@@ -1,0 +1,1898 @@
+{
+  "python": "3.12.13",
+  "runs": 5,
+  "calls": 10,
+  "samples": [
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "loads_medium",
+      "startup": {
+        "VmHWM_kib": 17136,
+        "VmRSS_kib": 17136,
+        "ru_maxrss_kib": 17136
+      },
+      "before": {
+        "VmHWM_kib": 17992,
+        "VmRSS_kib": 17992,
+        "ru_maxrss_kib": 17992
+      },
+      "first": {
+        "VmHWM_kib": 19276,
+        "VmRSS_kib": 19276,
+        "ru_maxrss_kib": 19276
+      },
+      "final": {
+        "VmHWM_kib": 19276,
+        "VmRSS_kib": 19276,
+        "ru_maxrss_kib": 19276
+      },
+      "run": 0
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "loads_medium",
+      "startup": {
+        "VmHWM_kib": 17060,
+        "VmRSS_kib": 17060,
+        "ru_maxrss_kib": 17060
+      },
+      "before": {
+        "VmHWM_kib": 17468,
+        "VmRSS_kib": 17468,
+        "ru_maxrss_kib": 17468
+      },
+      "first": {
+        "VmHWM_kib": 18376,
+        "VmRSS_kib": 18352,
+        "ru_maxrss_kib": 18376
+      },
+      "final": {
+        "VmHWM_kib": 18376,
+        "VmRSS_kib": 18352,
+        "ru_maxrss_kib": 18376
+      },
+      "run": 0
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "loads_medium",
+      "startup": {
+        "VmHWM_kib": 17172,
+        "VmRSS_kib": 17172,
+        "ru_maxrss_kib": 17172
+      },
+      "before": {
+        "VmHWM_kib": 17584,
+        "VmRSS_kib": 17584,
+        "ru_maxrss_kib": 17584
+      },
+      "first": {
+        "VmHWM_kib": 18476,
+        "VmRSS_kib": 18452,
+        "ru_maxrss_kib": 18476
+      },
+      "final": {
+        "VmHWM_kib": 18476,
+        "VmRSS_kib": 18452,
+        "ru_maxrss_kib": 18476
+      },
+      "run": 1
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "loads_medium",
+      "startup": {
+        "VmHWM_kib": 17040,
+        "VmRSS_kib": 17040,
+        "ru_maxrss_kib": 17056
+      },
+      "before": {
+        "VmHWM_kib": 17956,
+        "VmRSS_kib": 17956,
+        "ru_maxrss_kib": 17956
+      },
+      "first": {
+        "VmHWM_kib": 19236,
+        "VmRSS_kib": 19236,
+        "ru_maxrss_kib": 19236
+      },
+      "final": {
+        "VmHWM_kib": 19236,
+        "VmRSS_kib": 19236,
+        "ru_maxrss_kib": 19236
+      },
+      "run": 1
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "loads_medium",
+      "startup": {
+        "VmHWM_kib": 17136,
+        "VmRSS_kib": 17136,
+        "ru_maxrss_kib": 17136
+      },
+      "before": {
+        "VmHWM_kib": 17992,
+        "VmRSS_kib": 17992,
+        "ru_maxrss_kib": 17992
+      },
+      "first": {
+        "VmHWM_kib": 19212,
+        "VmRSS_kib": 19212,
+        "ru_maxrss_kib": 19212
+      },
+      "final": {
+        "VmHWM_kib": 19212,
+        "VmRSS_kib": 19212,
+        "ru_maxrss_kib": 19212
+      },
+      "run": 2
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "loads_medium",
+      "startup": {
+        "VmHWM_kib": 16992,
+        "VmRSS_kib": 16992,
+        "ru_maxrss_kib": 17056
+      },
+      "before": {
+        "VmHWM_kib": 17400,
+        "VmRSS_kib": 17400,
+        "ru_maxrss_kib": 17400
+      },
+      "first": {
+        "VmHWM_kib": 18312,
+        "VmRSS_kib": 18288,
+        "ru_maxrss_kib": 18312
+      },
+      "final": {
+        "VmHWM_kib": 18312,
+        "VmRSS_kib": 18288,
+        "ru_maxrss_kib": 18312
+      },
+      "run": 2
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "loads_medium",
+      "startup": {
+        "VmHWM_kib": 17064,
+        "VmRSS_kib": 17064,
+        "ru_maxrss_kib": 17064
+      },
+      "before": {
+        "VmHWM_kib": 17472,
+        "VmRSS_kib": 17472,
+        "ru_maxrss_kib": 17472
+      },
+      "first": {
+        "VmHWM_kib": 18380,
+        "VmRSS_kib": 18356,
+        "ru_maxrss_kib": 18380
+      },
+      "final": {
+        "VmHWM_kib": 18380,
+        "VmRSS_kib": 18356,
+        "ru_maxrss_kib": 18380
+      },
+      "run": 3
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "loads_medium",
+      "startup": {
+        "VmHWM_kib": 17060,
+        "VmRSS_kib": 17060,
+        "ru_maxrss_kib": 17060
+      },
+      "before": {
+        "VmHWM_kib": 17904,
+        "VmRSS_kib": 17904,
+        "ru_maxrss_kib": 17904
+      },
+      "first": {
+        "VmHWM_kib": 19136,
+        "VmRSS_kib": 19136,
+        "ru_maxrss_kib": 19136
+      },
+      "final": {
+        "VmHWM_kib": 19136,
+        "VmRSS_kib": 19136,
+        "ru_maxrss_kib": 19136
+      },
+      "run": 3
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "loads_medium",
+      "startup": {
+        "VmHWM_kib": 16992,
+        "VmRSS_kib": 16992,
+        "ru_maxrss_kib": 17056
+      },
+      "before": {
+        "VmHWM_kib": 17844,
+        "VmRSS_kib": 17844,
+        "ru_maxrss_kib": 17844
+      },
+      "first": {
+        "VmHWM_kib": 19124,
+        "VmRSS_kib": 19124,
+        "ru_maxrss_kib": 19124
+      },
+      "final": {
+        "VmHWM_kib": 19124,
+        "VmRSS_kib": 19124,
+        "ru_maxrss_kib": 19124
+      },
+      "run": 4
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "loads_medium",
+      "startup": {
+        "VmHWM_kib": 17100,
+        "VmRSS_kib": 17100,
+        "ru_maxrss_kib": 17100
+      },
+      "before": {
+        "VmHWM_kib": 17512,
+        "VmRSS_kib": 17512,
+        "ru_maxrss_kib": 17512
+      },
+      "first": {
+        "VmHWM_kib": 18408,
+        "VmRSS_kib": 18384,
+        "ru_maxrss_kib": 18408
+      },
+      "final": {
+        "VmHWM_kib": 18408,
+        "VmRSS_kib": 18384,
+        "ru_maxrss_kib": 18408
+      },
+      "run": 4
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "loads_large",
+      "startup": {
+        "VmHWM_kib": 17148,
+        "VmRSS_kib": 17148,
+        "ru_maxrss_kib": 17148
+      },
+      "before": {
+        "VmHWM_kib": 24324,
+        "VmRSS_kib": 24324,
+        "ru_maxrss_kib": 24324
+      },
+      "first": {
+        "VmHWM_kib": 56832,
+        "VmRSS_kib": 26844,
+        "ru_maxrss_kib": 56832
+      },
+      "final": {
+        "VmHWM_kib": 56832,
+        "VmRSS_kib": 29500,
+        "ru_maxrss_kib": 56832
+      },
+      "run": 0
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "loads_large",
+      "startup": {
+        "VmHWM_kib": 17236,
+        "VmRSS_kib": 17236,
+        "ru_maxrss_kib": 17236
+      },
+      "before": {
+        "VmHWM_kib": 23652,
+        "VmRSS_kib": 23652,
+        "ru_maxrss_kib": 23652
+      },
+      "first": {
+        "VmHWM_kib": 76164,
+        "VmRSS_kib": 25996,
+        "ru_maxrss_kib": 76164
+      },
+      "final": {
+        "VmHWM_kib": 76332,
+        "VmRSS_kib": 28776,
+        "ru_maxrss_kib": 76332
+      },
+      "run": 0
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "loads_large",
+      "startup": {
+        "VmHWM_kib": 17064,
+        "VmRSS_kib": 17064,
+        "ru_maxrss_kib": 17064
+      },
+      "before": {
+        "VmHWM_kib": 23484,
+        "VmRSS_kib": 23484,
+        "ru_maxrss_kib": 23484
+      },
+      "first": {
+        "VmHWM_kib": 74376,
+        "VmRSS_kib": 25328,
+        "ru_maxrss_kib": 74376
+      },
+      "final": {
+        "VmHWM_kib": 74548,
+        "VmRSS_kib": 28140,
+        "ru_maxrss_kib": 74548
+      },
+      "run": 1
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "loads_large",
+      "startup": {
+        "VmHWM_kib": 17216,
+        "VmRSS_kib": 17216,
+        "ru_maxrss_kib": 17216
+      },
+      "before": {
+        "VmHWM_kib": 24436,
+        "VmRSS_kib": 24436,
+        "ru_maxrss_kib": 24436
+      },
+      "first": {
+        "VmHWM_kib": 56888,
+        "VmRSS_kib": 26964,
+        "ru_maxrss_kib": 56888
+      },
+      "final": {
+        "VmHWM_kib": 56888,
+        "VmRSS_kib": 29556,
+        "ru_maxrss_kib": 56888
+      },
+      "run": 1
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "loads_large",
+      "startup": {
+        "VmHWM_kib": 17060,
+        "VmRSS_kib": 17060,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 24220,
+        "VmRSS_kib": 24220,
+        "ru_maxrss_kib": 24220
+      },
+      "first": {
+        "VmHWM_kib": 56736,
+        "VmRSS_kib": 26748,
+        "ru_maxrss_kib": 56736
+      },
+      "final": {
+        "VmHWM_kib": 56736,
+        "VmRSS_kib": 29404,
+        "ru_maxrss_kib": 56736
+      },
+      "run": 2
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "loads_large",
+      "startup": {
+        "VmHWM_kib": 17036,
+        "VmRSS_kib": 17036,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 23524,
+        "VmRSS_kib": 23524,
+        "ru_maxrss_kib": 23524
+      },
+      "first": {
+        "VmHWM_kib": 75496,
+        "VmRSS_kib": 25396,
+        "ru_maxrss_kib": 75496
+      },
+      "final": {
+        "VmHWM_kib": 75496,
+        "VmRSS_kib": 28208,
+        "ru_maxrss_kib": 75496
+      },
+      "run": 2
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "loads_large",
+      "startup": {
+        "VmHWM_kib": 17004,
+        "VmRSS_kib": 17004,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 23420,
+        "VmRSS_kib": 23420,
+        "ru_maxrss_kib": 23420
+      },
+      "first": {
+        "VmHWM_kib": 74328,
+        "VmRSS_kib": 25280,
+        "ru_maxrss_kib": 74328
+      },
+      "final": {
+        "VmHWM_kib": 74500,
+        "VmRSS_kib": 28092,
+        "ru_maxrss_kib": 74500
+      },
+      "run": 3
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "loads_large",
+      "startup": {
+        "VmHWM_kib": 17220,
+        "VmRSS_kib": 17220,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 24380,
+        "VmRSS_kib": 24380,
+        "ru_maxrss_kib": 24380
+      },
+      "first": {
+        "VmHWM_kib": 56900,
+        "VmRSS_kib": 26976,
+        "ru_maxrss_kib": 56900
+      },
+      "final": {
+        "VmHWM_kib": 56900,
+        "VmRSS_kib": 29568,
+        "ru_maxrss_kib": 56900
+      },
+      "run": 3
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "loads_large",
+      "startup": {
+        "VmHWM_kib": 17028,
+        "VmRSS_kib": 17028,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 24368,
+        "VmRSS_kib": 24368,
+        "ru_maxrss_kib": 24368
+      },
+      "first": {
+        "VmHWM_kib": 56828,
+        "VmRSS_kib": 26840,
+        "ru_maxrss_kib": 56828
+      },
+      "final": {
+        "VmHWM_kib": 56828,
+        "VmRSS_kib": 29496,
+        "ru_maxrss_kib": 56828
+      },
+      "run": 4
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "loads_large",
+      "startup": {
+        "VmHWM_kib": 17220,
+        "VmRSS_kib": 17220,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 23644,
+        "VmRSS_kib": 23644,
+        "ru_maxrss_kib": 23644
+      },
+      "first": {
+        "VmHWM_kib": 75040,
+        "VmRSS_kib": 25924,
+        "ru_maxrss_kib": 75040
+      },
+      "final": {
+        "VmHWM_kib": 75080,
+        "VmRSS_kib": 28704,
+        "ru_maxrss_kib": 75080
+      },
+      "run": 4
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "dumps_medium",
+      "startup": {
+        "VmHWM_kib": 17096,
+        "VmRSS_kib": 17096,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 19028,
+        "VmRSS_kib": 19028,
+        "ru_maxrss_kib": 19028
+      },
+      "first": {
+        "VmHWM_kib": 19292,
+        "VmRSS_kib": 19292,
+        "ru_maxrss_kib": 19292
+      },
+      "final": {
+        "VmHWM_kib": 19292,
+        "VmRSS_kib": 19292,
+        "ru_maxrss_kib": 19292
+      },
+      "run": 0
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "dumps_medium",
+      "startup": {
+        "VmHWM_kib": 17136,
+        "VmRSS_kib": 17136,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18148,
+        "VmRSS_kib": 18148,
+        "ru_maxrss_kib": 18148
+      },
+      "first": {
+        "VmHWM_kib": 18148,
+        "VmRSS_kib": 18148,
+        "ru_maxrss_kib": 18148
+      },
+      "final": {
+        "VmHWM_kib": 18148,
+        "VmRSS_kib": 18148,
+        "ru_maxrss_kib": 18148
+      },
+      "run": 0
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "dumps_medium",
+      "startup": {
+        "VmHWM_kib": 17212,
+        "VmRSS_kib": 17212,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18212,
+        "VmRSS_kib": 18212,
+        "ru_maxrss_kib": 18212
+      },
+      "first": {
+        "VmHWM_kib": 18212,
+        "VmRSS_kib": 18212,
+        "ru_maxrss_kib": 18212
+      },
+      "final": {
+        "VmHWM_kib": 18212,
+        "VmRSS_kib": 18212,
+        "ru_maxrss_kib": 18212
+      },
+      "run": 1
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "dumps_medium",
+      "startup": {
+        "VmHWM_kib": 16992,
+        "VmRSS_kib": 16992,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18860,
+        "VmRSS_kib": 18860,
+        "ru_maxrss_kib": 18860
+      },
+      "first": {
+        "VmHWM_kib": 19124,
+        "VmRSS_kib": 19124,
+        "ru_maxrss_kib": 19124
+      },
+      "final": {
+        "VmHWM_kib": 19124,
+        "VmRSS_kib": 19124,
+        "ru_maxrss_kib": 19124
+      },
+      "run": 1
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "dumps_medium",
+      "startup": {
+        "VmHWM_kib": 17224,
+        "VmRSS_kib": 17224,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18984,
+        "VmRSS_kib": 18984,
+        "ru_maxrss_kib": 18984
+      },
+      "first": {
+        "VmHWM_kib": 19368,
+        "VmRSS_kib": 19368,
+        "ru_maxrss_kib": 19368
+      },
+      "final": {
+        "VmHWM_kib": 19368,
+        "VmRSS_kib": 19368,
+        "ru_maxrss_kib": 19368
+      },
+      "run": 2
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "dumps_medium",
+      "startup": {
+        "VmHWM_kib": 17064,
+        "VmRSS_kib": 17064,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18072,
+        "VmRSS_kib": 18072,
+        "ru_maxrss_kib": 18072
+      },
+      "first": {
+        "VmHWM_kib": 18072,
+        "VmRSS_kib": 18072,
+        "ru_maxrss_kib": 18072
+      },
+      "final": {
+        "VmHWM_kib": 18072,
+        "VmRSS_kib": 18072,
+        "ru_maxrss_kib": 18072
+      },
+      "run": 2
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "dumps_medium",
+      "startup": {
+        "VmHWM_kib": 17220,
+        "VmRSS_kib": 17220,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18220,
+        "VmRSS_kib": 18220,
+        "ru_maxrss_kib": 18220
+      },
+      "first": {
+        "VmHWM_kib": 18220,
+        "VmRSS_kib": 18220,
+        "ru_maxrss_kib": 18220
+      },
+      "final": {
+        "VmHWM_kib": 18220,
+        "VmRSS_kib": 18220,
+        "ru_maxrss_kib": 18220
+      },
+      "run": 3
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "dumps_medium",
+      "startup": {
+        "VmHWM_kib": 17204,
+        "VmRSS_kib": 17204,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18960,
+        "VmRSS_kib": 18960,
+        "ru_maxrss_kib": 18960
+      },
+      "first": {
+        "VmHWM_kib": 19344,
+        "VmRSS_kib": 19344,
+        "ru_maxrss_kib": 19344
+      },
+      "final": {
+        "VmHWM_kib": 19344,
+        "VmRSS_kib": 19344,
+        "ru_maxrss_kib": 19344
+      },
+      "run": 3
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "dumps_medium",
+      "startup": {
+        "VmHWM_kib": 17204,
+        "VmRSS_kib": 17204,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18960,
+        "VmRSS_kib": 18960,
+        "ru_maxrss_kib": 18960
+      },
+      "first": {
+        "VmHWM_kib": 19344,
+        "VmRSS_kib": 19344,
+        "ru_maxrss_kib": 19344
+      },
+      "final": {
+        "VmHWM_kib": 19344,
+        "VmRSS_kib": 19344,
+        "ru_maxrss_kib": 19344
+      },
+      "run": 4
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "dumps_medium",
+      "startup": {
+        "VmHWM_kib": 17200,
+        "VmRSS_kib": 17200,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18200,
+        "VmRSS_kib": 18200,
+        "ru_maxrss_kib": 18200
+      },
+      "first": {
+        "VmHWM_kib": 18200,
+        "VmRSS_kib": 18200,
+        "ru_maxrss_kib": 18200
+      },
+      "final": {
+        "VmHWM_kib": 18200,
+        "VmRSS_kib": 18200,
+        "ru_maxrss_kib": 18200
+      },
+      "run": 4
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "fragments_1000",
+      "startup": {
+        "VmHWM_kib": 17032,
+        "VmRSS_kib": 17032,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 17964,
+        "VmRSS_kib": 17964,
+        "ru_maxrss_kib": 17964
+      },
+      "first": {
+        "VmHWM_kib": 17964,
+        "VmRSS_kib": 17964,
+        "ru_maxrss_kib": 17964
+      },
+      "final": {
+        "VmHWM_kib": 17964,
+        "VmRSS_kib": 17964,
+        "ru_maxrss_kib": 17964
+      },
+      "run": 0
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "fragments_1000",
+      "startup": {
+        "VmHWM_kib": 17220,
+        "VmRSS_kib": 17220,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 17636,
+        "VmRSS_kib": 17636,
+        "ru_maxrss_kib": 17636
+      },
+      "first": {
+        "VmHWM_kib": 17636,
+        "VmRSS_kib": 17636,
+        "ru_maxrss_kib": 17636
+      },
+      "final": {
+        "VmHWM_kib": 17636,
+        "VmRSS_kib": 17636,
+        "ru_maxrss_kib": 17636
+      },
+      "run": 0
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "fragments_1000",
+      "startup": {
+        "VmHWM_kib": 17176,
+        "VmRSS_kib": 17176,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 17588,
+        "VmRSS_kib": 17588,
+        "ru_maxrss_kib": 17588
+      },
+      "first": {
+        "VmHWM_kib": 17588,
+        "VmRSS_kib": 17588,
+        "ru_maxrss_kib": 17588
+      },
+      "final": {
+        "VmHWM_kib": 17588,
+        "VmRSS_kib": 17588,
+        "ru_maxrss_kib": 17588
+      },
+      "run": 1
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "fragments_1000",
+      "startup": {
+        "VmHWM_kib": 17176,
+        "VmRSS_kib": 17176,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 17996,
+        "VmRSS_kib": 17996,
+        "ru_maxrss_kib": 17996
+      },
+      "first": {
+        "VmHWM_kib": 17996,
+        "VmRSS_kib": 17996,
+        "ru_maxrss_kib": 17996
+      },
+      "final": {
+        "VmHWM_kib": 17996,
+        "VmRSS_kib": 17996,
+        "ru_maxrss_kib": 17996
+      },
+      "run": 1
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "fragments_1000",
+      "startup": {
+        "VmHWM_kib": 17140,
+        "VmRSS_kib": 17140,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 17996,
+        "VmRSS_kib": 17996,
+        "ru_maxrss_kib": 17996
+      },
+      "first": {
+        "VmHWM_kib": 17996,
+        "VmRSS_kib": 17996,
+        "ru_maxrss_kib": 17996
+      },
+      "final": {
+        "VmHWM_kib": 17996,
+        "VmRSS_kib": 17996,
+        "ru_maxrss_kib": 17996
+      },
+      "run": 2
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "fragments_1000",
+      "startup": {
+        "VmHWM_kib": 17200,
+        "VmRSS_kib": 17200,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 17612,
+        "VmRSS_kib": 17612,
+        "ru_maxrss_kib": 17612
+      },
+      "first": {
+        "VmHWM_kib": 17612,
+        "VmRSS_kib": 17612,
+        "ru_maxrss_kib": 17612
+      },
+      "final": {
+        "VmHWM_kib": 17612,
+        "VmRSS_kib": 17612,
+        "ru_maxrss_kib": 17612
+      },
+      "run": 2
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "fragments_1000",
+      "startup": {
+        "VmHWM_kib": 17064,
+        "VmRSS_kib": 17064,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 17472,
+        "VmRSS_kib": 17472,
+        "ru_maxrss_kib": 17548
+      },
+      "first": {
+        "VmHWM_kib": 17472,
+        "VmRSS_kib": 17472,
+        "ru_maxrss_kib": 17548
+      },
+      "final": {
+        "VmHWM_kib": 17472,
+        "VmRSS_kib": 17472,
+        "ru_maxrss_kib": 17548
+      },
+      "run": 3
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "fragments_1000",
+      "startup": {
+        "VmHWM_kib": 17140,
+        "VmRSS_kib": 17140,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 17996,
+        "VmRSS_kib": 17996,
+        "ru_maxrss_kib": 17996
+      },
+      "first": {
+        "VmHWM_kib": 17996,
+        "VmRSS_kib": 17996,
+        "ru_maxrss_kib": 17996
+      },
+      "final": {
+        "VmHWM_kib": 17996,
+        "VmRSS_kib": 17996,
+        "ru_maxrss_kib": 17996
+      },
+      "run": 3
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "fragments_1000",
+      "startup": {
+        "VmHWM_kib": 17176,
+        "VmRSS_kib": 17176,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18024,
+        "VmRSS_kib": 18024,
+        "ru_maxrss_kib": 18024
+      },
+      "first": {
+        "VmHWM_kib": 18024,
+        "VmRSS_kib": 18024,
+        "ru_maxrss_kib": 18024
+      },
+      "final": {
+        "VmHWM_kib": 18024,
+        "VmRSS_kib": 18024,
+        "ru_maxrss_kib": 18024
+      },
+      "run": 4
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "fragments_1000",
+      "startup": {
+        "VmHWM_kib": 17136,
+        "VmRSS_kib": 17136,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 17548,
+        "VmRSS_kib": 17548,
+        "ru_maxrss_kib": 17548
+      },
+      "first": {
+        "VmHWM_kib": 17548,
+        "VmRSS_kib": 17548,
+        "ru_maxrss_kib": 17548
+      },
+      "final": {
+        "VmHWM_kib": 17548,
+        "VmRSS_kib": 17548,
+        "ru_maxrss_kib": 17548
+      },
+      "run": 4
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "dataclasses_1000",
+      "startup": {
+        "VmHWM_kib": 17044,
+        "VmRSS_kib": 17044,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18976,
+        "VmRSS_kib": 18976,
+        "ru_maxrss_kib": 18976
+      },
+      "first": {
+        "VmHWM_kib": 18976,
+        "VmRSS_kib": 18976,
+        "ru_maxrss_kib": 18976
+      },
+      "final": {
+        "VmHWM_kib": 18976,
+        "VmRSS_kib": 18976,
+        "ru_maxrss_kib": 18976
+      },
+      "run": 0
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "dataclasses_1000",
+      "startup": {
+        "VmHWM_kib": 17180,
+        "VmRSS_kib": 17180,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18196,
+        "VmRSS_kib": 18196,
+        "ru_maxrss_kib": 18196
+      },
+      "first": {
+        "VmHWM_kib": 18196,
+        "VmRSS_kib": 18196,
+        "ru_maxrss_kib": 18196
+      },
+      "final": {
+        "VmHWM_kib": 18196,
+        "VmRSS_kib": 18196,
+        "ru_maxrss_kib": 18196
+      },
+      "run": 0
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "dataclasses_1000",
+      "startup": {
+        "VmHWM_kib": 17200,
+        "VmRSS_kib": 17200,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18200,
+        "VmRSS_kib": 18200,
+        "ru_maxrss_kib": 18200
+      },
+      "first": {
+        "VmHWM_kib": 18200,
+        "VmRSS_kib": 18200,
+        "ru_maxrss_kib": 18200
+      },
+      "final": {
+        "VmHWM_kib": 18200,
+        "VmRSS_kib": 18200,
+        "ru_maxrss_kib": 18200
+      },
+      "run": 1
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "dataclasses_1000",
+      "startup": {
+        "VmHWM_kib": 17032,
+        "VmRSS_kib": 17032,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18964,
+        "VmRSS_kib": 18964,
+        "ru_maxrss_kib": 18964
+      },
+      "first": {
+        "VmHWM_kib": 18964,
+        "VmRSS_kib": 18964,
+        "ru_maxrss_kib": 18964
+      },
+      "final": {
+        "VmHWM_kib": 18964,
+        "VmRSS_kib": 18964,
+        "ru_maxrss_kib": 18964
+      },
+      "run": 1
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "dataclasses_1000",
+      "startup": {
+        "VmHWM_kib": 17216,
+        "VmRSS_kib": 17216,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18976,
+        "VmRSS_kib": 18976,
+        "ru_maxrss_kib": 18976
+      },
+      "first": {
+        "VmHWM_kib": 18976,
+        "VmRSS_kib": 18976,
+        "ru_maxrss_kib": 18976
+      },
+      "final": {
+        "VmHWM_kib": 18976,
+        "VmRSS_kib": 18976,
+        "ru_maxrss_kib": 18976
+      },
+      "run": 2
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "dataclasses_1000",
+      "startup": {
+        "VmHWM_kib": 17044,
+        "VmRSS_kib": 17044,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18116,
+        "VmRSS_kib": 18116,
+        "ru_maxrss_kib": 18116
+      },
+      "first": {
+        "VmHWM_kib": 18116,
+        "VmRSS_kib": 18116,
+        "ru_maxrss_kib": 18116
+      },
+      "final": {
+        "VmHWM_kib": 18116,
+        "VmRSS_kib": 18116,
+        "ru_maxrss_kib": 18116
+      },
+      "run": 2
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "dataclasses_1000",
+      "startup": {
+        "VmHWM_kib": 17132,
+        "VmRSS_kib": 17132,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18144,
+        "VmRSS_kib": 18144,
+        "ru_maxrss_kib": 18144
+      },
+      "first": {
+        "VmHWM_kib": 18144,
+        "VmRSS_kib": 18144,
+        "ru_maxrss_kib": 18144
+      },
+      "final": {
+        "VmHWM_kib": 18144,
+        "VmRSS_kib": 18144,
+        "ru_maxrss_kib": 18144
+      },
+      "run": 3
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "dataclasses_1000",
+      "startup": {
+        "VmHWM_kib": 17136,
+        "VmRSS_kib": 17136,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18888,
+        "VmRSS_kib": 18888,
+        "ru_maxrss_kib": 18888
+      },
+      "first": {
+        "VmHWM_kib": 18888,
+        "VmRSS_kib": 18888,
+        "ru_maxrss_kib": 18888
+      },
+      "final": {
+        "VmHWM_kib": 18888,
+        "VmRSS_kib": 18888,
+        "ru_maxrss_kib": 18888
+      },
+      "run": 3
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "dataclasses_1000",
+      "startup": {
+        "VmHWM_kib": 17136,
+        "VmRSS_kib": 17136,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18952,
+        "VmRSS_kib": 18952,
+        "ru_maxrss_kib": 18952
+      },
+      "first": {
+        "VmHWM_kib": 18952,
+        "VmRSS_kib": 18952,
+        "ru_maxrss_kib": 18952
+      },
+      "final": {
+        "VmHWM_kib": 18952,
+        "VmRSS_kib": 18952,
+        "ru_maxrss_kib": 18952
+      },
+      "run": 4
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "dataclasses_1000",
+      "startup": {
+        "VmHWM_kib": 17204,
+        "VmRSS_kib": 17204,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18212,
+        "VmRSS_kib": 18212,
+        "ru_maxrss_kib": 18212
+      },
+      "first": {
+        "VmHWM_kib": 18212,
+        "VmRSS_kib": 18212,
+        "ru_maxrss_kib": 18212
+      },
+      "final": {
+        "VmHWM_kib": 18212,
+        "VmRSS_kib": 18212,
+        "ru_maxrss_kib": 18212
+      },
+      "run": 4
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": "2.5.2",
+      "case": "numpy_float32",
+      "startup": {
+        "VmHWM_kib": 17064,
+        "VmRSS_kib": 17064,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 33720,
+        "VmRSS_kib": 33720,
+        "ru_maxrss_kib": 33720
+      },
+      "first": {
+        "VmHWM_kib": 36276,
+        "VmRSS_kib": 34316,
+        "ru_maxrss_kib": 36276
+      },
+      "final": {
+        "VmHWM_kib": 36276,
+        "VmRSS_kib": 34188,
+        "ru_maxrss_kib": 36276
+      },
+      "run": 0
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": "2.5.2",
+      "case": "numpy_float32",
+      "startup": {
+        "VmHWM_kib": 17064,
+        "VmRSS_kib": 17064,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 33192,
+        "VmRSS_kib": 33192,
+        "ru_maxrss_kib": 33192
+      },
+      "first": {
+        "VmHWM_kib": 36832,
+        "VmRSS_kib": 34100,
+        "ru_maxrss_kib": 36832
+      },
+      "final": {
+        "VmHWM_kib": 36832,
+        "VmRSS_kib": 36472,
+        "ru_maxrss_kib": 36832
+      },
+      "run": 0
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": "2.5.2",
+      "case": "numpy_float32",
+      "startup": {
+        "VmHWM_kib": 17000,
+        "VmRSS_kib": 17000,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 33268,
+        "VmRSS_kib": 33268,
+        "ru_maxrss_kib": 33268
+      },
+      "first": {
+        "VmHWM_kib": 36888,
+        "VmRSS_kib": 34156,
+        "ru_maxrss_kib": 36888
+      },
+      "final": {
+        "VmHWM_kib": 36888,
+        "VmRSS_kib": 36528,
+        "ru_maxrss_kib": 36888
+      },
+      "run": 1
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": "2.5.2",
+      "case": "numpy_float32",
+      "startup": {
+        "VmHWM_kib": 17064,
+        "VmRSS_kib": 17064,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 33840,
+        "VmRSS_kib": 33840,
+        "ru_maxrss_kib": 33840
+      },
+      "first": {
+        "VmHWM_kib": 36208,
+        "VmRSS_kib": 34248,
+        "ru_maxrss_kib": 36208
+      },
+      "final": {
+        "VmHWM_kib": 36208,
+        "VmRSS_kib": 34120,
+        "ru_maxrss_kib": 36208
+      },
+      "run": 1
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": "2.5.2",
+      "case": "numpy_float32",
+      "startup": {
+        "VmHWM_kib": 16992,
+        "VmRSS_kib": 16992,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 33880,
+        "VmRSS_kib": 33880,
+        "ru_maxrss_kib": 33880
+      },
+      "first": {
+        "VmHWM_kib": 36188,
+        "VmRSS_kib": 34228,
+        "ru_maxrss_kib": 36188
+      },
+      "final": {
+        "VmHWM_kib": 36188,
+        "VmRSS_kib": 34100,
+        "ru_maxrss_kib": 36188
+      },
+      "run": 2
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": "2.5.2",
+      "case": "numpy_float32",
+      "startup": {
+        "VmHWM_kib": 17136,
+        "VmRSS_kib": 17136,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 33136,
+        "VmRSS_kib": 33136,
+        "ru_maxrss_kib": 33136
+      },
+      "first": {
+        "VmHWM_kib": 36776,
+        "VmRSS_kib": 34044,
+        "ru_maxrss_kib": 36776
+      },
+      "final": {
+        "VmHWM_kib": 36776,
+        "VmRSS_kib": 36416,
+        "ru_maxrss_kib": 36776
+      },
+      "run": 2
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": "2.5.2",
+      "case": "numpy_float32",
+      "startup": {
+        "VmHWM_kib": 17008,
+        "VmRSS_kib": 17008,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 33272,
+        "VmRSS_kib": 33272,
+        "ru_maxrss_kib": 33272
+      },
+      "first": {
+        "VmHWM_kib": 36888,
+        "VmRSS_kib": 34156,
+        "ru_maxrss_kib": 36888
+      },
+      "final": {
+        "VmHWM_kib": 36888,
+        "VmRSS_kib": 36528,
+        "ru_maxrss_kib": 36888
+      },
+      "run": 3
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": "2.5.2",
+      "case": "numpy_float32",
+      "startup": {
+        "VmHWM_kib": 17136,
+        "VmRSS_kib": 17136,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 33932,
+        "VmRSS_kib": 33932,
+        "ru_maxrss_kib": 33932
+      },
+      "first": {
+        "VmHWM_kib": 36360,
+        "VmRSS_kib": 34400,
+        "ru_maxrss_kib": 36360
+      },
+      "final": {
+        "VmHWM_kib": 36360,
+        "VmRSS_kib": 34272,
+        "ru_maxrss_kib": 36360
+      },
+      "run": 3
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": "2.5.2",
+      "case": "numpy_float32",
+      "startup": {
+        "VmHWM_kib": 17044,
+        "VmRSS_kib": 17044,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 34004,
+        "VmRSS_kib": 34004,
+        "ru_maxrss_kib": 34004
+      },
+      "first": {
+        "VmHWM_kib": 36312,
+        "VmRSS_kib": 34352,
+        "ru_maxrss_kib": 36312
+      },
+      "final": {
+        "VmHWM_kib": 36312,
+        "VmRSS_kib": 34224,
+        "ru_maxrss_kib": 36312
+      },
+      "run": 4
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": "2.5.2",
+      "case": "numpy_float32",
+      "startup": {
+        "VmHWM_kib": 17104,
+        "VmRSS_kib": 17104,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 33172,
+        "VmRSS_kib": 33172,
+        "ru_maxrss_kib": 33172
+      },
+      "first": {
+        "VmHWM_kib": 36864,
+        "VmRSS_kib": 34132,
+        "ru_maxrss_kib": 36864
+      },
+      "final": {
+        "VmHWM_kib": 36864,
+        "VmRSS_kib": 36504,
+        "ru_maxrss_kib": 36864
+      },
+      "run": 4
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "late_default",
+      "startup": {
+        "VmHWM_kib": 17180,
+        "VmRSS_kib": 17180,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18988,
+        "VmRSS_kib": 18988,
+        "ru_maxrss_kib": 18988
+      },
+      "first": {
+        "VmHWM_kib": 60192,
+        "VmRSS_kib": 19200,
+        "ru_maxrss_kib": 60192
+      },
+      "final": {
+        "VmHWM_kib": 62240,
+        "VmRSS_kib": 40972,
+        "ru_maxrss_kib": 62240
+      },
+      "run": 0
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "late_default",
+      "startup": {
+        "VmHWM_kib": 17228,
+        "VmRSS_kib": 17228,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 17644,
+        "VmRSS_kib": 17644,
+        "ru_maxrss_kib": 17644
+      },
+      "first": {
+        "VmHWM_kib": 39800,
+        "VmRSS_kib": 18356,
+        "ru_maxrss_kib": 39800
+      },
+      "final": {
+        "VmHWM_kib": 39864,
+        "VmRSS_kib": 18356,
+        "ru_maxrss_kib": 39864
+      },
+      "run": 0
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "late_default",
+      "startup": {
+        "VmHWM_kib": 17136,
+        "VmRSS_kib": 17136,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 17548,
+        "VmRSS_kib": 17548,
+        "ru_maxrss_kib": 17548
+      },
+      "first": {
+        "VmHWM_kib": 38920,
+        "VmRSS_kib": 18268,
+        "ru_maxrss_kib": 38920
+      },
+      "final": {
+        "VmHWM_kib": 38984,
+        "VmRSS_kib": 18268,
+        "ru_maxrss_kib": 38984
+      },
+      "run": 1
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "late_default",
+      "startup": {
+        "VmHWM_kib": 17136,
+        "VmRSS_kib": 17136,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18888,
+        "VmRSS_kib": 18888,
+        "ru_maxrss_kib": 18888
+      },
+      "first": {
+        "VmHWM_kib": 59100,
+        "VmRSS_kib": 19096,
+        "ru_maxrss_kib": 59100
+      },
+      "final": {
+        "VmHWM_kib": 60916,
+        "VmRSS_kib": 40660,
+        "ru_maxrss_kib": 60916
+      },
+      "run": 1
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "late_default",
+      "startup": {
+        "VmHWM_kib": 17140,
+        "VmRSS_kib": 17140,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18956,
+        "VmRSS_kib": 18956,
+        "ru_maxrss_kib": 18956
+      },
+      "first": {
+        "VmHWM_kib": 59924,
+        "VmRSS_kib": 19160,
+        "ru_maxrss_kib": 59924
+      },
+      "final": {
+        "VmHWM_kib": 60088,
+        "VmRSS_kib": 39060,
+        "ru_maxrss_kib": 60088
+      },
+      "run": 2
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "late_default",
+      "startup": {
+        "VmHWM_kib": 17208,
+        "VmRSS_kib": 17208,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 17620,
+        "VmRSS_kib": 17620,
+        "ru_maxrss_kib": 17620
+      },
+      "first": {
+        "VmHWM_kib": 40044,
+        "VmRSS_kib": 18336,
+        "ru_maxrss_kib": 40044
+      },
+      "final": {
+        "VmHWM_kib": 40108,
+        "VmRSS_kib": 18336,
+        "ru_maxrss_kib": 40108
+      },
+      "run": 2
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "late_default",
+      "startup": {
+        "VmHWM_kib": 17068,
+        "VmRSS_kib": 17068,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 17476,
+        "VmRSS_kib": 17476,
+        "ru_maxrss_kib": 17548
+      },
+      "first": {
+        "VmHWM_kib": 38848,
+        "VmRSS_kib": 18196,
+        "ru_maxrss_kib": 38848
+      },
+      "final": {
+        "VmHWM_kib": 38912,
+        "VmRSS_kib": 18196,
+        "ru_maxrss_kib": 38912
+      },
+      "run": 3
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "late_default",
+      "startup": {
+        "VmHWM_kib": 17100,
+        "VmRSS_kib": 17100,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18852,
+        "VmRSS_kib": 18852,
+        "ru_maxrss_kib": 18852
+      },
+      "first": {
+        "VmHWM_kib": 59128,
+        "VmRSS_kib": 19056,
+        "ru_maxrss_kib": 59128
+      },
+      "final": {
+        "VmHWM_kib": 60412,
+        "VmRSS_kib": 39932,
+        "ru_maxrss_kib": 60412
+      },
+      "run": 3
+    },
+    {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "numpy": null,
+      "case": "late_default",
+      "startup": {
+        "VmHWM_kib": 17152,
+        "VmRSS_kib": 17152,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 18912,
+        "VmRSS_kib": 18912,
+        "ru_maxrss_kib": 18912
+      },
+      "first": {
+        "VmHWM_kib": 60372,
+        "VmRSS_kib": 19116,
+        "ru_maxrss_kib": 60372
+      },
+      "final": {
+        "VmHWM_kib": 60836,
+        "VmRSS_kib": 39236,
+        "ru_maxrss_kib": 60836
+      },
+      "run": 4
+    },
+    {
+      "module": "orjson",
+      "version": "3.11.9",
+      "numpy": null,
+      "case": "late_default",
+      "startup": {
+        "VmHWM_kib": 17004,
+        "VmRSS_kib": 17004,
+        "ru_maxrss_kib": 17548
+      },
+      "before": {
+        "VmHWM_kib": 17412,
+        "VmRSS_kib": 17412,
+        "ru_maxrss_kib": 17548
+      },
+      "first": {
+        "VmHWM_kib": 38524,
+        "VmRSS_kib": 18132,
+        "ru_maxrss_kib": 38524
+      },
+      "final": {
+        "VmHWM_kib": 38588,
+        "VmRSS_kib": 18132,
+        "ru_maxrss_kib": 38588
+      },
+      "run": 4
+    }
+  ],
+  "cpu": 12
+}
