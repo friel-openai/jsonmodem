@@ -332,7 +332,7 @@ pub fn loads(py: Python<'_>, input: Bound<'_, PyAny>) -> PyResult<PyObject> {
 }
 
 fn decode_bytes(py: Python<'_>, bytes: &[u8]) -> PyResult<PyObject> {
-    // This validator is faster on Unicode but slower on short or ASCII input.
+    // Limit SIMD dispatch to long inputs with early non-ASCII bytes.
     if bytes.len() >= 128 && !bytes[..32].is_ascii() {
         let input = simdutf8::compat::from_utf8(bytes)
             .map_err(|_| super::json_decode_error(py, "str is not valid UTF-8", "", 0))?;
