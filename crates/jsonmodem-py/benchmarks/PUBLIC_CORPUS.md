@@ -212,6 +212,11 @@ aggregates unless a report explicitly defines a combined weighting.
 The result JSON contains metadata and measurements, not fixture contents or local
 build paths. It is written atomically only after the requested run succeeds.
 
+For allocation counts and fresh-process peak RSS on the same documents, use the
+separate [public-corpus memory runner](PUBLIC_MEMORY.md). The timing worker keeps
+a reference tree for correctness checks, so its process RSS is not a suitable
+decode-memory comparison.
+
 ## Runner tests
 
 The offline tests need pytest but do not download fixtures or require either

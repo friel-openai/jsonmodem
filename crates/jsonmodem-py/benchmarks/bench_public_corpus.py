@@ -248,7 +248,7 @@ def child(library, payload, hash_seed, timeout):
 def verify_builds(libraries, payload, references, timeout):
     verified = {}
     for library in libraries:
-        print(f"Checking {library['name']} before timing", file=sys.stderr, flush=True)
+        print(f"Checking {library['name']} correctness", file=sys.stderr, flush=True)
         verified[library["name"]] = child(library, dict(payload, mode="verify"), 1729, timeout)
     expected = verified[references[0]]["cases"]
     for name, result in verified.items():
