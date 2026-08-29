@@ -79,11 +79,15 @@ impl<'py, 'src> Decoder<'py, 'src> {
     #[cold]
     #[inline(never)]
     fn error(&self, error: DocumentError) -> PyErr {
-        let position = self
-            .input
-            .char_indices()
-            .take_while(|(i, _)| *i < error.offset)
-            .count();
+        let position = match self.input.get(..error.offset) {
+            Some(prefix) => prefix.chars().count(),
+            // Preserve the count for offsets that split a character or exceed the input.
+            None => self
+                .input
+                .char_indices()
+                .take_while(|(i, _)| *i < error.offset)
+                .count(),
+        };
         super::json_decode_error(self.py, error.message, self.input, position)
     }
 
