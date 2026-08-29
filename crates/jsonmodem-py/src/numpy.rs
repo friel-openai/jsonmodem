@@ -1,8 +1,6 @@
 //! NumPy formatting from checked immutable bytes, without borrowing NumPy
 //! memory.
 
-use std::io::Write;
-
 use chrono::{Datelike, NaiveDate, NaiveDateTime, Timelike};
 use pyo3::{exceptions::PyTypeError, prelude::*, types::PyBytes};
 
@@ -60,27 +58,44 @@ fn datetime(value: i64, unit: &str) -> PyResult<NaiveDateTime> {
     Ok(result)
 }
 
+/// Encode a checked value below 100 as two zero-padded ASCII digits.
+#[inline]
+fn two_digits(value: u32) -> [u8; 2] {
+    debug_assert!(value < 100);
+    [b'0' + (value / 10) as u8, b'0' + (value % 10) as u8]
+}
+
 fn write_datetime(output: &mut Vec<u8>, value: i64, unit: &str, option: i32) -> PyResult<()> {
     let date = datetime(value, unit)?;
-    write!(
-        output,
-        "\"{:04}-{:02}-{:02}T{:02}:{:02}:{:02}",
-        date.year(),
-        date.month(),
-        date.day(),
-        date.hour(),
-        date.minute(),
-        date.second()
-    )
-    .expect("Vec write");
+    let mut text = *b"\"0000-00-00T00:00:00.000000+00:00\"";
+    let year = date.year() as u32;
+    text[1..3].copy_from_slice(&two_digits(year / 100));
+    text[3..5].copy_from_slice(&two_digits(year % 100));
+    text[6..8].copy_from_slice(&two_digits(date.month()));
+    text[9..11].copy_from_slice(&two_digits(date.day()));
+    text[12..14].copy_from_slice(&two_digits(date.hour()));
+    text[15..17].copy_from_slice(&two_digits(date.minute()));
+    text[18..20].copy_from_slice(&two_digits(date.second()));
+    let mut end = 20;
+    // datetime() constructs epoch-based or midnight values, never leap seconds.
     let micros = date.nanosecond() / 1000;
     if micros != 0 && option & 8 == 0 {
-        write!(output, ".{micros:06}").expect("Vec write");
+        text[21..23].copy_from_slice(&two_digits(micros / 10_000));
+        text[23..25].copy_from_slice(&two_digits(micros / 100 % 100));
+        text[25..27].copy_from_slice(&two_digits(micros % 100));
+        end = 27;
     }
     if option & 2 != 0 {
-        output.extend_from_slice(if option & 128 != 0 { b"Z" } else { b"+00:00" });
+        if option & 128 != 0 {
+            text[end] = b'Z';
+            end += 1;
+        } else {
+            text[end..end + 6].copy_from_slice(b"+00:00");
+            end += 6;
+        }
     }
-    output.push(b'"');
+    text[end] = b'"';
+    output.extend_from_slice(&text[..end + 1]);
     Ok(())
 }
 
