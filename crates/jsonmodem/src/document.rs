@@ -156,7 +156,9 @@ impl<'a> DocumentReader<'a> {
         // The first escape can add four UTF-8 bytes after the plain prefix.
         decoded.reserve(64.max(self.offset - start + 4));
         loop {
-            decoded.push_str(&self.input[start..self.offset]);
+            if start != self.offset {
+                decoded.push_str(&self.input[start..self.offset]);
+            }
             let escape_start = self.offset;
             self.offset += 1;
             let escape = self
@@ -211,6 +213,10 @@ impl<'a> DocumentReader<'a> {
                 }
             }
             start = self.offset;
+            // The plain-prefix scanner would stop at this same backslash.
+            if self.input.as_bytes().get(start).copied() == Some(b'\\') {
+                continue;
+            }
             let remaining = &self.input.as_bytes()[start..];
             self.offset += if remaining.len() < 8 {
                 scalar_string_prefix::<false>(remaining)
@@ -584,6 +590,169 @@ mod tests {
                 DocumentReader::new(token).string_with_buffer(&mut buffer),
                 Err(DocumentError { message, offset }),
             );
+        }
+    }
+
+    #[test]
+    fn adjacent_simple_escapes_preserve_values_and_cursor() {
+        let escapes = [
+            ("\\\"", "\""),
+            ("\\\\", "\\"),
+            ("\\/", "/"),
+            ("\\b", "\u{8}"),
+            ("\\f", "\u{c}"),
+            ("\\n", "\n"),
+            ("\\r", "\r"),
+            ("\\t", "\t"),
+        ];
+        for (first, first_value) in escapes {
+            for count in [1, 2, 3, 31, 32, 33, 65] {
+                let input = format!("\"{}\"", first.repeat(count));
+                let expected = first_value.repeat(count);
+                let mut reader = DocumentReader::new(&input);
+                assert_eq!(reader.string().unwrap().as_ref(), expected.as_str());
+                assert_eq!(reader.offset(), input.len());
+            }
+            for (second, second_value) in escapes {
+                let input = format!("\"\u{e9}{first}{second}\u{1f642}\" next");
+                let mut reader = DocumentReader::new(&input);
+                let mut decoded = String::new();
+                assert_eq!(reader.string_with_buffer(&mut decoded).unwrap(), None);
+                assert_eq!(
+                    decoded,
+                    format!("\u{e9}{first_value}{second_value}\u{1f642}")
+                );
+                assert_eq!(reader.offset(), input.len() - " next".len());
+                assert_eq!(reader.peek(), Some(b'n'));
+            }
+        }
+    }
+
+    #[test]
+    fn adjacent_escapes_preserve_scanner_boundaries() {
+        for length in [
+            0, 1, 6, 7, 8, 9, 14, 15, 16, 17, 30, 31, 32, 33, 46, 47, 48, 49, 62, 63, 64, 65,
+        ] {
+            let plain = "x".repeat(length);
+            for (body, expected) in [
+                (format!("{plain}\\n\\t"), format!("{plain}\n\t")),
+                (format!("\\n\\t{plain}"), format!("\n\t{plain}")),
+                (
+                    format!("\\n\\t{plain}\\r\\f"),
+                    format!("\n\t{plain}\r\u{c}"),
+                ),
+                (
+                    format!("\\n\u{e9}\u{1f642}{plain}\\t"),
+                    format!("\n\u{e9}\u{1f642}{plain}\t"),
+                ),
+                (
+                    format!("\\uD83D\\uDE42\\n{plain}\\u0000\\t"),
+                    format!("\u{1f642}\n{plain}\0\t"),
+                ),
+            ] {
+                let input = format!("\"{body}\"");
+                let mut reader = DocumentReader::new(&input);
+                assert_eq!(
+                    reader.string().unwrap().as_ref(),
+                    expected.as_str(),
+                    "{input:?}"
+                );
+                assert_eq!(reader.offset(), input.len(), "{input:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn adjacent_escape_errors_preserve_cursor_and_partial_buffer() {
+        let head = "\"\u{e9}\\n\\t";
+        let mut decoded = String::with_capacity(128);
+        let storage = decoded.as_ptr();
+        let capacity = decoded.capacity();
+        for (tail, message, error_offset, cursor, decoded_tail) in [
+            ("", "unterminated string", 0, 0, ""),
+            ("\\", "incomplete escape", 1, 1, ""),
+            ("\\q\"", "invalid escaped character in string", 1, 2, ""),
+            ("\\u\"", "invalid escaped sequence in string", 0, 2, ""),
+            ("\\u00x0\"", "invalid escaped sequence in string", 0, 4, ""),
+            ("\\uD800\"", "no low surrogate in string", 6, 6, ""),
+            ("\\uD800\\q\"", "no low surrogate in string", 6, 6, ""),
+            (
+                "\\uD800\\uZZZZ\"",
+                "invalid escaped sequence in string",
+                6,
+                8,
+                "",
+            ),
+            (
+                "\\uD800\\u0000\"",
+                "invalid low surrogate in string",
+                6,
+                12,
+                "",
+            ),
+            ("\\uDC00\"", "invalid high surrogate in string", 0, 6, ""),
+            ("\\uD83D\\uDE42\\", "incomplete escape", 13, 13, "\u{1f642}"),
+            ("\n\"", "unescaped control character", 0, 0, ""),
+            ("\\u0000", "unterminated string", 6, 6, "\0"),
+        ] {
+            let input = format!("{head}{tail}");
+            let mut reader = DocumentReader::new(&input);
+            assert_eq!(
+                reader.string_with_buffer(&mut decoded),
+                Err(DocumentError {
+                    message,
+                    offset: head.len() + error_offset,
+                }),
+                "{input:?}",
+            );
+            assert_eq!(reader.offset(), head.len() + cursor, "{input:?}");
+            assert_eq!(decoded, format!("\u{e9}\n\t{decoded_tail}"));
+            assert_eq!(decoded.as_ptr(), storage);
+            assert_eq!(decoded.capacity(), capacity);
+
+            let mut next = DocumentReader::new(r#""\r\f""#);
+            assert_eq!(next.string_with_buffer(&mut decoded).unwrap(), None);
+            assert_eq!(decoded, "\r\u{c}");
+            assert_eq!(decoded.as_ptr(), storage);
+            assert_eq!(decoded.capacity(), capacity);
+            assert_eq!(next.peek(), None);
+        }
+    }
+
+    #[test]
+    fn adjacent_escape_buffer_retains_storage_after_a_large_string() {
+        let count = if cfg!(miri) { 128 } else { 32769 };
+        let input = format!("\"{}\"", "\\n\\t".repeat(count));
+        let mut decoded = String::new();
+        assert_eq!(
+            DocumentReader::new(&input)
+                .string_with_buffer(&mut decoded)
+                .unwrap(),
+            None,
+        );
+        assert_eq!(decoded, "\n\t".repeat(count));
+        let storage = decoded.as_ptr();
+        let capacity = decoded.capacity();
+
+        for (input, expected) in [
+            (r#""\t\n""#, "\t\n"),
+            (r#""\uD83D\uDE42\n""#, "\u{1f642}\n"),
+            (r#""\\\"""#, "\\\""),
+            (r#""\u005c\u006e""#, "\\n"),
+        ] {
+            let mut reader = DocumentReader::new(input);
+            assert_eq!(reader.string_with_buffer(&mut decoded).unwrap(), None);
+            assert_eq!(decoded, expected);
+            assert_eq!(reader.offset(), input.len());
+            assert_eq!(decoded.as_ptr(), storage);
+            assert_eq!(decoded.capacity(), capacity);
+            assert_eq!(
+                DocumentReader::new("\"plain\"")
+                    .string_with_buffer(&mut decoded)
+                    .unwrap(),
+                Some("plain"),
+            );
+            assert_eq!(decoded, expected);
         }
     }
 
