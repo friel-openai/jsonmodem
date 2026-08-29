@@ -3,7 +3,8 @@
 use pyo3::prelude::*;
 #[cfg(not(any(Py_LIMITED_API, Py_GIL_DISABLED, PyPy, GraalPy)))]
 use pyo3::types::{
-    PyDate, PyDateAccess, PyDateTime, PyTime, PyTimeAccess, PyTzInfo, PyTzInfoAccess,
+    PyDate, PyDateAccess, PyDateTime, PyDelta, PyDeltaAccess, PyTime, PyTimeAccess, PyTzInfo,
+    PyTzInfoAccess,
 };
 
 use super::Encoder;
@@ -26,10 +27,22 @@ pub(super) fn write(encoder: &mut Encoder<true>, value: &Bound<'_, PyAny>) -> Py
     let mut formatted = FormattedDateTime::new();
     if value.is_exact_instance_of::<PyDateTime>() {
         let datetime = value.downcast::<PyDateTime>()?;
-        let utc_suffix = match datetime.get_tzinfo() {
-            Some(timezone) if timezone.is(utc) => true,
+        let offset_seconds = match datetime.get_tzinfo() {
+            Some(timezone) if timezone.is(utc) => Some(0),
+            Some(timezone) if timezone.get_type().is(utc.get_type()) => {
+                let offset =
+                    timezone.call_method1(pyo3::intern!(value.py(), "utcoffset"), (datetime,))?;
+                // A timedelta subclass can override the fields used by the
+                // Python formatter. Keep that behavior instead of reading its
+                // native fields. The builtin method returns its stored offset.
+                if !offset.is_exact_instance_of::<PyDelta>() {
+                    return Ok(false);
+                }
+                let offset = offset.downcast::<PyDelta>()?;
+                Some(i64::from(offset.get_days()) * 86_400 + i64::from(offset.get_seconds()))
+            }
             Some(_) => return Ok(false),
-            None => encoder.option & NAIVE_UTC != 0,
+            None => (encoder.option & NAIVE_UTC != 0).then_some(0),
         };
         if !formatted.date(datetime) {
             return Ok(false);
@@ -38,12 +51,16 @@ pub(super) fn write(encoder: &mut Encoder<true>, value: &Bound<'_, PyAny>) -> Py
         if !formatted.time(datetime, encoder.option & OMIT_MICROSECONDS != 0) {
             return Ok(false);
         }
-        if utc_suffix {
-            if encoder.option & UTC_Z != 0 {
-                formatted.push(b'Z');
-            } else {
-                formatted.bytes[formatted.len..formatted.len + 6].copy_from_slice(b"+00:00");
-                formatted.len += 6;
+        if let Some(seconds) = offset_seconds {
+            if seconds == 0 {
+                if encoder.option & UTC_Z != 0 {
+                    formatted.push(b'Z');
+                } else {
+                    formatted.bytes[formatted.len..formatted.len + 6].copy_from_slice(b"+00:00");
+                    formatted.len += 6;
+                }
+            } else if !formatted.offset(seconds, encoder.option & UTC_Z != 0) {
+                return Ok(false);
             }
         }
     } else if value.is_exact_instance_of::<PyDate>() {
@@ -133,6 +150,24 @@ impl FormattedDateTime {
             self.two_digits((microsecond / 10_000) as u8);
             self.two_digits((microsecond / 100 % 100) as u8);
             self.two_digits((microsecond % 100) as u8);
+        }
+        true
+    }
+
+    fn offset(&mut self, seconds: i64, utc_z: bool) -> bool {
+        // Ignoring offset microseconds can produce -86400 for a valid offset
+        // just above -24 hours. Rounding can then produce either sign of 24:00.
+        if !(-86_400..86_400).contains(&seconds) {
+            return false;
+        }
+        let minutes = (seconds.unsigned_abs() + 30) / 60;
+        if minutes == 0 && utc_z {
+            self.push(b'Z');
+        } else {
+            self.push(if seconds < 0 { b'-' } else { b'+' });
+            self.two_digits((minutes / 60) as u8);
+            self.push(b':');
+            self.two_digits((minutes % 60) as u8);
         }
         true
     }
