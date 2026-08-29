@@ -217,6 +217,12 @@ separate [public-corpus memory runner](PUBLIC_MEMORY.md). The timing worker keep
 a reference tree for correctness checks, so its process RSS is not a suitable
 decode-memory comparison.
 
+To compare the first serialization of newly prepared Python values with a
+reused-input control, use the separate
+[fresh/reused dumps runner](PUBLIC_FRESH_DUMPS.md). Its stopwatch excludes
+returned-byte destruction, so keep its results separate from this repeated-call
+benchmark.
+
 ## Runner tests
 
 The offline tests need pytest but do not download fixtures or require either
