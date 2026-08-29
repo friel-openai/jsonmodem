@@ -1,0 +1,3122 @@
+{
+  "schema_version": 1,
+  "kind": "supplemental_memory_baseline",
+  "created_utc": "2026-08-29T06:13:32.705044+00:00",
+  "libraries": {
+    "jsonmodem_baseline": {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "files": [
+        {
+          "name": "__init__.py",
+          "sha256": "cf8bf5012cc9dcfc8f9bd304de337afce918d955ed22e6d0131b2f533424afb4"
+        },
+        {
+          "name": "_compat.py",
+          "sha256": "f4f53fa3faa1abb82e65171735a9d23ea20673ca0d854bab1b6d330b29d5a6ca"
+        },
+        {
+          "name": "_jsonmodem.cpython-312-x86_64-linux-gnu.so",
+          "sha256": "5b1ab812d74c1df4c60d87e3d194c29c140a179a5e7bd2948a4fb6ea61d11ebe"
+        },
+        {
+          "name": "_numpy.py",
+          "sha256": "cafad3349b1e0f77f49dc363af1df3f473ce18fb5394d0d7b9b3bc1a3cb01b9e"
+        }
+      ],
+      "python": "3.12.13",
+      "implementation": "CPython",
+      "python_compiler": "Clang 22.1.3 ",
+      "python_cache_tag": "cpython-312",
+      "executable_sha256": "7d43f6e86a6c6dd12005ec77eb2055f1be3f1bb3adedf8afe0a87973fa7371ce",
+      "platform": "Linux-5.15.0-1110-azure-x86_64-with-glibc2.39",
+      "machine": "x86_64",
+      "pointer_bits": 64,
+      "cpu_affinity": [
+        8
+      ],
+      "python_malloc": "default",
+      "declared_revision": "b7fe329765f3e90064cc38f127d3594165116c71",
+      "declared_wheel_sha256": "51e493282dab7c0f60b37eab3a8e34c7167fa72a1f89a660d10b962474b8110b"
+    },
+    "orjson_3119": {
+      "module": "orjson",
+      "version": "3.11.9",
+      "files": [
+        {
+          "name": "__init__.py",
+          "sha256": "7a3a05b1281b65aa5054c35387fbe5bc99305bf94b9ec7774a6cd4a6f5b148f5"
+        },
+        {
+          "name": "orjson.cpython-312-x86_64-linux-gnu.so",
+          "sha256": "cf95e4edd9c6752be617f8afc1f08bfd6b015007520e15069e56c102ffb9d295"
+        }
+      ],
+      "python": "3.12.13",
+      "implementation": "CPython",
+      "python_compiler": "Clang 22.1.3 ",
+      "python_cache_tag": "cpython-312",
+      "executable_sha256": "7d43f6e86a6c6dd12005ec77eb2055f1be3f1bb3adedf8afe0a87973fa7371ce",
+      "platform": "Linux-5.15.0-1110-azure-x86_64-with-glibc2.39",
+      "machine": "x86_64",
+      "pointer_bits": 64,
+      "cpu_affinity": [
+        8
+      ],
+      "python_malloc": "default"
+    }
+  },
+  "dependencies": {
+    "memray": {
+      "version": "1.20.0",
+      "files": [
+        {
+          "module": "memray",
+          "name": "__init__.py",
+          "sha256": "0ef9af2788f7781437d8790c1a81d4683945b52d6c08a740e6480e25d76ab0e5"
+        },
+        {
+          "module": "memray._memray",
+          "name": "_memray.cpython-312-x86_64-linux-gnu.so",
+          "sha256": "686a31d35cb42b4bbb1a60a791767782733d4a110ec30685b816696d2becbeb9"
+        }
+      ]
+    },
+    "numpy": {
+      "version": "2.5.2",
+      "files": [
+        {
+          "module": "numpy",
+          "name": "__init__.py",
+          "sha256": "09295a80660f17925ae23765ce8cbd7ff7ceae968d5f2f89349f1cb74c0b9e11"
+        },
+        {
+          "module": "numpy._core._multiarray_umath",
+          "name": "_multiarray_umath.cpython-312-x86_64-linux-gnu.so",
+          "sha256": "9369e7ee42af16a2136ec03c7c1d09d5244d028cf327a33b2f072b8893259e11"
+        },
+        {
+          "module": "numpy.linalg._umath_linalg",
+          "name": "_umath_linalg.cpython-312-x86_64-linux-gnu.so",
+          "sha256": "de31ad57826aacc0b68a06c134f525daa9329527c5b523786c2e3ae7c75df4df"
+        }
+      ]
+    }
+  },
+  "source_sha256": {
+    "bench_allocations.py": "8867cbd3d8ae049dd41531fbce82c2ce533bf10ebf8fd1231be577869483e04d",
+    "bench_rss.py": "6839ff52e66d2b9c659ebb1b9b8e09270a52985d606f7e364711e6aa4eca27d9",
+    "allocation_stats.py": "811f04e52c2177df802cf45589ab02a15f5c25260815c3975af07bbeafe86f15",
+    "bench_public_corpus.py": "b00c361b29535abfc16548de41a32a5d4caa0737e4989d80991c1d9041a9bbe9",
+    "public_corpus.py": "6a7ba7893d0e3ec83ef0cd70043eb29893eb2e8a7730476dcf02c0ec8cc9505c",
+    "synthetic_memory_preflight.py": "bdf7037198028a0fccd18f07d7146e1ce6b3d3ec3ec6c7685059f01d789240c4",
+    "run_memory_baseline_additions.sh": "f1350fa4a6e51920e1cc69f48ffd895bdcd8f46f945903e966893d3e57fca361"
+  },
+  "analysis_source": {
+    "name": "audit_supplemental_memory.py",
+    "size_bytes": 9728,
+    "sha256": "1ee761bf457b6fd2a558802d7dee2357ef841da395e9e810274a3c87ee2c8314"
+  },
+  "checks": {
+    "before_after_fingerprints_equal": true,
+    "allocations_recomputed_from_traces": 84,
+    "rss_workers_checked": 42,
+    "zero_warmup_traces_recomputed": 18
+  },
+  "method": {
+    "direction": "Lower is better within each memory metric. Sizes are bytes; requests are counts.",
+    "coordinated_cpu": 8,
+    "other_workers_heavy_jobs_paused": true,
+    "allocation_processes": "Six fresh processes, three per library. Each process prepares all 14 workloads and captures them sequentially, one tracked call after ten warmups. Cyclic GC is collected after warmups and remains enabled during capture.",
+    "rss_processes": "42 fresh workers, three per library/workload, ten calls without Memray or preliminary warmups. GC is collected after preparation and remains enabled. RSS readings follow released results.",
+    "rss_units": "Source KiB converted to bytes. Peak RSS includes imports, preparation, results, and retained allocator pages. No subtraction or reset.",
+    "zero_warmups": "18 fresh public-corpus workers. First library dumps call is tracked, including possible library initialization and first-use string allocations. It does not isolate UTF-8 caches.",
+    "warm_comparison_limits": "The earlier ten-warmup public captures allowed concurrent builds/checks. These measurement families remain separate; there is no overall memory score."
+  },
+  "artifacts": [
+    {
+      "name": "preflight-before.json",
+      "size_bytes": 12453,
+      "sha256": "62a099bba8bb6f1b46c09b442b8f7ae09b557c2638a575c00ef7fa116850542f"
+    },
+    {
+      "name": "preflight-after.json",
+      "size_bytes": 12453,
+      "sha256": "47527616d8c10b6d12aba73f126f5396fe3c584ca945488ff61cb7c8529997c9"
+    },
+    {
+      "name": "jsonmodem-1.json",
+      "size_bytes": 2138,
+      "sha256": "d3bcb0720a32a128737203c3ad62abef5a18d83f45496bfd8e96d1644140364d"
+    },
+    {
+      "name": "orjson-1.json",
+      "size_bytes": 2140,
+      "sha256": "a9e9c7c8548072e333450d8496854dac6db820efb10e58f929bb72b906c130f1"
+    },
+    {
+      "name": "jsonmodem-2.json",
+      "size_bytes": 2138,
+      "sha256": "d3bcb0720a32a128737203c3ad62abef5a18d83f45496bfd8e96d1644140364d"
+    },
+    {
+      "name": "orjson-2.json",
+      "size_bytes": 2140,
+      "sha256": "a9e9c7c8548072e333450d8496854dac6db820efb10e58f929bb72b906c130f1"
+    },
+    {
+      "name": "jsonmodem-3.json",
+      "size_bytes": 2138,
+      "sha256": "d3bcb0720a32a128737203c3ad62abef5a18d83f45496bfd8e96d1644140364d"
+    },
+    {
+      "name": "orjson-3.json",
+      "size_bytes": 2140,
+      "sha256": "a9e9c7c8548072e333450d8496854dac6db820efb10e58f929bb72b906c130f1"
+    },
+    {
+      "name": "rss.json",
+      "size_bytes": 25054,
+      "sha256": "7cea680b07b19358df526a39ba632b2dbd97d4366ae7fe0808ce0842b7ab31e5"
+    },
+    {
+      "name": "memory-first-use.json",
+      "size_bytes": 29322,
+      "sha256": "09b26273a9945ad7f51420eccee27afd9f1058995c9b11762e2e9446d1ad188d"
+    }
+  ],
+  "synthetic_allocations": {
+    "loads_medium": {
+      "jsonmodem_baseline": {
+        "allocation_requests": 4762,
+        "total_allocated_bytes": 349287,
+        "peak_live_bytes": 288396,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 4762,
+            "total_allocated_bytes": 349287,
+            "peak_live_bytes": 288396,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-1.loads_medium.bin",
+              "size_bytes": 22523,
+              "sha256": "ee2f48f8cc00a6df22a77bc5380e9ea415bcfb6db32c8a4b1b1ef0497cd191db"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 4762,
+            "total_allocated_bytes": 349287,
+            "peak_live_bytes": 288396,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-2.loads_medium.bin",
+              "size_bytes": 22517,
+              "sha256": "e139af4c6b7714e8d8257080faef43e85990c73755132c0e5cb38dfe8645d7d8"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 4762,
+            "total_allocated_bytes": 349287,
+            "peak_live_bytes": 288396,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-3.loads_medium.bin",
+              "size_bytes": 22598,
+              "sha256": "814996a92978e722af3b01439612d3abeebe2aef2e7cfde589c4bd28f36ae3d4"
+            }
+          }
+        ]
+      },
+      "orjson_3119": {
+        "allocation_requests": 4732,
+        "total_allocated_bytes": 927857,
+        "peak_live_bytes": 927414,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 4732,
+            "total_allocated_bytes": 927857,
+            "peak_live_bytes": 927414,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-1.loads_medium.bin",
+              "size_bytes": 22405,
+              "sha256": "aecd2c1ed2f5b31ebf3112c9f0c939073073ae8109b5f19d45bc3762dd4c25ac"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 4732,
+            "total_allocated_bytes": 927857,
+            "peak_live_bytes": 927414,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-2.loads_medium.bin",
+              "size_bytes": 22383,
+              "sha256": "bbbe8a002ef14ac02e6110d27a910741a2ec5d77f1b789e17e33a9b898651ccc"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 4732,
+            "total_allocated_bytes": 927857,
+            "peak_live_bytes": 927414,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-3.loads_medium.bin",
+              "size_bytes": 22399,
+              "sha256": "949224944f10fd978d6ed53433b9bd0cf0262978a6f0c200c69799574ef78024"
+            }
+          }
+        ]
+      }
+    },
+    "dumps_small": {
+      "jsonmodem_baseline": {
+        "allocation_requests": 11,
+        "total_allocated_bytes": 740,
+        "peak_live_bytes": 388,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 11,
+            "total_allocated_bytes": 740,
+            "peak_live_bytes": 388,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-1.dumps_small.bin",
+              "size_bytes": 1775,
+              "sha256": "c81d7391f8ac14e5e05cc23639d39c94b342500982168346594b11aec3c920d7"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 11,
+            "total_allocated_bytes": 740,
+            "peak_live_bytes": 388,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-2.dumps_small.bin",
+              "size_bytes": 1775,
+              "sha256": "45227ce17a61ac71e8a368c0e7dff7681699edf600b797cb84eb9ffabb4082b9"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 11,
+            "total_allocated_bytes": 740,
+            "peak_live_bytes": 388,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-3.dumps_small.bin",
+              "size_bytes": 1774,
+              "sha256": "d093c1576357963c80fad1a2674f4d0264a3769851b83874ecf3cd7c09e6854e"
+            }
+          }
+        ]
+      },
+      "orjson_3119": {
+        "allocation_requests": 10,
+        "total_allocated_bytes": 1449,
+        "peak_live_bytes": 1129,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 10,
+            "total_allocated_bytes": 1449,
+            "peak_live_bytes": 1129,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-1.dumps_small.bin",
+              "size_bytes": 1792,
+              "sha256": "3069e29b7aae03e30ccd5f3cf3aa1f406497fb9b806e6e780027a56d804f66ab"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 10,
+            "total_allocated_bytes": 1449,
+            "peak_live_bytes": 1129,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-2.dumps_small.bin",
+              "size_bytes": 1775,
+              "sha256": "65c3deda182d791812deb21b2a701ea28133b3e043fb205fb10f0b6b611a997e"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 10,
+            "total_allocated_bytes": 1449,
+            "peak_live_bytes": 1129,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-3.dumps_small.bin",
+              "size_bytes": 1775,
+              "sha256": "3869f3ef1ecbef3ac113e74a218a7238d90bc9ada00a0f43325bb2f0713d814f"
+            }
+          }
+        ]
+      }
+    },
+    "dumps_medium": {
+      "jsonmodem_baseline": {
+        "allocation_requests": 20,
+        "total_allocated_bytes": 184831,
+        "peak_live_bytes": 119199,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 20,
+            "total_allocated_bytes": 184831,
+            "peak_live_bytes": 119199,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-1.dumps_medium.bin",
+              "size_bytes": 1825,
+              "sha256": "96c9e9f70e4fbc7ef9cc9ebd40c370d3d1b0cddea309826b3973f7f404147169"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 20,
+            "total_allocated_bytes": 184831,
+            "peak_live_bytes": 119199,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-2.dumps_medium.bin",
+              "size_bytes": 1825,
+              "sha256": "1a97f24b191859240138e87d6564b95417ac9c81c88a67367799e5225ed398b0"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 20,
+            "total_allocated_bytes": 184831,
+            "peak_live_bytes": 119199,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-3.dumps_medium.bin",
+              "size_bytes": 1822,
+              "sha256": "c8d5b204d7b3691a673da8a894f0171a122799be591a1c589d4b3ba05c87c7a3"
+            }
+          }
+        ]
+      },
+      "orjson_3119": {
+        "allocation_requests": 16,
+        "total_allocated_bytes": 130671,
+        "peak_live_bytes": 65641,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 16,
+            "total_allocated_bytes": 130671,
+            "peak_live_bytes": 65641,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-1.dumps_medium.bin",
+              "size_bytes": 1816,
+              "sha256": "3d9b1ceaedf136e43a0494ee0dd891b63d9e09990e4b4e3a4357a4af6bad3e0d"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 16,
+            "total_allocated_bytes": 130671,
+            "peak_live_bytes": 65641,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-2.dumps_medium.bin",
+              "size_bytes": 1810,
+              "sha256": "113d71ec5ba8b573d62228e5e5eba8e17b84d40f4046509d8c088ff0a3beda6b"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 16,
+            "total_allocated_bytes": 130671,
+            "peak_live_bytes": 65641,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-3.dumps_medium.bin",
+              "size_bytes": 1809,
+              "sha256": "909ca9e914ccadeeeed934792e5b67bb3477e5939dea23e59c441dfa0778316d"
+            }
+          }
+        ]
+      }
+    },
+    "long_string": {
+      "jsonmodem_baseline": {
+        "allocation_requests": 10,
+        "total_allocated_bytes": 143787,
+        "peak_live_bytes": 143467,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 10,
+            "total_allocated_bytes": 143787,
+            "peak_live_bytes": 143467,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-1.long_string.bin",
+              "size_bytes": 1770,
+              "sha256": "6905e6c207a1a98316710c6ef5707683da018a8711a7aa1b2a7ad3465c093f13"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 10,
+            "total_allocated_bytes": 143787,
+            "peak_live_bytes": 143467,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-2.long_string.bin",
+              "size_bytes": 1770,
+              "sha256": "9fb1b3792aedbf2859a3c91fb8f347e61caaecf5774d654853653064e70885c2"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 10,
+            "total_allocated_bytes": 143787,
+            "peak_live_bytes": 143467,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-3.long_string.bin",
+              "size_bytes": 1769,
+              "sha256": "3f42301cda0051fe8b50086a63b29e469506dc9c25bbbdf9f4914a65669eed0d"
+            }
+          }
+        ]
+      },
+      "orjson_3119": {
+        "allocation_requests": 11,
+        "total_allocated_bytes": 2098634,
+        "peak_live_bytes": 2097257,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 11,
+            "total_allocated_bytes": 2098634,
+            "peak_live_bytes": 2097257,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-1.long_string.bin",
+              "size_bytes": 1786,
+              "sha256": "1ae495a852b99f34fb737643e9b4b0ef81cc5e0ad020786fe3e615313cf91ec2"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 11,
+            "total_allocated_bytes": 2098634,
+            "peak_live_bytes": 2097257,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-2.long_string.bin",
+              "size_bytes": 1786,
+              "sha256": "feb4e5536013aca8700f45729158ecd1478df1ac0572bb87cd320b67a78570e6"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 11,
+            "total_allocated_bytes": 2098634,
+            "peak_live_bytes": 2097257,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-3.long_string.bin",
+              "size_bytes": 1786,
+              "sha256": "25317a59fab5eb7e59023e7cccb3fdfa101be074e0e1f8ea6d1c76bc780c1fb8"
+            }
+          }
+        ]
+      }
+    },
+    "sorted_medium": {
+      "jsonmodem_baseline": {
+        "allocation_requests": 1022,
+        "total_allocated_bytes": 248975,
+        "peak_live_bytes": 119343,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 1022,
+            "total_allocated_bytes": 248975,
+            "peak_live_bytes": 119343,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-1.sorted_medium.bin",
+              "size_bytes": 1938,
+              "sha256": "72023692cbfd129c2e6bd6bec37fbfcd1fc1e25d31da5abf2a760add7ea2027e"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 1022,
+            "total_allocated_bytes": 248975,
+            "peak_live_bytes": 119343,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-2.sorted_medium.bin",
+              "size_bytes": 1938,
+              "sha256": "381a03c2e1c10f91a722301e328196b2d319d6d61daca84f56018429f9ebd0ca"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 1022,
+            "total_allocated_bytes": 248975,
+            "peak_live_bytes": 119343,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-3.sorted_medium.bin",
+              "size_bytes": 1937,
+              "sha256": "edb1a4d72809c8f748448339ad7263e9db472f7146ba1f7182e04257858ec8dd"
+            }
+          }
+        ]
+      },
+      "orjson_3119": {
+        "allocation_requests": 1018,
+        "total_allocated_bytes": 202815,
+        "peak_live_bytes": 65825,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 1018,
+            "total_allocated_bytes": 202815,
+            "peak_live_bytes": 65825,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-1.sorted_medium.bin",
+              "size_bytes": 1897,
+              "sha256": "1163db718021b8a99dbc4fb5f90a4c89d157fe6d4390d79963e0516aa80fcdb7"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 1018,
+            "total_allocated_bytes": 202815,
+            "peak_live_bytes": 65825,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-2.sorted_medium.bin",
+              "size_bytes": 1899,
+              "sha256": "f3f75dc84728c365bc57136a68f94b3f2f0e43d6eccb855c29c68128194df7ea"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 1018,
+            "total_allocated_bytes": 202815,
+            "peak_live_bytes": 65825,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-3.sorted_medium.bin",
+              "size_bytes": 1901,
+              "sha256": "21bf9433c27cb81400fecf7a964f252bcbbca01a52398aaea29a48c1c38c059b"
+            }
+          }
+        ]
+      }
+    },
+    "fragments_1000": {
+      "jsonmodem_baseline": {
+        "allocation_requests": 17,
+        "total_allocated_bytes": 46938,
+        "peak_live_bytes": 30458,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 17,
+            "total_allocated_bytes": 46938,
+            "peak_live_bytes": 30458,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-1.fragments_1000.bin",
+              "size_bytes": 1806,
+              "sha256": "584639782c7f0bf56b18bed4b97d6284e27fba349e40b94c8e98b9d616c545e2"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 17,
+            "total_allocated_bytes": 46938,
+            "peak_live_bytes": 30458,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-2.fragments_1000.bin",
+              "size_bytes": 1806,
+              "sha256": "3541a5c6ff4b9156a1195a4f0d6534b2973e8e14934a9521afb728187d56e7ce"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 17,
+            "total_allocated_bytes": 46938,
+            "peak_live_bytes": 30458,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-3.fragments_1000.bin",
+              "size_bytes": 1805,
+              "sha256": "fcbaca77824e3368755bf37979ab3ec66de731a5dcb34fbbe5709dde6dcdaee8"
+            }
+          }
+        ]
+      },
+      "orjson_3119": {
+        "allocation_requests": 14,
+        "total_allocated_bytes": 32301,
+        "peak_live_bytes": 16489,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 14,
+            "total_allocated_bytes": 32301,
+            "peak_live_bytes": 16489,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-1.fragments_1000.bin",
+              "size_bytes": 1806,
+              "sha256": "c61ab316e03475fd7cbe2e17d0be37a617426b35d124a2d67bcef688bf7d0141"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 14,
+            "total_allocated_bytes": 32301,
+            "peak_live_bytes": 16489,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-2.fragments_1000.bin",
+              "size_bytes": 1800,
+              "sha256": "afb60c2fdd44b6ad278b0c9fdf9640af859c0f9043e3a7cef7d3a7e762a9ed03"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 14,
+            "total_allocated_bytes": 32301,
+            "peak_live_bytes": 16489,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-3.fragments_1000.bin",
+              "size_bytes": 1800,
+              "sha256": "ac4bf0b3523b254810aa4e7157aa2d914fc2e6a9fa142b3ef25dc378dc9d4f40"
+            }
+          }
+        ]
+      }
+    },
+    "dataclasses_1000": {
+      "jsonmodem_baseline": {
+        "allocation_requests": 22,
+        "total_allocated_bytes": 102672,
+        "peak_live_bytes": 61758,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 22,
+            "total_allocated_bytes": 102672,
+            "peak_live_bytes": 61758,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-1.dataclasses_1000.bin",
+              "size_bytes": 1835,
+              "sha256": "3af5dcd94e9629a2d7f3502bfe0e20242876e67837e30aa2490968df4a487122"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 22,
+            "total_allocated_bytes": 102672,
+            "peak_live_bytes": 61758,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-2.dataclasses_1000.bin",
+              "size_bytes": 1835,
+              "sha256": "a3dad2a7a487cc306b30637332b499a246b41633582890bfc082dc386771e5a4"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 22,
+            "total_allocated_bytes": 102672,
+            "peak_live_bytes": 61758,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-3.dataclasses_1000.bin",
+              "size_bytes": 1834,
+              "sha256": "45c7de80bd0feb9a06e72d847b56eab535704db0bed84f0a3b8ea97cdad08902"
+            }
+          }
+        ]
+      },
+      "orjson_3119": {
+        "allocation_requests": 15,
+        "total_allocated_bytes": 65102,
+        "peak_live_bytes": 32873,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 15,
+            "total_allocated_bytes": 65102,
+            "peak_live_bytes": 32873,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-1.dataclasses_1000.bin",
+              "size_bytes": 1811,
+              "sha256": "3a150fbb7adc8dcfaa9503ef8dd223ae119502c88757e9530d3a5c54d1b39355"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 15,
+            "total_allocated_bytes": 65102,
+            "peak_live_bytes": 32873,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-2.dataclasses_1000.bin",
+              "size_bytes": 1811,
+              "sha256": "87e1b3c59ce01819260779639e7dbffc12005652b4a57d96bfcbbe0c53034273"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 15,
+            "total_allocated_bytes": 65102,
+            "peak_live_bytes": 32873,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-3.dataclasses_1000.bin",
+              "size_bytes": 1806,
+              "sha256": "e22d1afdf37041763f74eafdf424825653e2d67b03a279f7bef4d80e4f23b456"
+            }
+          }
+        ]
+      }
+    },
+    "numpy_float32": {
+      "jsonmodem_baseline": {
+        "allocation_requests": 45,
+        "total_allocated_bytes": 3273146,
+        "peak_live_bytes": 2288589,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 45,
+            "total_allocated_bytes": 3273146,
+            "peak_live_bytes": 2288589,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-1.numpy_float32.bin",
+              "size_bytes": 2601,
+              "sha256": "6a8cd0640885f52a12a63751f97f0af3d4be0fb2ebad21622e99415adcaf71da"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 45,
+            "total_allocated_bytes": 3273146,
+            "peak_live_bytes": 2288589,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-2.numpy_float32.bin",
+              "size_bytes": 2601,
+              "sha256": "746239ff5212e65abce714d0e620623f0fe6219b694afaf45f80d7cd1006526c"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 45,
+            "total_allocated_bytes": 3273146,
+            "peak_live_bytes": 2288589,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-3.numpy_float32.bin",
+              "size_bytes": 2599,
+              "sha256": "0b8b270ece272488a68a923a158bd7657e0a0793468e0cb2cf6f756d4556b56d"
+            }
+          }
+        ]
+      },
+      "orjson_3119": {
+        "allocation_requests": 25041,
+        "total_allocated_bytes": 7739899,
+        "peak_live_bytes": 4070385,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 25041,
+            "total_allocated_bytes": 7739899,
+            "peak_live_bytes": 4070385,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-1.numpy_float32.bin",
+              "size_bytes": 2944,
+              "sha256": "8e583e9568d464f49a2ab2b76237d27fbea8ff2ba99bcc0e645af677cffade92"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 25041,
+            "total_allocated_bytes": 7739899,
+            "peak_live_bytes": 4070385,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-2.numpy_float32.bin",
+              "size_bytes": 2931,
+              "sha256": "6b00a26d622991a1a029f730d9c4930f5d46a25b1661b394855da653023d9b42"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 25041,
+            "total_allocated_bytes": 7739899,
+            "peak_live_bytes": 4070385,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-3.numpy_float32.bin",
+              "size_bytes": 2934,
+              "sha256": "c5dc8c23c3a56a35573cea9f08678fb8a346b711330d44d7afebdf91ea5cfef9"
+            }
+          }
+        ]
+      }
+    },
+    "late_default": {
+      "jsonmodem_baseline": {
+        "allocation_requests": 31,
+        "total_allocated_bytes": 87689990,
+        "peak_live_bytes": 54074271,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 31,
+            "total_allocated_bytes": 87689990,
+            "peak_live_bytes": 54074271,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-1.late_default.bin",
+              "size_bytes": 1891,
+              "sha256": "67ab211ced15174c8b3e96bb402361ef6648af78a33676e02ab2c50ca4a88e9c"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 31,
+            "total_allocated_bytes": 87689990,
+            "peak_live_bytes": 54074271,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-2.late_default.bin",
+              "size_bytes": 1891,
+              "sha256": "b0c78989d052975896ca7d6c0c2768037936f23d221b9f744cd2c074d2cba258"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 31,
+            "total_allocated_bytes": 87689990,
+            "peak_live_bytes": 54074271,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-3.late_default.bin",
+              "size_bytes": 1889,
+              "sha256": "1a26dd5c4333e97726f93984db07e2d33783328585cbdf6b7b1e4f08ea3911b4"
+            }
+          }
+        ]
+      },
+      "orjson_3119": {
+        "allocation_requests": 23,
+        "total_allocated_bytes": 67045395,
+        "peak_live_bytes": 33554793,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 23,
+            "total_allocated_bytes": 67045395,
+            "peak_live_bytes": 33554793,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-1.late_default.bin",
+              "size_bytes": 1870,
+              "sha256": "0a62e2d2f4ab5aae3ab7e29cb3532e3de9c86e26d74626eb6286ffe0500ba2fe"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 23,
+            "total_allocated_bytes": 67045395,
+            "peak_live_bytes": 33554793,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-2.late_default.bin",
+              "size_bytes": 1870,
+              "sha256": "9a16de2b627d0a37ea370200cf6d2970d8314d533469f67340219d4c1a719466"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 23,
+            "total_allocated_bytes": 67045395,
+            "peak_live_bytes": 33554793,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-3.late_default.bin",
+              "size_bytes": 1871,
+              "sha256": "4d6d195a88f3826773bb9f4a9a5cba293e927e47d4679e560c9e332f694b73a0"
+            }
+          }
+        ]
+      }
+    },
+    "loads_small_array_view": {
+      "jsonmodem_baseline": {
+        "allocation_requests": 16,
+        "total_allocated_bytes": 742,
+        "peak_live_bytes": 390,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 16,
+            "total_allocated_bytes": 742,
+            "peak_live_bytes": 390,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-1.loads_small_array_view.bin",
+              "size_bytes": 1796,
+              "sha256": "a454960e180eeb60fd16a3341bb4bc22147acc09fe552c0fd06ed03cbf3a42e9"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 16,
+            "total_allocated_bytes": 742,
+            "peak_live_bytes": 390,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-2.loads_small_array_view.bin",
+              "size_bytes": 1796,
+              "sha256": "22c2f48cffb24d0a9349488a05da2de884cffa8cea7b99a6ee93ebbf27224b30"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 16,
+            "total_allocated_bytes": 742,
+            "peak_live_bytes": 390,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-3.loads_small_array_view.bin",
+              "size_bytes": 1784,
+              "sha256": "48d9b4d4d457f3536e969867215f304f015fee206dfb60e40ab8e2a61face8a1"
+            }
+          }
+        ]
+      },
+      "orjson_3119": {
+        "allocation_requests": 15,
+        "total_allocated_bytes": 4688,
+        "peak_live_bytes": 4336,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 15,
+            "total_allocated_bytes": 4688,
+            "peak_live_bytes": 4336,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-1.loads_small_array_view.bin",
+              "size_bytes": 1795,
+              "sha256": "043be384a6c31d360322a87b42af860328d3088616c8e55c2c66cce09876f648"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 15,
+            "total_allocated_bytes": 4688,
+            "peak_live_bytes": 4336,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-2.loads_small_array_view.bin",
+              "size_bytes": 1801,
+              "sha256": "36e95f952b7f828c7b063f0838512495ce6576b21362f870b861cf3631edd021"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 15,
+            "total_allocated_bytes": 4688,
+            "peak_live_bytes": 4336,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-3.loads_small_array_view.bin",
+              "size_bytes": 1795,
+              "sha256": "25d4013968eee13b3d919c36fcb1b7fad42f3416ebb63e5ae877e0d60225500f"
+            }
+          }
+        ]
+      }
+    },
+    "loads_small": {
+      "jsonmodem_baseline": {
+        "allocation_requests": 15,
+        "total_allocated_bytes": 650,
+        "peak_live_bytes": 330,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 15,
+            "total_allocated_bytes": 650,
+            "peak_live_bytes": 330,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-1.loads_small.bin",
+              "size_bytes": 1780,
+              "sha256": "a2059dfb2345c1f33c8d2387b140c3e6cb39b2c21ba197a6f8d8e1cc1b65f8e4"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 15,
+            "total_allocated_bytes": 650,
+            "peak_live_bytes": 330,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-2.loads_small.bin",
+              "size_bytes": 1780,
+              "sha256": "e77988e18e16e8edc3d624de86492d08865a47a80380a5934d176393f81c5605"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 15,
+            "total_allocated_bytes": 650,
+            "peak_live_bytes": 330,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-3.loads_small.bin",
+              "size_bytes": 1779,
+              "sha256": "6655010095ec5c9daf52875a0c2fd0ee5a177ee6e2405e83224c834a18943397"
+            }
+          }
+        ]
+      },
+      "orjson_3119": {
+        "allocation_requests": 15,
+        "total_allocated_bytes": 4688,
+        "peak_live_bytes": 4336,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 15,
+            "total_allocated_bytes": 4688,
+            "peak_live_bytes": 4336,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-1.loads_small.bin",
+              "size_bytes": 1792,
+              "sha256": "ca3b8ca2065f97aa003c130e5cf9c76995162f1c1ff1fe8a3af3ee5b215d0210"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 15,
+            "total_allocated_bytes": 4688,
+            "peak_live_bytes": 4336,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-2.loads_small.bin",
+              "size_bytes": 1792,
+              "sha256": "027d9cf019174ab85092c2c3f562a02e5c4d8a13d15f426a500cb0dc0aea9197"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 15,
+            "total_allocated_bytes": 4688,
+            "peak_live_bytes": 4336,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-3.loads_small.bin",
+              "size_bytes": 1800,
+              "sha256": "f3d121e50b72600a6b6488731d9068afb3f20d4d685093c85836d6f3f140b3cd"
+            }
+          }
+        ]
+      }
+    },
+    "loads_medium_array_view": {
+      "jsonmodem_baseline": {
+        "allocation_requests": 4779,
+        "total_allocated_bytes": 403646,
+        "peak_live_bytes": 342755,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 4779,
+            "total_allocated_bytes": 403646,
+            "peak_live_bytes": 342755,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-1.loads_medium_array_view.bin",
+              "size_bytes": 28905,
+              "sha256": "0949a61cf17e0e98e6d93aa12f63509df70313003613cfe03ea7a8596928d6ce"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 4779,
+            "total_allocated_bytes": 403646,
+            "peak_live_bytes": 342755,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-2.loads_medium_array_view.bin",
+              "size_bytes": 28906,
+              "sha256": "c0f0dd15dfd4b7ff12a9e7e96d27f95cbea61e81c25f237347269337177a9594"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 4779,
+            "total_allocated_bytes": 403646,
+            "peak_live_bytes": 342755,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-3.loads_medium_array_view.bin",
+              "size_bytes": 28922,
+              "sha256": "e711b5fab9aa8442220db5e60487dc77f107df1a57e24a17549e955111edb22f"
+            }
+          }
+        ]
+      },
+      "orjson_3119": {
+        "allocation_requests": 4748,
+        "total_allocated_bytes": 928689,
+        "peak_live_bytes": 928246,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 4748,
+            "total_allocated_bytes": 928689,
+            "peak_live_bytes": 928246,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-1.loads_medium_array_view.bin",
+              "size_bytes": 25494,
+              "sha256": "34308886e3e40c725a9db80e39a475c37cb9c07709945b1c4cc186e0a95d3c52"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 4748,
+            "total_allocated_bytes": 928689,
+            "peak_live_bytes": 928246,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-2.loads_medium_array_view.bin",
+              "size_bytes": 25429,
+              "sha256": "c1d63f94a366e2816bf4d0f9db15d250525642d432ec5376d9e3395eb250b3d9"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 4748,
+            "total_allocated_bytes": 928689,
+            "peak_live_bytes": 928246,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-3.loads_medium_array_view.bin",
+              "size_bytes": 25442,
+              "sha256": "055cf8751398a52f78391e3289f9a46c7b25415e244547e8ba7219366bd760e1"
+            }
+          }
+        ]
+      }
+    },
+    "loads_long_string_array_view": {
+      "jsonmodem_baseline": {
+        "allocation_requests": 11,
+        "total_allocated_bytes": 287188,
+        "peak_live_bytes": 286836,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 11,
+            "total_allocated_bytes": 287188,
+            "peak_live_bytes": 286836,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-1.loads_long_string_array_view.bin",
+              "size_bytes": 1781,
+              "sha256": "76b025ba50186d789c7eb3d18fd51780dbc2384a9b61ec72cbe3d763d171dbd2"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 11,
+            "total_allocated_bytes": 287188,
+            "peak_live_bytes": 286836,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-2.loads_long_string_array_view.bin",
+              "size_bytes": 1781,
+              "sha256": "5c1afa6937dac13b30c203ca60224e76c3bc3510eb9400a6dbca1261d80fad36"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 11,
+            "total_allocated_bytes": 287188,
+            "peak_live_bytes": 286836,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-3.loads_long_string_array_view.bin",
+              "size_bytes": 1779,
+              "sha256": "bd197d879e67d84239431a3ff035b2843ffa56355c7053b4c53888e710e4117d"
+            }
+          }
+        ]
+      },
+      "orjson_3119": {
+        "allocation_requests": 11,
+        "total_allocated_bytes": 1868209,
+        "peak_live_bytes": 1867857,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 11,
+            "total_allocated_bytes": 1868209,
+            "peak_live_bytes": 1867857,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-1.loads_long_string_array_view.bin",
+              "size_bytes": 1786,
+              "sha256": "58454c39073d6d106d99174cd17a9e82d18c46b6824e2b43ae756bfde74aef86"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 11,
+            "total_allocated_bytes": 1868209,
+            "peak_live_bytes": 1867857,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-2.loads_long_string_array_view.bin",
+              "size_bytes": 1778,
+              "sha256": "45892b00f790790ce42dfac0986506882a0f68378a5c17616026db1230d55f35"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 11,
+            "total_allocated_bytes": 1868209,
+            "peak_live_bytes": 1867857,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-3.loads_long_string_array_view.bin",
+              "size_bytes": 1786,
+              "sha256": "808c3f7b88d1e64a64429c6318113ab1ec1803d6dc0f897a27894b6673514280"
+            }
+          }
+        ]
+      }
+    },
+    "loads_long_string": {
+      "jsonmodem_baseline": {
+        "allocation_requests": 10,
+        "total_allocated_bytes": 143793,
+        "peak_live_bytes": 143473,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 10,
+            "total_allocated_bytes": 143793,
+            "peak_live_bytes": 143473,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-1.loads_long_string.bin",
+              "size_bytes": 1771,
+              "sha256": "442c1405436577ab987da72891512d2434a49c890cc37811f681c8c2137a3e61"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 10,
+            "total_allocated_bytes": 143793,
+            "peak_live_bytes": 143473,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-2.loads_long_string.bin",
+              "size_bytes": 1771,
+              "sha256": "0767331d87a4879329c5292687b0ef10894171d1cb25c15ff8197d4bb1ec8493"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 10,
+            "total_allocated_bytes": 143793,
+            "peak_live_bytes": 143473,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "jsonmodem-3.loads_long_string.bin",
+              "size_bytes": 1769,
+              "sha256": "0c6e720a8bacd1ae957e2c3c46cbe9f4f16862dfa98ac020b2315138c74f9374"
+            }
+          }
+        ]
+      },
+      "orjson_3119": {
+        "allocation_requests": 11,
+        "total_allocated_bytes": 1868209,
+        "peak_live_bytes": 1867857,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "allocation_requests": 11,
+            "total_allocated_bytes": 1868209,
+            "peak_live_bytes": 1867857,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-1.loads_long_string.bin",
+              "size_bytes": 1784,
+              "sha256": "a1f932d56308bd536678aaa1f3578f7cc8223268dbeba4aeae5c44034391a317"
+            }
+          },
+          {
+            "repeat": 2,
+            "allocation_requests": 11,
+            "total_allocated_bytes": 1868209,
+            "peak_live_bytes": 1867857,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-2.loads_long_string.bin",
+              "size_bytes": 1781,
+              "sha256": "a27084021ef5a67d297db88bbe59d6a65652ff58f8fc3475157521f57039d779"
+            }
+          },
+          {
+            "repeat": 3,
+            "allocation_requests": 11,
+            "total_allocated_bytes": 1868209,
+            "peak_live_bytes": 1867857,
+            "python_allocator": "pymalloc",
+            "trace_python_allocators": true,
+            "native_traces": false,
+            "file_format": "ALL_ALLOCATIONS",
+            "capture": {
+              "name": "orjson-3.loads_long_string.bin",
+              "size_bytes": 1786,
+              "sha256": "4a238a0677b3c5939dcf935e81b653f51315e3cea862104ae3425a6d48df7327"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "synthetic_rss": {
+    "loads_medium": {
+      "jsonmodem_baseline": {
+        "peak_rss_bytes": 19644416,
+        "prepared_rss_bytes": 18362368,
+        "prepared_peak_rss_bytes": 18362368,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17657856,
+                "VmRSS_bytes": 17657856,
+                "ru_maxrss_bytes": 17670144
+              },
+              "before": {
+                "VmHWM_bytes": 18362368,
+                "VmRSS_bytes": 18362368,
+                "ru_maxrss_bytes": 18362368
+              },
+              "first": {
+                "VmHWM_bytes": 19644416,
+                "VmRSS_bytes": 19644416,
+                "ru_maxrss_bytes": 19644416
+              },
+              "final": {
+                "VmHWM_bytes": 19644416,
+                "VmRSS_bytes": 19644416,
+                "ru_maxrss_bytes": 19644416
+              }
+            }
+          },
+          {
+            "repeat": 2,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17653760,
+                "VmRSS_bytes": 17653760,
+                "ru_maxrss_bytes": 17670144
+              },
+              "before": {
+                "VmHWM_bytes": 18386944,
+                "VmRSS_bytes": 18386944,
+                "ru_maxrss_bytes": 18386944
+              },
+              "first": {
+                "VmHWM_bytes": 19668992,
+                "VmRSS_bytes": 19668992,
+                "ru_maxrss_bytes": 19668992
+              },
+              "final": {
+                "VmHWM_bytes": 19668992,
+                "VmRSS_bytes": 19668992,
+                "ru_maxrss_bytes": 19668992
+              }
+            }
+          },
+          {
+            "repeat": 3,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17543168,
+                "VmRSS_bytes": 17543168,
+                "ru_maxrss_bytes": 17670144
+              },
+              "before": {
+                "VmHWM_bytes": 18337792,
+                "VmRSS_bytes": 18337792,
+                "ru_maxrss_bytes": 18337792
+              },
+              "first": {
+                "VmHWM_bytes": 19619840,
+                "VmRSS_bytes": 19619840,
+                "ru_maxrss_bytes": 19619840
+              },
+              "final": {
+                "VmHWM_bytes": 19619840,
+                "VmRSS_bytes": 19619840,
+                "ru_maxrss_bytes": 19619840
+              }
+            }
+          }
+        ]
+      },
+      "orjson_3119": {
+        "peak_rss_bytes": 18862080,
+        "prepared_rss_bytes": 17936384,
+        "prepared_peak_rss_bytes": 17936384,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17518592,
+                "VmRSS_bytes": 17518592,
+                "ru_maxrss_bytes": 17670144
+              },
+              "before": {
+                "VmHWM_bytes": 17924096,
+                "VmRSS_bytes": 17924096,
+                "ru_maxrss_bytes": 17924096
+              },
+              "first": {
+                "VmHWM_bytes": 18849792,
+                "VmRSS_bytes": 18829312,
+                "ru_maxrss_bytes": 18849792
+              },
+              "final": {
+                "VmHWM_bytes": 18849792,
+                "VmRSS_bytes": 18829312,
+                "ru_maxrss_bytes": 18849792
+              }
+            }
+          },
+          {
+            "repeat": 2,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17530880,
+                "VmRSS_bytes": 17530880,
+                "ru_maxrss_bytes": 17670144
+              },
+              "before": {
+                "VmHWM_bytes": 17936384,
+                "VmRSS_bytes": 17936384,
+                "ru_maxrss_bytes": 17936384
+              },
+              "first": {
+                "VmHWM_bytes": 18862080,
+                "VmRSS_bytes": 18841600,
+                "ru_maxrss_bytes": 18862080
+              },
+              "final": {
+                "VmHWM_bytes": 18862080,
+                "VmRSS_bytes": 18841600,
+                "ru_maxrss_bytes": 18862080
+              }
+            }
+          },
+          {
+            "repeat": 3,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17723392,
+                "VmRSS_bytes": 17723392,
+                "ru_maxrss_bytes": 17723392
+              },
+              "before": {
+                "VmHWM_bytes": 18141184,
+                "VmRSS_bytes": 18141184,
+                "ru_maxrss_bytes": 18141184
+              },
+              "first": {
+                "VmHWM_bytes": 19042304,
+                "VmRSS_bytes": 19021824,
+                "ru_maxrss_bytes": 19042304
+              },
+              "final": {
+                "VmHWM_bytes": 19042304,
+                "VmRSS_bytes": 19021824,
+                "ru_maxrss_bytes": 19042304
+              }
+            }
+          }
+        ]
+      }
+    },
+    "loads_large": {
+      "jsonmodem_baseline": {
+        "peak_rss_bytes": 58257408,
+        "prepared_rss_bytes": 24956928,
+        "prepared_peak_rss_bytes": 24956928,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17727488,
+                "VmRSS_bytes": 17727488,
+                "ru_maxrss_bytes": 17727488
+              },
+              "before": {
+                "VmHWM_bytes": 24961024,
+                "VmRSS_bytes": 24961024,
+                "ru_maxrss_bytes": 24961024
+              },
+              "first": {
+                "VmHWM_bytes": 58261504,
+                "VmRSS_bytes": 27549696,
+                "ru_maxrss_bytes": 58261504
+              },
+              "final": {
+                "VmHWM_bytes": 58261504,
+                "VmRSS_bytes": 30273536,
+                "ru_maxrss_bytes": 58261504
+              }
+            }
+          },
+          {
+            "repeat": 2,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17510400,
+                "VmRSS_bytes": 17510400,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 24600576,
+                "VmRSS_bytes": 24600576,
+                "ru_maxrss_bytes": 24600576
+              },
+              "first": {
+                "VmHWM_bytes": 57896960,
+                "VmRSS_bytes": 27185152,
+                "ru_maxrss_bytes": 57896960
+              },
+              "final": {
+                "VmHWM_bytes": 57896960,
+                "VmRSS_bytes": 29908992,
+                "ru_maxrss_bytes": 57896960
+              }
+            }
+          },
+          {
+            "repeat": 3,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17723392,
+                "VmRSS_bytes": 17723392,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 24956928,
+                "VmRSS_bytes": 24956928,
+                "ru_maxrss_bytes": 24956928
+              },
+              "first": {
+                "VmHWM_bytes": 58257408,
+                "VmRSS_bytes": 27545600,
+                "ru_maxrss_bytes": 58257408
+              },
+              "final": {
+                "VmHWM_bytes": 58257408,
+                "VmRSS_bytes": 30269440,
+                "ru_maxrss_bytes": 58257408
+              }
+            }
+          }
+        ]
+      },
+      "orjson_3119": {
+        "peak_rss_bytes": 76451840,
+        "prepared_rss_bytes": 24293376,
+        "prepared_peak_rss_bytes": 24293376,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17723392,
+                "VmRSS_bytes": 17723392,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 24293376,
+                "VmRSS_bytes": 24293376,
+                "ru_maxrss_bytes": 24293376
+              },
+              "first": {
+                "VmHWM_bytes": 78491648,
+                "VmRSS_bytes": 26656768,
+                "ru_maxrss_bytes": 78491648
+              },
+              "final": {
+                "VmHWM_bytes": 78491648,
+                "VmRSS_bytes": 29499392,
+                "ru_maxrss_bytes": 78491648
+              }
+            }
+          },
+          {
+            "repeat": 2,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17739776,
+                "VmRSS_bytes": 17739776,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 24305664,
+                "VmRSS_bytes": 24305664,
+                "ru_maxrss_bytes": 24305664
+              },
+              "first": {
+                "VmHWM_bytes": 76394496,
+                "VmRSS_bytes": 26648576,
+                "ru_maxrss_bytes": 76394496
+              },
+              "final": {
+                "VmHWM_bytes": 76394496,
+                "VmRSS_bytes": 29491200,
+                "ru_maxrss_bytes": 76394496
+              }
+            }
+          },
+          {
+            "repeat": 3,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17580032,
+                "VmRSS_bytes": 17580032,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 24137728,
+                "VmRSS_bytes": 24137728,
+                "ru_maxrss_bytes": 24137728
+              },
+              "first": {
+                "VmHWM_bytes": 76271616,
+                "VmRSS_bytes": 26529792,
+                "ru_maxrss_bytes": 76271616
+              },
+              "final": {
+                "VmHWM_bytes": 76451840,
+                "VmRSS_bytes": 29372416,
+                "ru_maxrss_bytes": 76451840
+              }
+            }
+          }
+        ]
+      }
+    },
+    "dumps_medium": {
+      "jsonmodem_baseline": {
+        "peak_rss_bytes": 19582976,
+        "prepared_rss_bytes": 19214336,
+        "prepared_peak_rss_bytes": 19214336,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17526784,
+                "VmRSS_bytes": 17526784,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 19079168,
+                "VmRSS_bytes": 19079168,
+                "ru_maxrss_bytes": 19079168
+              },
+              "first": {
+                "VmHWM_bytes": 19472384,
+                "VmRSS_bytes": 19472384,
+                "ru_maxrss_bytes": 19472384
+              },
+              "final": {
+                "VmHWM_bytes": 19472384,
+                "VmRSS_bytes": 19472384,
+                "ru_maxrss_bytes": 19472384
+              }
+            }
+          },
+          {
+            "repeat": 2,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17653760,
+                "VmRSS_bytes": 17653760,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 19214336,
+                "VmRSS_bytes": 19214336,
+                "ru_maxrss_bytes": 19214336
+              },
+              "first": {
+                "VmHWM_bytes": 19607552,
+                "VmRSS_bytes": 19607552,
+                "ru_maxrss_bytes": 19607552
+              },
+              "final": {
+                "VmHWM_bytes": 19607552,
+                "VmRSS_bytes": 19607552,
+                "ru_maxrss_bytes": 19607552
+              }
+            }
+          },
+          {
+            "repeat": 3,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17563648,
+                "VmRSS_bytes": 17563648,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 19251200,
+                "VmRSS_bytes": 19251200,
+                "ru_maxrss_bytes": 19251200
+              },
+              "first": {
+                "VmHWM_bytes": 19582976,
+                "VmRSS_bytes": 19582976,
+                "ru_maxrss_bytes": 19582976
+              },
+              "final": {
+                "VmHWM_bytes": 19582976,
+                "VmRSS_bytes": 19582976,
+                "ru_maxrss_bytes": 19582976
+              }
+            }
+          }
+        ]
+      },
+      "orjson_3119": {
+        "peak_rss_bytes": 18714624,
+        "prepared_rss_bytes": 18714624,
+        "prepared_peak_rss_bytes": 18714624,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17739776,
+                "VmRSS_bytes": 17739776,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 18751488,
+                "VmRSS_bytes": 18751488,
+                "ru_maxrss_bytes": 18751488
+              },
+              "first": {
+                "VmHWM_bytes": 18751488,
+                "VmRSS_bytes": 18751488,
+                "ru_maxrss_bytes": 18751488
+              },
+              "final": {
+                "VmHWM_bytes": 18751488,
+                "VmRSS_bytes": 18751488,
+                "ru_maxrss_bytes": 18751488
+              }
+            }
+          },
+          {
+            "repeat": 2,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17653760,
+                "VmRSS_bytes": 17653760,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 18677760,
+                "VmRSS_bytes": 18677760,
+                "ru_maxrss_bytes": 18677760
+              },
+              "first": {
+                "VmHWM_bytes": 18677760,
+                "VmRSS_bytes": 18677760,
+                "ru_maxrss_bytes": 18677760
+              },
+              "final": {
+                "VmHWM_bytes": 18677760,
+                "VmRSS_bytes": 18677760,
+                "ru_maxrss_bytes": 18677760
+              }
+            }
+          },
+          {
+            "repeat": 3,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17694720,
+                "VmRSS_bytes": 17694720,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 18714624,
+                "VmRSS_bytes": 18714624,
+                "ru_maxrss_bytes": 18714624
+              },
+              "first": {
+                "VmHWM_bytes": 18714624,
+                "VmRSS_bytes": 18714624,
+                "ru_maxrss_bytes": 18714624
+              },
+              "final": {
+                "VmHWM_bytes": 18714624,
+                "VmRSS_bytes": 18714624,
+                "ru_maxrss_bytes": 18714624
+              }
+            }
+          }
+        ]
+      }
+    },
+    "fragments_1000": {
+      "jsonmodem_baseline": {
+        "peak_rss_bytes": 18337792,
+        "prepared_rss_bytes": 18337792,
+        "prepared_peak_rss_bytes": 18337792,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17543168,
+                "VmRSS_bytes": 17543168,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 18337792,
+                "VmRSS_bytes": 18337792,
+                "ru_maxrss_bytes": 18337792
+              },
+              "first": {
+                "VmHWM_bytes": 18337792,
+                "VmRSS_bytes": 18337792,
+                "ru_maxrss_bytes": 18337792
+              },
+              "final": {
+                "VmHWM_bytes": 18337792,
+                "VmRSS_bytes": 18337792,
+                "ru_maxrss_bytes": 18337792
+              }
+            }
+          },
+          {
+            "repeat": 2,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17514496,
+                "VmRSS_bytes": 17514496,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 18243584,
+                "VmRSS_bytes": 18243584,
+                "ru_maxrss_bytes": 18243584
+              },
+              "first": {
+                "VmHWM_bytes": 18243584,
+                "VmRSS_bytes": 18243584,
+                "ru_maxrss_bytes": 18243584
+              },
+              "final": {
+                "VmHWM_bytes": 18243584,
+                "VmRSS_bytes": 18243584,
+                "ru_maxrss_bytes": 18243584
+              }
+            }
+          },
+          {
+            "repeat": 3,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17715200,
+                "VmRSS_bytes": 17715200,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 18452480,
+                "VmRSS_bytes": 18452480,
+                "ru_maxrss_bytes": 18452480
+              },
+              "first": {
+                "VmHWM_bytes": 18452480,
+                "VmRSS_bytes": 18452480,
+                "ru_maxrss_bytes": 18452480
+              },
+              "final": {
+                "VmHWM_bytes": 18452480,
+                "VmRSS_bytes": 18452480,
+                "ru_maxrss_bytes": 18452480
+              }
+            }
+          }
+        ]
+      },
+      "orjson_3119": {
+        "peak_rss_bytes": 18063360,
+        "prepared_rss_bytes": 18063360,
+        "prepared_peak_rss_bytes": 18063360,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17739776,
+                "VmRSS_bytes": 17739776,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 18153472,
+                "VmRSS_bytes": 18153472,
+                "ru_maxrss_bytes": 18173952
+              },
+              "first": {
+                "VmHWM_bytes": 18153472,
+                "VmRSS_bytes": 18153472,
+                "ru_maxrss_bytes": 18173952
+              },
+              "final": {
+                "VmHWM_bytes": 18153472,
+                "VmRSS_bytes": 18153472,
+                "ru_maxrss_bytes": 18173952
+              }
+            }
+          },
+          {
+            "repeat": 2,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17653760,
+                "VmRSS_bytes": 17653760,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 18063360,
+                "VmRSS_bytes": 18063360,
+                "ru_maxrss_bytes": 18173952
+              },
+              "first": {
+                "VmHWM_bytes": 18063360,
+                "VmRSS_bytes": 18063360,
+                "ru_maxrss_bytes": 18173952
+              },
+              "final": {
+                "VmHWM_bytes": 18063360,
+                "VmRSS_bytes": 18063360,
+                "ru_maxrss_bytes": 18173952
+              }
+            }
+          },
+          {
+            "repeat": 3,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17514496,
+                "VmRSS_bytes": 17514496,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 17920000,
+                "VmRSS_bytes": 17920000,
+                "ru_maxrss_bytes": 18173952
+              },
+              "first": {
+                "VmHWM_bytes": 17920000,
+                "VmRSS_bytes": 17920000,
+                "ru_maxrss_bytes": 18173952
+              },
+              "final": {
+                "VmHWM_bytes": 17920000,
+                "VmRSS_bytes": 17920000,
+                "ru_maxrss_bytes": 18173952
+              }
+            }
+          }
+        ]
+      }
+    },
+    "dataclasses_1000": {
+      "jsonmodem_baseline": {
+        "peak_rss_bytes": 19202048,
+        "prepared_rss_bytes": 19202048,
+        "prepared_peak_rss_bytes": 19202048,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17559552,
+                "VmRSS_bytes": 17559552,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 19189760,
+                "VmRSS_bytes": 19189760,
+                "ru_maxrss_bytes": 19189760
+              },
+              "first": {
+                "VmHWM_bytes": 19189760,
+                "VmRSS_bytes": 19189760,
+                "ru_maxrss_bytes": 19189760
+              },
+              "final": {
+                "VmHWM_bytes": 19189760,
+                "VmRSS_bytes": 19189760,
+                "ru_maxrss_bytes": 19189760
+              }
+            }
+          },
+          {
+            "repeat": 2,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17580032,
+                "VmRSS_bytes": 17580032,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 19202048,
+                "VmRSS_bytes": 19202048,
+                "ru_maxrss_bytes": 19202048
+              },
+              "first": {
+                "VmHWM_bytes": 19202048,
+                "VmRSS_bytes": 19202048,
+                "ru_maxrss_bytes": 19202048
+              },
+              "final": {
+                "VmHWM_bytes": 19202048,
+                "VmRSS_bytes": 19202048,
+                "ru_maxrss_bytes": 19202048
+              }
+            }
+          },
+          {
+            "repeat": 3,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17563648,
+                "VmRSS_bytes": 17563648,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 19251200,
+                "VmRSS_bytes": 19251200,
+                "ru_maxrss_bytes": 19251200
+              },
+              "first": {
+                "VmHWM_bytes": 19251200,
+                "VmRSS_bytes": 19251200,
+                "ru_maxrss_bytes": 19251200
+              },
+              "final": {
+                "VmHWM_bytes": 19251200,
+                "VmRSS_bytes": 19251200,
+                "ru_maxrss_bytes": 19251200
+              }
+            }
+          }
+        ]
+      },
+      "orjson_3119": {
+        "peak_rss_bytes": 18677760,
+        "prepared_rss_bytes": 18677760,
+        "prepared_peak_rss_bytes": 18677760,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17551360,
+                "VmRSS_bytes": 17551360,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 18632704,
+                "VmRSS_bytes": 18632704,
+                "ru_maxrss_bytes": 18632704
+              },
+              "first": {
+                "VmHWM_bytes": 18632704,
+                "VmRSS_bytes": 18632704,
+                "ru_maxrss_bytes": 18632704
+              },
+              "final": {
+                "VmHWM_bytes": 18632704,
+                "VmRSS_bytes": 18632704,
+                "ru_maxrss_bytes": 18632704
+              }
+            }
+          },
+          {
+            "repeat": 2,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17653760,
+                "VmRSS_bytes": 17653760,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 18677760,
+                "VmRSS_bytes": 18677760,
+                "ru_maxrss_bytes": 18677760
+              },
+              "first": {
+                "VmHWM_bytes": 18677760,
+                "VmRSS_bytes": 18677760,
+                "ru_maxrss_bytes": 18677760
+              },
+              "final": {
+                "VmHWM_bytes": 18677760,
+                "VmRSS_bytes": 18677760,
+                "ru_maxrss_bytes": 18677760
+              }
+            }
+          },
+          {
+            "repeat": 3,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17657856,
+                "VmRSS_bytes": 17657856,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 18681856,
+                "VmRSS_bytes": 18681856,
+                "ru_maxrss_bytes": 18681856
+              },
+              "first": {
+                "VmHWM_bytes": 18681856,
+                "VmRSS_bytes": 18681856,
+                "ru_maxrss_bytes": 18681856
+              },
+              "final": {
+                "VmHWM_bytes": 18681856,
+                "VmRSS_bytes": 18681856,
+                "ru_maxrss_bytes": 18681856
+              }
+            }
+          }
+        ]
+      }
+    },
+    "numpy_float32": {
+      "jsonmodem_baseline": {
+        "peak_rss_bytes": 37113856,
+        "prepared_rss_bytes": 34693120,
+        "prepared_peak_rss_bytes": 34693120,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17526784,
+                "VmRSS_bytes": 17526784,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 34603008,
+                "VmRSS_bytes": 34603008,
+                "ru_maxrss_bytes": 34603008
+              },
+              "first": {
+                "VmHWM_bytes": 37093376,
+                "VmRSS_bytes": 35086336,
+                "ru_maxrss_bytes": 37093376
+              },
+              "final": {
+                "VmHWM_bytes": 37093376,
+                "VmRSS_bytes": 34955264,
+                "ru_maxrss_bytes": 37093376
+              }
+            }
+          },
+          {
+            "repeat": 2,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17739776,
+                "VmRSS_bytes": 17739776,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 34869248,
+                "VmRSS_bytes": 34869248,
+                "ru_maxrss_bytes": 34869248
+              },
+              "first": {
+                "VmHWM_bytes": 37298176,
+                "VmRSS_bytes": 35291136,
+                "ru_maxrss_bytes": 37298176
+              },
+              "final": {
+                "VmHWM_bytes": 37298176,
+                "VmRSS_bytes": 35160064,
+                "ru_maxrss_bytes": 37298176
+              }
+            }
+          },
+          {
+            "repeat": 3,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17555456,
+                "VmRSS_bytes": 17555456,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 34693120,
+                "VmRSS_bytes": 34693120,
+                "ru_maxrss_bytes": 34693120
+              },
+              "first": {
+                "VmHWM_bytes": 37113856,
+                "VmRSS_bytes": 35106816,
+                "ru_maxrss_bytes": 37113856
+              },
+              "final": {
+                "VmHWM_bytes": 37113856,
+                "VmRSS_bytes": 34975744,
+                "ru_maxrss_bytes": 37113856
+              }
+            }
+          }
+        ]
+      },
+      "orjson_3119": {
+        "peak_rss_bytes": 37818368,
+        "prepared_rss_bytes": 34082816,
+        "prepared_peak_rss_bytes": 34082816,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17739776,
+                "VmRSS_bytes": 17739776,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 34082816,
+                "VmRSS_bytes": 34082816,
+                "ru_maxrss_bytes": 34082816
+              },
+              "first": {
+                "VmHWM_bytes": 37818368,
+                "VmRSS_bytes": 35020800,
+                "ru_maxrss_bytes": 37818368
+              },
+              "final": {
+                "VmHWM_bytes": 37818368,
+                "VmRSS_bytes": 37449728,
+                "ru_maxrss_bytes": 37818368
+              }
+            }
+          },
+          {
+            "repeat": 2,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17633280,
+                "VmRSS_bytes": 17633280,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 34037760,
+                "VmRSS_bytes": 34037760,
+                "ru_maxrss_bytes": 34037760
+              },
+              "first": {
+                "VmHWM_bytes": 37752832,
+                "VmRSS_bytes": 34955264,
+                "ru_maxrss_bytes": 37752832
+              },
+              "final": {
+                "VmHWM_bytes": 37752832,
+                "VmRSS_bytes": 37384192,
+                "ru_maxrss_bytes": 37752832
+              }
+            }
+          },
+          {
+            "repeat": 3,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17723392,
+                "VmRSS_bytes": 17723392,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 34144256,
+                "VmRSS_bytes": 34144256,
+                "ru_maxrss_bytes": 34144256
+              },
+              "first": {
+                "VmHWM_bytes": 37863424,
+                "VmRSS_bytes": 35065856,
+                "ru_maxrss_bytes": 37863424
+              },
+              "final": {
+                "VmHWM_bytes": 37863424,
+                "VmRSS_bytes": 37494784,
+                "ru_maxrss_bytes": 37863424
+              }
+            }
+          }
+        ]
+      }
+    },
+    "late_default": {
+      "jsonmodem_baseline": {
+        "peak_rss_bytes": 63414272,
+        "prepared_rss_bytes": 19419136,
+        "prepared_peak_rss_bytes": 19419136,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17813504,
+                "VmRSS_bytes": 17813504,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 19505152,
+                "VmRSS_bytes": 19505152,
+                "ru_maxrss_bytes": 19505152
+              },
+              "first": {
+                "VmHWM_bytes": 61702144,
+                "VmRSS_bytes": 19726336,
+                "ru_maxrss_bytes": 61702144
+              },
+              "final": {
+                "VmHWM_bytes": 64462848,
+                "VmRSS_bytes": 42684416,
+                "ru_maxrss_bytes": 64462848
+              }
+            }
+          },
+          {
+            "repeat": 2,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17731584,
+                "VmRSS_bytes": 17731584,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 19419136,
+                "VmRSS_bytes": 19419136,
+                "ru_maxrss_bytes": 19419136
+              },
+              "first": {
+                "VmHWM_bytes": 62152704,
+                "VmRSS_bytes": 19636224,
+                "ru_maxrss_bytes": 62152704
+              },
+              "final": {
+                "VmHWM_bytes": 63414272,
+                "VmRSS_bytes": 41033728,
+                "ru_maxrss_bytes": 63414272
+              }
+            }
+          },
+          {
+            "repeat": 3,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17571840,
+                "VmRSS_bytes": 17571840,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 19189760,
+                "VmRSS_bytes": 19189760,
+                "ru_maxrss_bytes": 19189760
+              },
+              "first": {
+                "VmHWM_bytes": 60715008,
+                "VmRSS_bytes": 19410944,
+                "ru_maxrss_bytes": 60715008
+              },
+              "final": {
+                "VmHWM_bytes": 61595648,
+                "VmRSS_bytes": 40484864,
+                "ru_maxrss_bytes": 61595648
+              }
+            }
+          }
+        ]
+      },
+      "orjson_3119": {
+        "peak_rss_bytes": 39809024,
+        "prepared_rss_bytes": 18059264,
+        "prepared_peak_rss_bytes": 18059264,
+        "process_samples": [
+          {
+            "repeat": 1,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17653760,
+                "VmRSS_bytes": 17653760,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 18059264,
+                "VmRSS_bytes": 18059264,
+                "ru_maxrss_bytes": 18173952
+              },
+              "first": {
+                "VmHWM_bytes": 39481344,
+                "VmRSS_bytes": 18808832,
+                "ru_maxrss_bytes": 39481344
+              },
+              "final": {
+                "VmHWM_bytes": 39546880,
+                "VmRSS_bytes": 18808832,
+                "ru_maxrss_bytes": 39546880
+              }
+            }
+          },
+          {
+            "repeat": 2,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17711104,
+                "VmRSS_bytes": 17711104,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 18116608,
+                "VmRSS_bytes": 18116608,
+                "ru_maxrss_bytes": 18173952
+              },
+              "first": {
+                "VmHWM_bytes": 39743488,
+                "VmRSS_bytes": 18862080,
+                "ru_maxrss_bytes": 39743488
+              },
+              "final": {
+                "VmHWM_bytes": 39809024,
+                "VmRSS_bytes": 18862080,
+                "ru_maxrss_bytes": 39809024
+              }
+            }
+          },
+          {
+            "repeat": 3,
+            "readings": {
+              "startup": {
+                "VmHWM_bytes": 17514496,
+                "VmRSS_bytes": 17514496,
+                "ru_maxrss_bytes": 18173952
+              },
+              "before": {
+                "VmHWM_bytes": 17920000,
+                "VmRSS_bytes": 17920000,
+                "ru_maxrss_bytes": 18173952
+              },
+              "first": {
+                "VmHWM_bytes": 40075264,
+                "VmRSS_bytes": 18665472,
+                "ru_maxrss_bytes": 40075264
+              },
+              "final": {
+                "VmHWM_bytes": 40075264,
+                "VmRSS_bytes": 18665472,
+                "ru_maxrss_bytes": 40075264
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "public_first_use": {
+    "dumps:numbers": {
+      "jsonmodem_baseline": {
+        "zero_warmups": {
+          "allocation_requests": 20,
+          "total_allocated_bytes": 674763,
+          "peak_live_bytes": 412619,
+          "process_samples": [
+            {
+              "allocation_requests": 20,
+              "total_allocated_bytes": 674763,
+              "peak_live_bytes": 412619
+            },
+            {
+              "allocation_requests": 20,
+              "total_allocated_bytes": 674763,
+              "peak_live_bytes": 412619
+            },
+            {
+              "allocation_requests": 20,
+              "total_allocated_bytes": 674763,
+              "peak_live_bytes": 412619
+            }
+          ]
+        },
+        "ten_warmups": {
+          "allocation_requests": 20,
+          "total_allocated_bytes": 674763,
+          "peak_live_bytes": 412619,
+          "process_samples": [
+            {
+              "allocation_requests": 20,
+              "total_allocated_bytes": 674763,
+              "peak_live_bytes": 412619
+            },
+            {
+              "allocation_requests": 20,
+              "total_allocated_bytes": 674763,
+              "peak_live_bytes": 412619
+            },
+            {
+              "allocation_requests": 20,
+              "total_allocated_bytes": 674763,
+              "peak_live_bytes": 412619
+            }
+          ]
+        }
+      },
+      "orjson_3119": {
+        "zero_warmups": {
+          "allocation_requests": 17,
+          "total_allocated_bytes": 524137,
+          "peak_live_bytes": 262497,
+          "process_samples": [
+            {
+              "allocation_requests": 17,
+              "total_allocated_bytes": 524137,
+              "peak_live_bytes": 262497
+            },
+            {
+              "allocation_requests": 17,
+              "total_allocated_bytes": 524137,
+              "peak_live_bytes": 262497
+            },
+            {
+              "allocation_requests": 17,
+              "total_allocated_bytes": 524137,
+              "peak_live_bytes": 262497
+            }
+          ]
+        },
+        "ten_warmups": {
+          "allocation_requests": 17,
+          "total_allocated_bytes": 524137,
+          "peak_live_bytes": 262497,
+          "process_samples": [
+            {
+              "allocation_requests": 17,
+              "total_allocated_bytes": 524137,
+              "peak_live_bytes": 262497
+            },
+            {
+              "allocation_requests": 17,
+              "total_allocated_bytes": 524137,
+              "peak_live_bytes": 262497
+            },
+            {
+              "allocation_requests": 17,
+              "total_allocated_bytes": 524137,
+              "peak_live_bytes": 262497
+            }
+          ]
+        }
+      }
+    },
+    "dumps:twitterescaped": {
+      "jsonmodem_baseline": {
+        "zero_warmups": {
+          "allocation_requests": 785,
+          "total_allocated_bytes": 1699542,
+          "peak_live_bytes": 1136617,
+          "process_samples": [
+            {
+              "allocation_requests": 785,
+              "total_allocated_bytes": 1699542,
+              "peak_live_bytes": 1136617
+            },
+            {
+              "allocation_requests": 785,
+              "total_allocated_bytes": 1699542,
+              "peak_live_bytes": 1136617
+            },
+            {
+              "allocation_requests": 785,
+              "total_allocated_bytes": 1699542,
+              "peak_live_bytes": 1136617
+            }
+          ]
+        },
+        "ten_warmups": {
+          "allocation_requests": 27,
+          "total_allocated_bytes": 1587897,
+          "peak_live_bytes": 1026747,
+          "process_samples": [
+            {
+              "allocation_requests": 27,
+              "total_allocated_bytes": 1587897,
+              "peak_live_bytes": 1026747
+            },
+            {
+              "allocation_requests": 27,
+              "total_allocated_bytes": 1587897,
+              "peak_live_bytes": 1026747
+            },
+            {
+              "allocation_requests": 27,
+              "total_allocated_bytes": 1587897,
+              "peak_live_bytes": 1026747
+            }
+          ]
+        }
+      },
+      "orjson_3119": {
+        "zero_warmups": {
+          "allocation_requests": 775,
+          "total_allocated_bytes": 1158022,
+          "peak_live_bytes": 634511,
+          "process_samples": [
+            {
+              "allocation_requests": 775,
+              "total_allocated_bytes": 1158022,
+              "peak_live_bytes": 634511
+            },
+            {
+              "allocation_requests": 775,
+              "total_allocated_bytes": 1158022,
+              "peak_live_bytes": 634511
+            },
+            {
+              "allocation_requests": 775,
+              "total_allocated_bytes": 1158022,
+              "peak_live_bytes": 634511
+            }
+          ]
+        },
+        "ten_warmups": {
+          "allocation_requests": 17,
+          "total_allocated_bytes": 1046377,
+          "peak_live_bytes": 524641,
+          "process_samples": [
+            {
+              "allocation_requests": 17,
+              "total_allocated_bytes": 1046377,
+              "peak_live_bytes": 524641
+            },
+            {
+              "allocation_requests": 17,
+              "total_allocated_bytes": 1046377,
+              "peak_live_bytes": 524641
+            },
+            {
+              "allocation_requests": 17,
+              "total_allocated_bytes": 1046377,
+              "peak_live_bytes": 524641
+            }
+          ]
+        }
+      }
+    },
+    "dumps:poet": {
+      "jsonmodem_baseline": {
+        "zero_warmups": {
+          "allocation_requests": 19456,
+          "total_allocated_bytes": 14396870,
+          "peak_live_bytes": 9560446,
+          "process_samples": [
+            {
+              "allocation_requests": 19456,
+              "total_allocated_bytes": 14396870,
+              "peak_live_bytes": 9560446
+            },
+            {
+              "allocation_requests": 19456,
+              "total_allocated_bytes": 14396870,
+              "peak_live_bytes": 9560446
+            },
+            {
+              "allocation_requests": 19456,
+              "total_allocated_bytes": 14396870,
+              "peak_live_bytes": 9560446
+            }
+          ]
+        },
+        "ten_warmups": {
+          "allocation_requests": 24,
+          "total_allocated_bytes": 10368260,
+          "peak_live_bytes": 6833763,
+          "process_samples": [
+            {
+              "allocation_requests": 24,
+              "total_allocated_bytes": 10368260,
+              "peak_live_bytes": 6833763
+            },
+            {
+              "allocation_requests": 24,
+              "total_allocated_bytes": 10368260,
+              "peak_live_bytes": 6833763
+            },
+            {
+              "allocation_requests": 24,
+              "total_allocated_bytes": 10368260,
+              "peak_live_bytes": 6833763
+            }
+          ]
+        }
+      },
+      "orjson_3119": {
+        "zero_warmups": {
+          "allocation_requests": 19451,
+          "total_allocated_bytes": 12410989,
+          "peak_live_bytes": 6921340,
+          "process_samples": [
+            {
+              "allocation_requests": 19451,
+              "total_allocated_bytes": 12410989,
+              "peak_live_bytes": 6921340
+            },
+            {
+              "allocation_requests": 19451,
+              "total_allocated_bytes": 12410989,
+              "peak_live_bytes": 6921340
+            },
+            {
+              "allocation_requests": 19451,
+              "total_allocated_bytes": 12410989,
+              "peak_live_bytes": 6921340
+            }
+          ]
+        },
+        "ten_warmups": {
+          "allocation_requests": 19,
+          "total_allocated_bytes": 8382379,
+          "peak_live_bytes": 4194657,
+          "process_samples": [
+            {
+              "allocation_requests": 19,
+              "total_allocated_bytes": 8382379,
+              "peak_live_bytes": 4194657
+            },
+            {
+              "allocation_requests": 19,
+              "total_allocated_bytes": 8382379,
+              "peak_live_bytes": 4194657
+            },
+            {
+              "allocation_requests": 19,
+              "total_allocated_bytes": 8382379,
+              "peak_live_bytes": 4194657
+            }
+          ]
+        }
+      }
+    }
+  }
+}

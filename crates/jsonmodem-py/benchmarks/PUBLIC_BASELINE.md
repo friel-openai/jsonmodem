@@ -19,6 +19,8 @@ not a statistical significance test. Times are milliseconds per call. Memory
 uses MiB, where 1 MiB = 1,048,576 bytes. Full-precision values, repeated samples,
 and fingerprints are available in the
 [result data](data/public-baseline-2026-08-29/README.md).
+The [additional memory report](PUBLIC_SUPPLEMENTAL_MEMORY.md) covers synthetic
+workloads and first-use public-document allocations in separate measurements.
 
 ## Repeated-call timing
 

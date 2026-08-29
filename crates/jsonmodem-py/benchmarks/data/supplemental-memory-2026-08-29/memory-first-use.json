@@ -1,0 +1,786 @@
+{
+  "schema_version": 1,
+  "benchmark": "public-corpus-memory",
+  "created_utc": "2026-08-29T06:10:17.163537+00:00",
+  "manifest": {
+    "name": "public-json-parser-corpus-v1",
+    "sha256": "91dea3195ba691037f43399f927f5747ddb1dd80f5cc3e84db386f2bca7ddb30"
+  },
+  "runner_sha256": "b00c361b29535abfc16548de41a32a5d4caa0737e4989d80991c1d9041a9bbe9",
+  "corpus_helper_sha256": "6a7ba7893d0e3ec83ef0cd70043eb29893eb2e8a7730476dcf02c0ec8cc9505c",
+  "memory_runner_sha256": "883761e77126b07ed40ae4c818f67ec0e7416bae947ec75ca92bcd6824dbeb9d",
+  "allocation_helper_sha256": "811f04e52c2177df802cf45589ab02a15f5c25260815c3975af07bbeafe86f15",
+  "documents": [
+    {
+      "name": "numbers",
+      "filename": "numbers.json",
+      "description": "An array containing only floating-point numbers.",
+      "suite": "boost-json",
+      "terms": "upstream-data-terms",
+      "url": "https://raw.githubusercontent.com/simdjson/simdjson-data/4197c425e857f0ec38e89822fdd0bd9ea21f4daf/jsonexamples/numbers.json",
+      "size_bytes": 150124,
+      "sha256": "82e9ddfe00963110ed8a0704e7df4d1ad1af9c0f336d1b24431ebc63cf430a2b"
+    },
+    {
+      "name": "twitterescaped",
+      "filename": "twitterescaped.json",
+      "description": "Twitter data with Unicode escapes and less whitespace. Keep this distinct for loads; do not count identical dumps inputs twice.",
+      "suite": "boost-json",
+      "terms": "upstream-data-terms",
+      "url": "https://raw.githubusercontent.com/simdjson/simdjson-data/4197c425e857f0ec38e89822fdd0bd9ea21f4daf/jsonexamples/twitterescaped.json",
+      "size_bytes": 562408,
+      "sha256": "2a288b5af4691c55b6f40fa534225b3e08b8d8b7f7ca4ed29bc5c7c81566ed4a"
+    },
+    {
+      "name": "poet",
+      "filename": "poet.json",
+      "description": "Chinese author biographies; an array with long CJK strings.",
+      "suite": "yyjson",
+      "terms": "chinese-poetry-mit",
+      "url": "https://raw.githubusercontent.com/ibireme/yyjson_benchmark/aeefe6a44f37fccf1f9d730766abab9ffea43c6b/data/json/poet.json",
+      "size_bytes": 3512883,
+      "sha256": "2c2689a3b5df460f02e4dee2a36ac32cc27c43e2964fba7965eba3469bf617ec"
+    }
+  ],
+  "references": [
+    "orjson_3119"
+  ],
+  "libraries": {
+    "jsonmodem_baseline": {
+      "module": "jsonmodem",
+      "version": "0.0.0-alpha.0",
+      "files": [
+        {
+          "name": "__init__.py",
+          "sha256": "cf8bf5012cc9dcfc8f9bd304de337afce918d955ed22e6d0131b2f533424afb4"
+        },
+        {
+          "name": "_compat.py",
+          "sha256": "f4f53fa3faa1abb82e65171735a9d23ea20673ca0d854bab1b6d330b29d5a6ca"
+        },
+        {
+          "name": "_jsonmodem.cpython-312-x86_64-linux-gnu.so",
+          "sha256": "5b1ab812d74c1df4c60d87e3d194c29c140a179a5e7bd2948a4fb6ea61d11ebe"
+        },
+        {
+          "name": "_numpy.py",
+          "sha256": "cafad3349b1e0f77f49dc363af1df3f473ce18fb5394d0d7b9b3bc1a3cb01b9e"
+        }
+      ],
+      "python": "3.12.13",
+      "implementation": "CPython",
+      "python_compiler": "Clang 22.1.3 ",
+      "python_cache_tag": "cpython-312",
+      "executable_sha256": "7d43f6e86a6c6dd12005ec77eb2055f1be3f1bb3adedf8afe0a87973fa7371ce",
+      "platform": "Linux-5.15.0-1110-azure-x86_64-with-glibc2.39",
+      "machine": "x86_64",
+      "pointer_bits": 64,
+      "cpu_affinity": [
+        8
+      ],
+      "python_malloc": "default",
+      "declared_revision": "b7fe329765f3e90064cc38f127d3594165116c71",
+      "declared_wheel_sha256": "51e493282dab7c0f60b37eab3a8e34c7167fa72a1f89a660d10b962474b8110b"
+    },
+    "orjson_3119": {
+      "module": "orjson",
+      "version": "3.11.9",
+      "files": [
+        {
+          "name": "__init__.py",
+          "sha256": "7a3a05b1281b65aa5054c35387fbe5bc99305bf94b9ec7774a6cd4a6f5b148f5"
+        },
+        {
+          "name": "orjson.cpython-312-x86_64-linux-gnu.so",
+          "sha256": "cf95e4edd9c6752be617f8afc1f08bfd6b015007520e15069e56c102ffb9d295"
+        }
+      ],
+      "python": "3.12.13",
+      "implementation": "CPython",
+      "python_compiler": "Clang 22.1.3 ",
+      "python_cache_tag": "cpython-312",
+      "executable_sha256": "7d43f6e86a6c6dd12005ec77eb2055f1be3f1bb3adedf8afe0a87973fa7371ce",
+      "platform": "Linux-5.15.0-1110-azure-x86_64-with-glibc2.39",
+      "machine": "x86_64",
+      "pointer_bits": 64,
+      "cpu_affinity": [
+        8
+      ],
+      "python_malloc": "default"
+    }
+  },
+  "verification": {
+    "jsonmodem_baseline": {
+      "dumps:numbers": {
+        "input_bytes": 150124,
+        "output_bytes": 150122,
+        "output_sha256": "06087cde2be4974973e16b542c2aecb1d66dc0bc670de31d8ee4fc63aabdd576",
+        "work_bytes": 150122
+      },
+      "dumps:twitterescaped": {
+        "input_bytes": 562408,
+        "output_bytes": 466906,
+        "output_sha256": "584c28f40d3e00dd6aed43b80cec9f8df9e5c2c9967320f9c41c881fd02c4392",
+        "work_bytes": 466906
+      },
+      "dumps:poet": {
+        "input_bytes": 3512883,
+        "output_bytes": 3298466,
+        "output_sha256": "fa6931ec5bd40caee98c1ef317df8c090399c6e3264b191f65d797fd3d76f9d1",
+        "work_bytes": 3298466
+      }
+    },
+    "orjson_3119": {
+      "dumps:numbers": {
+        "input_bytes": 150124,
+        "output_bytes": 150122,
+        "output_sha256": "06087cde2be4974973e16b542c2aecb1d66dc0bc670de31d8ee4fc63aabdd576",
+        "work_bytes": 150122
+      },
+      "dumps:twitterescaped": {
+        "input_bytes": 562408,
+        "output_bytes": 466906,
+        "output_sha256": "584c28f40d3e00dd6aed43b80cec9f8df9e5c2c9967320f9c41c881fd02c4392",
+        "work_bytes": 466906
+      },
+      "dumps:poet": {
+        "input_bytes": 3512883,
+        "output_bytes": 3298466,
+        "output_sha256": "fa6931ec5bd40caee98c1ef317df8c090399c6e3264b191f65d797fd3d76f9d1",
+        "work_bytes": 3298466
+      }
+    }
+  },
+  "active_cases": [
+    "dumps:numbers",
+    "dumps:twitterescaped",
+    "dumps:poet"
+  ],
+  "duplicate_cases": {},
+  "memray_version": "1.20.0",
+  "method": {
+    "metrics": [
+      "memray"
+    ],
+    "direction": "Lower is better for allocation requests, allocated bytes, tracked peak bytes, and RSS. These are different quantities; do not compare them to one another.",
+    "processes": "Each library, case, metric, and repeat runs in a fresh process. Correctness checks run in separate processes, using the timing runner's exact-value and encoded-byte checks.",
+    "preparation": "Loads retains only hash-verified original bytes. Dumps retains one standard-library decoded input and releases the original bytes. No reference output is retained in memory workers.",
+    "gc": "Cyclic GC is collected and disabled before warmup or RSS calls, then restored. Every returned value is destroyed before the next call.",
+    "memray": "Full allocation captures with Python allocator tracing and no native stacks. Count allocation-kind records, including zero-byte requests; exclude FREE, PYMALLOC_FREE, and MUNMAP. Realloc counts its full requested new size. Peak is Memray's tracked live-byte high-water mark, not RSS.",
+    "memray_excludes": "Imports, input preparation, warmup allocations, preexisting live allocations, and capture analysis. The recorded loop and returned-value destruction are included. Peaks are not divided by calls.",
+    "rss": "Linux /proc/self/status VmHWM after all calls is the whole-process peak RSS. VmRSS is current RSS; ru_maxrss is recorded separately. All source KiB values are converted to bytes.",
+    "rss_limits": "RSS includes interpreter/imports, preparation, results, native temporaries, and retained allocator pages. Preparation can set the peak before the first call. Neither high-water mark is reset; subtracting a baseline does not isolate operation-only memory. Snapshot overhead is included.",
+    "cache": "Memray uses the selected warmup count. RSS has no preliminary library calls. Neither mode promises cold OS caches or excludes interpreter startup effects on RSS.",
+    "summary": "Per-case medians of fresh-process results, with every process sample retained. Ratios divide those medians by the labeled reference, or null if the reference is zero. There is no overall memory geomean or instrumented latency.",
+    "duplicates": "Loads deduplicates original document hashes. Dumps deduplicates exact encoded outputs after full correctness checks. duplicate_cases lists omitted cases.",
+    "memray_tracked_calls": 1,
+    "memray_warmup_calls": 0,
+    "rss_calls": 10,
+    "rss_warmup_calls": 0,
+    "process_repeats": 3,
+    "requested_cpu": 8
+  },
+  "runs": [
+    {
+      "repeat": 1,
+      "python_hash_seed": 1729,
+      "library_order": [
+        "jsonmodem_baseline",
+        "orjson_3119"
+      ],
+      "document_order": [
+        "twitterescaped",
+        "numbers",
+        "poet"
+      ],
+      "metric_order": [
+        "memray"
+      ],
+      "libraries": {
+        "jsonmodem_baseline": {
+          "dumps:twitterescaped": {
+            "memray": {
+              "allocation_requests": 785,
+              "total_allocated_bytes": 1699542,
+              "peak_live_bytes": 1136617,
+              "python_allocator": "pymalloc",
+              "trace_python_allocators": true,
+              "native_traces": false,
+              "file_format": "ALL_ALLOCATIONS",
+              "memray_version": "1.20.0",
+              "calls": 1,
+              "warmup_calls": 0,
+              "capture": {
+                "name": "001.jsonmodem_baseline.dumps.twitterescaped.bin",
+                "size_bytes": 6689,
+                "sha256": "a27c6a1727a7c4a8248d7d779d4cf0dfdc778b206d965169555319709aaa9a42"
+              }
+            }
+          },
+          "dumps:numbers": {
+            "memray": {
+              "allocation_requests": 20,
+              "total_allocated_bytes": 674763,
+              "peak_live_bytes": 412619,
+              "python_allocator": "pymalloc",
+              "trace_python_allocators": true,
+              "native_traces": false,
+              "file_format": "ALL_ALLOCATIONS",
+              "memray_version": "1.20.0",
+              "calls": 1,
+              "warmup_calls": 0,
+              "capture": {
+                "name": "001.jsonmodem_baseline.dumps.numbers.bin",
+                "size_bytes": 2546,
+                "sha256": "dfdcb0596932d7162d0f43b8c66b4c65f2c12ec3b7ed718c51e52ab8677b0c86"
+              }
+            }
+          },
+          "dumps:poet": {
+            "memray": {
+              "allocation_requests": 19456,
+              "total_allocated_bytes": 14396870,
+              "peak_live_bytes": 9560446,
+              "python_allocator": "pymalloc",
+              "trace_python_allocators": true,
+              "native_traces": false,
+              "file_format": "ALL_ALLOCATIONS",
+              "memray_version": "1.20.0",
+              "calls": 1,
+              "warmup_calls": 0,
+              "capture": {
+                "name": "001.jsonmodem_baseline.dumps.poet.bin",
+                "size_bytes": 100668,
+                "sha256": "09b84a90fd2e3267c460d138ab533f6a983b39a6b2c03a6db9c1e8352dea4dbd"
+              }
+            }
+          }
+        },
+        "orjson_3119": {
+          "dumps:twitterescaped": {
+            "memray": {
+              "allocation_requests": 775,
+              "total_allocated_bytes": 1158022,
+              "peak_live_bytes": 634511,
+              "python_allocator": "pymalloc",
+              "trace_python_allocators": true,
+              "native_traces": false,
+              "file_format": "ALL_ALLOCATIONS",
+              "memray_version": "1.20.0",
+              "calls": 1,
+              "warmup_calls": 0,
+              "capture": {
+                "name": "001.orjson_3119.dumps.twitterescaped.bin",
+                "size_bytes": 6632,
+                "sha256": "a51c2f5e1cf044b87312e48aacf21c4a03abf217a3d1d9ea2efb073c4880a1ab"
+              }
+            }
+          },
+          "dumps:numbers": {
+            "memray": {
+              "allocation_requests": 17,
+              "total_allocated_bytes": 524137,
+              "peak_live_bytes": 262497,
+              "python_allocator": "pymalloc",
+              "trace_python_allocators": true,
+              "native_traces": false,
+              "file_format": "ALL_ALLOCATIONS",
+              "memray_version": "1.20.0",
+              "calls": 1,
+              "warmup_calls": 0,
+              "capture": {
+                "name": "001.orjson_3119.dumps.numbers.bin",
+                "size_bytes": 2521,
+                "sha256": "af166188fc05204855952ae8864a20c6ab3792a6a958cf11e9f738f4fdc7cd21"
+              }
+            }
+          },
+          "dumps:poet": {
+            "memray": {
+              "allocation_requests": 19451,
+              "total_allocated_bytes": 12410989,
+              "peak_live_bytes": 6921340,
+              "python_allocator": "pymalloc",
+              "trace_python_allocators": true,
+              "native_traces": false,
+              "file_format": "ALL_ALLOCATIONS",
+              "memray_version": "1.20.0",
+              "calls": 1,
+              "warmup_calls": 0,
+              "capture": {
+                "name": "001.orjson_3119.dumps.poet.bin",
+                "size_bytes": 100340,
+                "sha256": "3003c6f8857e3704aa819d6f5d2803231cf21cf0e92cb8571bc5caf9dc752641"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "repeat": 2,
+      "python_hash_seed": 1730,
+      "library_order": [
+        "orjson_3119",
+        "jsonmodem_baseline"
+      ],
+      "document_order": [
+        "poet",
+        "twitterescaped",
+        "numbers"
+      ],
+      "metric_order": [
+        "memray"
+      ],
+      "libraries": {
+        "orjson_3119": {
+          "dumps:poet": {
+            "memray": {
+              "allocation_requests": 19451,
+              "total_allocated_bytes": 12410989,
+              "peak_live_bytes": 6921340,
+              "python_allocator": "pymalloc",
+              "trace_python_allocators": true,
+              "native_traces": false,
+              "file_format": "ALL_ALLOCATIONS",
+              "memray_version": "1.20.0",
+              "calls": 1,
+              "warmup_calls": 0,
+              "capture": {
+                "name": "002.orjson_3119.dumps.poet.bin",
+                "size_bytes": 100367,
+                "sha256": "0d5ed76d9980f9e346840c4647a9c8a6219a853c7c1d9abd5d8f22694c91232d"
+              }
+            }
+          },
+          "dumps:twitterescaped": {
+            "memray": {
+              "allocation_requests": 775,
+              "total_allocated_bytes": 1158022,
+              "peak_live_bytes": 634511,
+              "python_allocator": "pymalloc",
+              "trace_python_allocators": true,
+              "native_traces": false,
+              "file_format": "ALL_ALLOCATIONS",
+              "memray_version": "1.20.0",
+              "calls": 1,
+              "warmup_calls": 0,
+              "capture": {
+                "name": "002.orjson_3119.dumps.twitterescaped.bin",
+                "size_bytes": 6651,
+                "sha256": "5bdacfa3b9063fb401bbfd601c8a14b0604295eeb1059db2c6778dd9f6e0f155"
+              }
+            }
+          },
+          "dumps:numbers": {
+            "memray": {
+              "allocation_requests": 17,
+              "total_allocated_bytes": 524137,
+              "peak_live_bytes": 262497,
+              "python_allocator": "pymalloc",
+              "trace_python_allocators": true,
+              "native_traces": false,
+              "file_format": "ALL_ALLOCATIONS",
+              "memray_version": "1.20.0",
+              "calls": 1,
+              "warmup_calls": 0,
+              "capture": {
+                "name": "002.orjson_3119.dumps.numbers.bin",
+                "size_bytes": 2521,
+                "sha256": "dadb44dbe6b3f8b56d75d70893cbd44e46ac927305d351395cd84e53341c0048"
+              }
+            }
+          }
+        },
+        "jsonmodem_baseline": {
+          "dumps:poet": {
+            "memray": {
+              "allocation_requests": 19456,
+              "total_allocated_bytes": 14396870,
+              "peak_live_bytes": 9560446,
+              "python_allocator": "pymalloc",
+              "trace_python_allocators": true,
+              "native_traces": false,
+              "file_format": "ALL_ALLOCATIONS",
+              "memray_version": "1.20.0",
+              "calls": 1,
+              "warmup_calls": 0,
+              "capture": {
+                "name": "002.jsonmodem_baseline.dumps.poet.bin",
+                "size_bytes": 100452,
+                "sha256": "c92ecc9bb528af12f0f29ed16cec39ca0e57e4b635f24a803da823a9b27b3f4b"
+              }
+            }
+          },
+          "dumps:twitterescaped": {
+            "memray": {
+              "allocation_requests": 785,
+              "total_allocated_bytes": 1699542,
+              "peak_live_bytes": 1136617,
+              "python_allocator": "pymalloc",
+              "trace_python_allocators": true,
+              "native_traces": false,
+              "file_format": "ALL_ALLOCATIONS",
+              "memray_version": "1.20.0",
+              "calls": 1,
+              "warmup_calls": 0,
+              "capture": {
+                "name": "002.jsonmodem_baseline.dumps.twitterescaped.bin",
+                "size_bytes": 6782,
+                "sha256": "cf676cafb8310312a266f62da26f4d1e951695d917c4fda0205515741c546d52"
+              }
+            }
+          },
+          "dumps:numbers": {
+            "memray": {
+              "allocation_requests": 20,
+              "total_allocated_bytes": 674763,
+              "peak_live_bytes": 412619,
+              "python_allocator": "pymalloc",
+              "trace_python_allocators": true,
+              "native_traces": false,
+              "file_format": "ALL_ALLOCATIONS",
+              "memray_version": "1.20.0",
+              "calls": 1,
+              "warmup_calls": 0,
+              "capture": {
+                "name": "002.jsonmodem_baseline.dumps.numbers.bin",
+                "size_bytes": 2547,
+                "sha256": "9b2995155cb415ee29dd06448e9fdcf742b5f7eea8346057415dff79721a6d7b"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "repeat": 3,
+      "python_hash_seed": 1731,
+      "library_order": [
+        "jsonmodem_baseline",
+        "orjson_3119"
+      ],
+      "document_order": [
+        "poet",
+        "numbers",
+        "twitterescaped"
+      ],
+      "metric_order": [
+        "memray"
+      ],
+      "libraries": {
+        "jsonmodem_baseline": {
+          "dumps:poet": {
+            "memray": {
+              "allocation_requests": 19456,
+              "total_allocated_bytes": 14396870,
+              "peak_live_bytes": 9560446,
+              "python_allocator": "pymalloc",
+              "trace_python_allocators": true,
+              "native_traces": false,
+              "file_format": "ALL_ALLOCATIONS",
+              "memray_version": "1.20.0",
+              "calls": 1,
+              "warmup_calls": 0,
+              "capture": {
+                "name": "003.jsonmodem_baseline.dumps.poet.bin",
+                "size_bytes": 100540,
+                "sha256": "ed17f675bb92f2e7d8f97be6b9f18168cae1036ee97a3dcbcbf35ab03d4e3aab"
+              }
+            }
+          },
+          "dumps:numbers": {
+            "memray": {
+              "allocation_requests": 20,
+              "total_allocated_bytes": 674763,
+              "peak_live_bytes": 412619,
+              "python_allocator": "pymalloc",
+              "trace_python_allocators": true,
+              "native_traces": false,
+              "file_format": "ALL_ALLOCATIONS",
+              "memray_version": "1.20.0",
+              "calls": 1,
+              "warmup_calls": 0,
+              "capture": {
+                "name": "003.jsonmodem_baseline.dumps.numbers.bin",
+                "size_bytes": 2552,
+                "sha256": "e3c0ba01514ee2948b8fc121a70ec317e3df6e977f864ae8d6562556551e7eec"
+              }
+            }
+          },
+          "dumps:twitterescaped": {
+            "memray": {
+              "allocation_requests": 785,
+              "total_allocated_bytes": 1699542,
+              "peak_live_bytes": 1136617,
+              "python_allocator": "pymalloc",
+              "trace_python_allocators": true,
+              "native_traces": false,
+              "file_format": "ALL_ALLOCATIONS",
+              "memray_version": "1.20.0",
+              "calls": 1,
+              "warmup_calls": 0,
+              "capture": {
+                "name": "003.jsonmodem_baseline.dumps.twitterescaped.bin",
+                "size_bytes": 6694,
+                "sha256": "0cebaac4bfa7920313bdb9579a26ccf5c1faecefd031bf34cdc819a1cdd4207f"
+              }
+            }
+          }
+        },
+        "orjson_3119": {
+          "dumps:poet": {
+            "memray": {
+              "allocation_requests": 19451,
+              "total_allocated_bytes": 12410989,
+              "peak_live_bytes": 6921340,
+              "python_allocator": "pymalloc",
+              "trace_python_allocators": true,
+              "native_traces": false,
+              "file_format": "ALL_ALLOCATIONS",
+              "memray_version": "1.20.0",
+              "calls": 1,
+              "warmup_calls": 0,
+              "capture": {
+                "name": "003.orjson_3119.dumps.poet.bin",
+                "size_bytes": 100239,
+                "sha256": "ad0f30be83d580b4eac2e1ca8b98aed8d9e3f7b1f6b496eafabf0ae067ffcf7b"
+              }
+            }
+          },
+          "dumps:numbers": {
+            "memray": {
+              "allocation_requests": 17,
+              "total_allocated_bytes": 524137,
+              "peak_live_bytes": 262497,
+              "python_allocator": "pymalloc",
+              "trace_python_allocators": true,
+              "native_traces": false,
+              "file_format": "ALL_ALLOCATIONS",
+              "memray_version": "1.20.0",
+              "calls": 1,
+              "warmup_calls": 0,
+              "capture": {
+                "name": "003.orjson_3119.dumps.numbers.bin",
+                "size_bytes": 2521,
+                "sha256": "4d52161edc6fa3a509326f9a80e0003f09ee66599211fd5635bafc1afe1e1937"
+              }
+            }
+          },
+          "dumps:twitterescaped": {
+            "memray": {
+              "allocation_requests": 775,
+              "total_allocated_bytes": 1158022,
+              "peak_live_bytes": 634511,
+              "python_allocator": "pymalloc",
+              "trace_python_allocators": true,
+              "native_traces": false,
+              "file_format": "ALL_ALLOCATIONS",
+              "memray_version": "1.20.0",
+              "calls": 1,
+              "warmup_calls": 0,
+              "capture": {
+                "name": "003.orjson_3119.dumps.twitterescaped.bin",
+                "size_bytes": 6588,
+                "sha256": "2e0513578ee555f130aae82dd5c4f28c387f6eb963fb608351dcfbc0da3e335b"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "summary": {
+    "cases": {
+      "dumps:numbers": {
+        "input_bytes": 150124,
+        "output_bytes": 150122,
+        "output_sha256": "06087cde2be4974973e16b542c2aecb1d66dc0bc670de31d8ee4fc63aabdd576",
+        "work_bytes": 150122,
+        "memray": {
+          "measurements": {
+            "jsonmodem_baseline": {
+              "allocation_requests": 20,
+              "total_allocated_bytes": 674763,
+              "peak_live_bytes": 412619,
+              "process_samples": [
+                {
+                  "allocation_requests": 20,
+                  "total_allocated_bytes": 674763,
+                  "peak_live_bytes": 412619
+                },
+                {
+                  "allocation_requests": 20,
+                  "total_allocated_bytes": 674763,
+                  "peak_live_bytes": 412619
+                },
+                {
+                  "allocation_requests": 20,
+                  "total_allocated_bytes": 674763,
+                  "peak_live_bytes": 412619
+                }
+              ]
+            },
+            "orjson_3119": {
+              "allocation_requests": 17,
+              "total_allocated_bytes": 524137,
+              "peak_live_bytes": 262497,
+              "process_samples": [
+                {
+                  "allocation_requests": 17,
+                  "total_allocated_bytes": 524137,
+                  "peak_live_bytes": 262497
+                },
+                {
+                  "allocation_requests": 17,
+                  "total_allocated_bytes": 524137,
+                  "peak_live_bytes": 262497
+                },
+                {
+                  "allocation_requests": 17,
+                  "total_allocated_bytes": 524137,
+                  "peak_live_bytes": 262497
+                }
+              ]
+            }
+          },
+          "ratios": {
+            "orjson_3119": {
+              "jsonmodem_baseline": {
+                "allocation_requests": 1.1764705882352942,
+                "total_allocated_bytes": 1.2873790631075464,
+                "peak_live_bytes": 1.57189986933184
+              }
+            }
+          }
+        }
+      },
+      "dumps:twitterescaped": {
+        "input_bytes": 562408,
+        "output_bytes": 466906,
+        "output_sha256": "584c28f40d3e00dd6aed43b80cec9f8df9e5c2c9967320f9c41c881fd02c4392",
+        "work_bytes": 466906,
+        "memray": {
+          "measurements": {
+            "jsonmodem_baseline": {
+              "allocation_requests": 785,
+              "total_allocated_bytes": 1699542,
+              "peak_live_bytes": 1136617,
+              "process_samples": [
+                {
+                  "allocation_requests": 785,
+                  "total_allocated_bytes": 1699542,
+                  "peak_live_bytes": 1136617
+                },
+                {
+                  "allocation_requests": 785,
+                  "total_allocated_bytes": 1699542,
+                  "peak_live_bytes": 1136617
+                },
+                {
+                  "allocation_requests": 785,
+                  "total_allocated_bytes": 1699542,
+                  "peak_live_bytes": 1136617
+                }
+              ]
+            },
+            "orjson_3119": {
+              "allocation_requests": 775,
+              "total_allocated_bytes": 1158022,
+              "peak_live_bytes": 634511,
+              "process_samples": [
+                {
+                  "allocation_requests": 775,
+                  "total_allocated_bytes": 1158022,
+                  "peak_live_bytes": 634511
+                },
+                {
+                  "allocation_requests": 775,
+                  "total_allocated_bytes": 1158022,
+                  "peak_live_bytes": 634511
+                },
+                {
+                  "allocation_requests": 775,
+                  "total_allocated_bytes": 1158022,
+                  "peak_live_bytes": 634511
+                }
+              ]
+            }
+          },
+          "ratios": {
+            "orjson_3119": {
+              "jsonmodem_baseline": {
+                "allocation_requests": 1.0129032258064516,
+                "total_allocated_bytes": 1.4676249674013102,
+                "peak_live_bytes": 1.7913274947164037
+              }
+            }
+          }
+        }
+      },
+      "dumps:poet": {
+        "input_bytes": 3512883,
+        "output_bytes": 3298466,
+        "output_sha256": "fa6931ec5bd40caee98c1ef317df8c090399c6e3264b191f65d797fd3d76f9d1",
+        "work_bytes": 3298466,
+        "memray": {
+          "measurements": {
+            "jsonmodem_baseline": {
+              "allocation_requests": 19456,
+              "total_allocated_bytes": 14396870,
+              "peak_live_bytes": 9560446,
+              "process_samples": [
+                {
+                  "allocation_requests": 19456,
+                  "total_allocated_bytes": 14396870,
+                  "peak_live_bytes": 9560446
+                },
+                {
+                  "allocation_requests": 19456,
+                  "total_allocated_bytes": 14396870,
+                  "peak_live_bytes": 9560446
+                },
+                {
+                  "allocation_requests": 19456,
+                  "total_allocated_bytes": 14396870,
+                  "peak_live_bytes": 9560446
+                }
+              ]
+            },
+            "orjson_3119": {
+              "allocation_requests": 19451,
+              "total_allocated_bytes": 12410989,
+              "peak_live_bytes": 6921340,
+              "process_samples": [
+                {
+                  "allocation_requests": 19451,
+                  "total_allocated_bytes": 12410989,
+                  "peak_live_bytes": 6921340
+                },
+                {
+                  "allocation_requests": 19451,
+                  "total_allocated_bytes": 12410989,
+                  "peak_live_bytes": 6921340
+                },
+                {
+                  "allocation_requests": 19451,
+                  "total_allocated_bytes": 12410989,
+                  "peak_live_bytes": 6921340
+                }
+              ]
+            }
+          },
+          "ratios": {
+            "orjson_3119": {
+              "jsonmodem_baseline": {
+                "allocation_requests": 1.0002570561924837,
+                "total_allocated_bytes": 1.1600098912342924,
+                "peak_live_bytes": 1.3812998638991871
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

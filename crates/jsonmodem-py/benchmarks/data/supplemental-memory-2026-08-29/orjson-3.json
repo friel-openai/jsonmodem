@@ -1,0 +1,94 @@
+{
+  "python": "3.12.13",
+  "module": "orjson",
+  "version": "3.11.9",
+  "memray": "1.20.0",
+  "numpy": "2.5.2",
+  "calls": 1,
+  "cases": [
+    {
+      "name": "loads_medium",
+      "allocation_events": 4732,
+      "allocated_bytes": 927857,
+      "peak_live_bytes": 927414
+    },
+    {
+      "name": "dumps_small",
+      "allocation_events": 10,
+      "allocated_bytes": 1449,
+      "peak_live_bytes": 1129
+    },
+    {
+      "name": "dumps_medium",
+      "allocation_events": 16,
+      "allocated_bytes": 130671,
+      "peak_live_bytes": 65641
+    },
+    {
+      "name": "long_string",
+      "allocation_events": 11,
+      "allocated_bytes": 2098634,
+      "peak_live_bytes": 2097257
+    },
+    {
+      "name": "sorted_medium",
+      "allocation_events": 1018,
+      "allocated_bytes": 202815,
+      "peak_live_bytes": 65825
+    },
+    {
+      "name": "fragments_1000",
+      "allocation_events": 14,
+      "allocated_bytes": 32301,
+      "peak_live_bytes": 16489
+    },
+    {
+      "name": "dataclasses_1000",
+      "allocation_events": 15,
+      "allocated_bytes": 65102,
+      "peak_live_bytes": 32873
+    },
+    {
+      "name": "numpy_float32",
+      "allocation_events": 25041,
+      "allocated_bytes": 7739899,
+      "peak_live_bytes": 4070385
+    },
+    {
+      "name": "late_default",
+      "allocation_events": 23,
+      "allocated_bytes": 67045395,
+      "peak_live_bytes": 33554793
+    },
+    {
+      "name": "loads_small_array_view",
+      "allocation_events": 15,
+      "allocated_bytes": 4688,
+      "peak_live_bytes": 4336
+    },
+    {
+      "name": "loads_small",
+      "allocation_events": 15,
+      "allocated_bytes": 4688,
+      "peak_live_bytes": 4336
+    },
+    {
+      "name": "loads_medium_array_view",
+      "allocation_events": 4748,
+      "allocated_bytes": 928689,
+      "peak_live_bytes": 928246
+    },
+    {
+      "name": "loads_long_string_array_view",
+      "allocation_events": 11,
+      "allocated_bytes": 1868209,
+      "peak_live_bytes": 1867857
+    },
+    {
+      "name": "loads_long_string",
+      "allocation_events": 11,
+      "allocated_bytes": 1868209,
+      "peak_live_bytes": 1867857
+    }
+  ]
+}
