@@ -2,7 +2,6 @@
 //! invalid.
 
 use pyo3::PyResult;
-use smallvec::SmallVec;
 
 use super::{Decoder, MAX_DECODE_DEPTH, parse_double};
 
@@ -46,29 +45,32 @@ impl Decoder<'_, '_> {
     }
 
     pub(super) fn validate_without_values(&mut self) -> PyResult<()> {
-        // Each entry is the closer required by one unfinished container.
-        let mut stack: SmallVec<[u8; 32]> = SmallVec::new();
+        // The depth limit bounds storage, so each token needs no heap-state check.
+        let mut stack = [0_u8; MAX_DECODE_DEPTH];
+        let mut depth = 0;
         'next_value: loop {
             match self.reader.peek() {
                 Some(b'[') => {
-                    if stack.len() >= MAX_DECODE_DEPTH {
+                    if depth >= MAX_DECODE_DEPTH {
                         return Err(self.fail("recursion depth exceeded"));
                     }
                     self.expect(b'[')?;
                     if self.reader.peek() != Some(b']') {
-                        stack.push(b']');
+                        stack[depth] = b']';
+                        depth += 1;
                         continue;
                     }
                     self.expect(b']')?;
                 }
                 Some(b'{') => {
-                    if stack.len() >= MAX_DECODE_DEPTH {
+                    if depth >= MAX_DECODE_DEPTH {
                         return Err(self.fail("recursion depth exceeded"));
                     }
                     self.expect(b'{')?;
                     if self.reader.peek() != Some(b'}') {
                         self.validation_key()?;
-                        stack.push(b'}');
+                        stack[depth] = b'}';
+                        depth += 1;
                         continue;
                     }
                     self.expect(b'}')?;
@@ -99,15 +101,15 @@ impl Decoder<'_, '_> {
                 _ => return Err(self.fail("expected JSON value")),
             }
             loop {
-                match stack.last() {
-                    None => {
-                        return if self.reader.peek().is_some() {
-                            Err(self.fail("unexpected content after document"))
-                        } else {
-                            Ok(())
-                        };
-                    }
-                    Some(b']') => match self.reader.peek() {
+                if depth == 0 {
+                    return if self.reader.peek().is_some() {
+                        Err(self.fail("unexpected content after document"))
+                    } else {
+                        Ok(())
+                    };
+                }
+                match stack[depth - 1] {
+                    b']' => match self.reader.peek() {
                         Some(b',') => {
                             self.expect(b',')?;
                             continue 'next_value;
@@ -115,7 +117,7 @@ impl Decoder<'_, '_> {
                         Some(b']') => self.expect(b']')?,
                         _ => return Err(self.fail("expected comma or closing bracket")),
                     },
-                    Some(_) => match self.reader.peek() {
+                    _ => match self.reader.peek() {
                         Some(b',') => {
                             self.expect(b',')?;
                             self.validation_key()?;
@@ -125,7 +127,7 @@ impl Decoder<'_, '_> {
                         _ => return Err(self.fail("expected comma or closing brace")),
                     },
                 }
-                stack.pop();
+                depth -= 1;
             }
         }
     }
