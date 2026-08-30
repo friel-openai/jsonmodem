@@ -778,7 +778,7 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
     }
 
     /// Write a byte already identified as a JSON escape by either scanner.
-    #[inline]
+    #[inline(always)]
     fn escape_byte(&mut self, byte: u8) -> Result<(), OutputAllocationError> {
         match byte {
             b'"' => self.extend(b"\\\""),
