@@ -1,11 +1,12 @@
-# What profiling changed
+# What profiling found
 
-Native `py-spy` recordings and LLVM disassembly guided the changes below.
-The retained changes are in [jsonmodem b0f3190](https://github.com/friel-openai/jsonmodem/tree/b0f3190fb72af0396d9d25256f8d0174efd7ae23).
-These recordings predate that combined build. They explain the changes;
-they are not measurements of that build's speed.
+Native `py-spy` recordings and LLVM disassembly guided the changes in
+[jsonmodem b0f3190](https://github.com/friel-openai/jsonmodem/tree/b0f3190fb72af0396d9d25256f8d0174efd7ae23).
+Separate CPU and allocation profiles check that final build's remaining
+costs. Profiles identify work to investigate; the [unprofiled benchmarks](PERFORMANCE_36H.md)
+measure speed.
 
-## Changes informed by profiles
+## Changes guided by earlier profiles
 
 Completed recordings and `llvm-objdump` output showed an empty-prefix copy
 call and an unnecessary plain-text scan between consecutive JSON escapes.
@@ -30,42 +31,130 @@ uses Rust's bulk character count on a checked prefix. It retains the old
 calculation for offsets that split a character or exceed the input. Separate
 Memray comparisons found no allocation reduction from this change.
 
-## Remaining costs
+## Final-build CPU profiles
 
-Earlier decoder recordings identified Python string construction,
-dictionary-key lookup, and list insertion. Cache and batching prototypes
-regressed other cases and were not retained. These costs warrant another
-profile of the final build, not an assumption that more caching will help.
+The follow-up uses `py-spy` 0.4.2 with a requested rate of 19 samples per
+second, CPython 3.12.13 and CPU 16. Each worker performs ten warmups, disables cyclic GC during a
+32-second loop, and releases results inside that loop. It compares the final
+build, orjson 3.11.9, and selected cases from the unchanged PR #3 rebuild.
+The [profile data](data/final-profiles-2026-08-30/cpu.json) includes every
+completed recording, sampling-error count and failed attempt.
 
-After the NumPy byte-buffer change, large-array profiles still showed calendar
-conversion and per-timestamp appends. The final Python bytes allocation and
-copy appeared in only 1-2% of operation samples. Small arrays instead showed
-repeated helper imports, metadata checks, and snapshot creation. These
-observations precede the digit-pair change; a follow-up must recheck the costs
-and preserve owning snapshots and validation.
+A sample records the functions active at one instant. The counts below
+describe samples containing a function or a function it called. Counts can
+overlap; they are not separate function times or predicted speedups.
 
-The error-position follow-up suggests that `JSONDecodeError.__init__`,
-including its newline count, is worth investigating. However, that sampler
-wrote its recording and then exited with `ECHILD`: it could not collect a
-successful child-process exit status. This is diagnostic evidence, not a
-successful profiling run or proof of the final build's bottleneck. An earlier
-failed attempt produced no recording. Neither failure counts as a passing run.
+- **Object decoding:** `twitter` has 590 operation samples. `Decoder::key`
+  appears in 111, PyO3 string construction in 105, and dictionary insertion
+  in 88. Key lookup and Python object construction remain substantial work.
+- **Object encoding:** `twitter` has 575 operation samples. The owning PyO3
+  dictionary iterator appears in 135, `Encoder::key` in 94, and string
+  scanning in 82. Avoiding iterator work must not weaken ownership or
+  callback-mutation handling.
+- **Number encoding:** `canada` has 670 operation samples. zmij's float
+  formatter appears in 355; `Encoder::extend<false>` appears in 87.
+  `zmij::Buffer` is already an inline 24-byte array. Moving it into an encoder
+  field would not remove a heap allocation per number. Formatting and output
+  appends are the observed costs, not evidence that another buffer will win.
+- **Number decoding:** `canada` has 621 operation samples, with list append
+  in 135, `parse_double` in 93, and number-token scanning in 45. This capture
+  reports six sampling errors. Decimal conversion is not the only cost.
+- **Early errors:** rejecting a syntax error at the start of a 1 MiB input
+  has 606 operation samples. `json_decode_error` appears in 405, Python
+  string construction in 399, and Rust UTF-8 validation in 191. The first
+  two overlap in 397 samples. Constructing the exception's source string
+  still processes a large input after the early syntax error is known.
 
-Final timing also found slower early-error and large-depth rejection. A
-separate non-PGO rebuild of the preceding combined source had already shown
-the same slower pattern, before the error-position change. These inputs never
-reach the changed escape decoder, and their error positions are zero or
-1,024. Full-input UTF-8 validation in `decode_bytes` and Python source-string
-creation in `json_decode_error` are useful profiling targets. Neither is an
-established cause of the regression; source inspection adds no new full-input
-operation on those cases. The final report retains the losses.
+Long plain-string decoding also samples string scanning, Python string
+construction and UTF-8 validation in both the final and unchanged builds.
+One recording per build does not explain the measured regression. Earlier
+rebuilds already showed slower early-error rejection before the error-position
+change. The [timing report](PERFORMANCE_36H.md) retains those losses; neither
+profiling nor source inspection establishes their cause.
+
+## Final-build allocation profiles
+
+Memray 1.20.0 records native stacks for `citm_catalog`, `twitter` and `mesh`,
+both loads and dumps. Each library uses three fresh processes per case,
+one tracked complete call after ten warmups, with cyclic GC disabled and
+Python allocator tracing enabled. All 36 captures complete. Their request,
+requested-byte and tracked-peak totals match the corresponding published
+memory medians exactly, but these diagnostic captures do not replace that
+[memory comparison](data/final-2026-08-30/MEMORY_PUBLIC.md) or its separate RSS measurements.
+
+**Allocation requests per complete call; lower is better.** Bold marks the
+smaller value. Each count is the median of three native captures; all three
+observations agree.
+
+| Public document and operation | jsonmodem | orjson 3.11.9 |
+| --- | ---: | ---: |
+| `citm_catalog` loads | 51,213 | **49,014** |
+| `citm_catalog` dumps | 26 | **18** |
+| `twitter` loads | 11,551 | **9,237** |
+| `twitter` dumps | 27 | **17** |
+| `mesh` loads | 74,385 | **74,104** |
+| `mesh` dumps | 25 | **19** |
+
+For `mesh` decoding, stacks through PyO3's integer conversion account for
+34,654 requests; float construction accounts for 32,300. List append accounts
+for 3,877 requests and 5,306,528 requested bytes, including the full size of
+each reallocation. These counts agree in all three captures. The decoder
+allocates Python values and grows their lists; a number-scanning optimization
+alone would not remove that work.
+
+Encoding the same document makes only 25 requests, not one per number.
+The stacks include output-vector growth and the final Python bytes allocation.
+This supports investigating formatting and copying rather than assuming a
+heap allocation for every temporary number buffer. The [allocation data](data/final-profiles-2026-08-30/native-allocations.json)
+retains full stack groups and counts for both libraries. Individual function
+counts overlap and must not be summed; each allocation belongs to one full
+stack group.
+
+## Further experiments
+
+These are questions for another measured change, not additional retained code:
+
+- Test whether the existing SIMD UTF-8 validator helps large ASCII inputs,
+  while keeping small, non-ASCII and invalid-input controls. The current
+  selection already uses SIMD for long inputs with early non-ASCII bytes.
+- Separate dictionary iteration from escaping costs while preserving owned
+  references and callback behavior. Earlier cache and borrowing prototypes
+  remain [rejected](PERFORMANCE_EXPERIMENTS.md).
+- Any new number-output design must address the measured formatting or append
+  costs and beat the earlier [staging-buffer experiments](OUTPUT_BUFFERS.md).
+  Reusing zmij's stack buffer is not an allocation reduction by itself.
+
+The earlier NumPy recordings also suggest calendar conversion, repeated
+helper imports and snapshot creation as targets. They predate the final
+digit-pair change, so those costs need a fresh profile before another change.
+Owning snapshots and calendar checks must remain.
 
 ## Limits
 
-Samples were recorded in Speedscope format. Counts describe overlapping
-stacks, not additive function times or throughput. Some native symbols were
-unresolved. Higher-rate NumPy recordings had lag or shutdown failures; the
-successful 19 Hz recordings support the attribution above instead.
+Eighteen of the twenty planned CPU recordings complete with independently
+collected sampler and workload exit statuses of zero. Fifteen report no
+sampling errors.
+Final `citm_catalog` dumps reports two, final `canada` loads six, and orjson
+`canada` dumps 160. The underlying sampling-error messages are unavailable.
+The orjson `canada` dumps recording is unsuitable for comparing function costs.
+
+The final late-error sampler saves data, then exits unsuccessfully with
+`ECHILD`; its workload is independently collected with exit zero. The saved
+data remains a failed diagnostic, and the planned orjson late-error recording
+is not run. An earlier denied attachment and earlier NumPy/error-profile
+failures are also retained, not counted as successful recordings.
+
+The orjson wheel provides no C/Rust source attribution in the CPU samples.
+Some CPython executable labels are implausible; precise claims above use
+verifiable source-qualified callers instead. A successful sampler exit or
+nonempty native stack does not prove that every frame is resolved correctly.
+
+The first native-Memray attempt stops because its strict stderr check rejects
+warnings about correcting malloc/free function addresses. That attempt remains
+failed. A separate run accepts only the source-reviewed correction messages from
+the pinned Memray build, retaining the raw warnings. All 36 captures emit that
+pair; other diagnostics and nonzero exits remain errors. Hook correction is
+not proof that every allocation or native frame was captured correctly.
 
 CPU affinity was controlled, but the machine was not exclusive and CPU
 frequency was not fixed. Hardware performance counters were unavailable.
