@@ -37,6 +37,40 @@ fn parse_double(text: &str) -> Result<f64, lexical_parse_float::Error> {
     f64::from_lexical(text.as_bytes())
 }
 
+/// Borrow text from an owned string, using inline ASCII storage on supported
+/// builds.
+#[inline]
+fn string_text<'value>(value: &'value Bound<'_, PyString>) -> PyResult<&'value str> {
+    #[cfg(all(
+        Py_3_12,
+        not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+        not(py_sys_config = "Py_TRACE_REFS"),
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64",
+        target_endian = "little",
+    ))]
+    if value.is_exact_instance_of::<PyString>() {
+        // SAFETY: value owns an exact CPython str while the GIL is held. In the
+        // selected ABI, compact ASCII has initialized, immutable ASCII data of
+        // GET_LENGTH bytes. PyO3 computes its address for that ABI, including
+        // empty strings. The returned view cannot outlive the owning reference.
+        unsafe {
+            let pointer = value.as_ptr();
+            if pyo3::ffi::PyUnicode_IS_COMPACT_ASCII(pointer) != 0 {
+                if let Ok(length) = usize::try_from(pyo3::ffi::PyUnicode_GET_LENGTH(pointer)) {
+                    let bytes = std::slice::from_raw_parts(
+                        pyo3::ffi::PyUnicode_1BYTE_DATA(pointer),
+                        length,
+                    );
+                    return Ok(std::str::from_utf8_unchecked(bytes));
+                }
+            }
+        }
+    }
+    value.to_str()
+}
+
 /// Explicit raw output, retaining its owner without parsing or placeholder
 /// substitution.
 #[pyclass(module = "jsonmodem", frozen)]
@@ -539,9 +573,7 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                 return Ok(());
             }
         }
-        let text = key
-            .to_str()
-            .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
+        let text = string_text(key).map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
         let start = self.output.len();
         self.string(text)?;
         if cache && self.keys.len() < 16 && text.len() <= 64 {
@@ -614,9 +646,7 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
             self.extend(b"null")?;
         } else if let Ok(string) = value.downcast_exact::<PyString>() {
             self.string(
-                string
-                    .to_str()
-                    .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?,
+                string_text(string).map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?,
             )?;
         } else if let Ok(boolean) = value.downcast_exact::<PyBool>() {
             self.extend(if boolean.is_true() { b"true" } else { b"false" })?;
@@ -865,9 +895,8 @@ pub fn dumps(
         return Err(PyTypeError::new_err("unsupported option bits"));
     }
     let root_string = if let Ok(string) = obj.downcast_exact::<PyString>() {
-        let text = string
-            .to_str()
-            .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
+        let text =
+            string_text(string).map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
         if text.len() >= INITIAL_OUTPUT_CAPACITY {
             return dump_long_string(py, text, flags);
         }
