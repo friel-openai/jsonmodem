@@ -452,6 +452,16 @@ pub fn _dumps_objects(
         option,
         base_depth: 0,
         dataclass_root: false,
+        #[cfg(all(
+            Py_3_12,
+            not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+            not(any(py_sys_config = "Py_TRACE_REFS", py_sys_config = "Py_REF_DEBUG")),
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64",
+            target_endian = "little",
+        ))]
+        integer_layout: super::IntegerLayout::Unchecked,
         keys: Vec::new(),
     };
     encoder.reserve(INITIAL_OUTPUT_CAPACITY)?;

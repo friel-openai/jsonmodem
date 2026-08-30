@@ -1,6 +1,19 @@
 //! Complete-document operations: no streaming events and no Python
 //! preprocessing.
 
+#[cfg_attr(
+    not(all(
+        Py_3_12,
+        not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+        not(any(py_sys_config = "Py_TRACE_REFS", py_sys_config = "Py_REF_DEBUG")),
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64",
+        target_endian = "little",
+    )),
+    allow(dead_code)
+)]
+mod integer;
 mod objects;
 
 #[cfg(all(
@@ -16,6 +29,7 @@ mod borrowed_dict;
 
 use std::{borrow::Cow, collections::HashMap, ops::Range};
 
+use integer::Integer;
 use jsonmodem::document::{DocumentError, DocumentReader, IntegerToken, plain_string_prefix};
 use lexical_parse_float::FromLexical;
 pub use objects::_dumps_objects;
@@ -392,6 +406,78 @@ fn decode_bytes(py: Python<'_>, bytes: &[u8]) -> PyResult<PyObject> {
     decode(py, input)
 }
 
+/// Cached storage check. Only copy_integer may record a checked result.
+#[cfg(all(
+    Py_3_12,
+    not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+    not(any(py_sys_config = "Py_TRACE_REFS", py_sys_config = "Py_REF_DEBUG")),
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64",
+    target_endian = "little",
+))]
+#[repr(u8)]
+enum IntegerLayout {
+    Unchecked,
+    Supported,
+    Fallback,
+}
+
+/// Copy an owned exact integer only on the reviewed CPython layout.
+#[cfg(all(
+    Py_3_12,
+    not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+    not(any(py_sys_config = "Py_TRACE_REFS", py_sys_config = "Py_REF_DEBUG")),
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64",
+    target_endian = "little",
+))]
+#[inline(always)]
+fn copy_integer(value: &Bound<'_, PyInt>, layout: &mut IntegerLayout) -> Option<Integer> {
+    /// Excluding digits avoids a padded struct read beyond a small allocation.
+    #[repr(C)]
+    struct IntegerPrefix {
+        _header: pyo3::ffi::PyObject,
+        tag: usize,
+    }
+
+    if !value.is_exact_instance_of::<PyInt>() {
+        return None;
+    }
+    let layout_matches = match layout {
+        IntegerLayout::Unchecked => {
+            let expected_offset = isize::try_from(std::mem::size_of::<IntegerPrefix>()).ok()?;
+            let integer_type = std::ptr::addr_of!(pyo3::ffi::PyLong_Type);
+            // SAFETY: Bound keeps Python attached to the GIL. These built-in
+            // fields are the first digit's offset and sizeof(digit). The type
+            // is immutable; no ordinary callback can change this cached result.
+            let matches = unsafe {
+                (*integer_type).tp_basicsize == expected_offset && (*integer_type).tp_itemsize == 4
+            };
+            *layout = if matches {
+                IntegerLayout::Supported
+            } else {
+                IntegerLayout::Fallback
+            };
+            matches
+        }
+        IntegerLayout::Supported => true,
+        IntegerLayout::Fallback => false,
+    };
+    let tag = value
+        .as_ptr()
+        .cast::<u8>()
+        .wrapping_add(std::mem::offset_of!(IntegerPrefix, tag))
+        .cast::<usize>();
+    // SAFETY: Bound retains an exact immutable int under the GIL. The selected
+    // ABI provides the initialized tag, and the cached metadata check proves
+    // the following digits' offset and width. Each counted digit is initialized
+    // and below 2^30. The helper reads no digit for zero or an unsupported count,
+    // makes no Python call, and retains no pointer. A false layout reads nothing.
+    unsafe { integer::read_integer(tag, layout_matches) }
+}
+
 /// Return a signed integer, or select unsigned conversion without an exception.
 #[inline(always)]
 fn signed_integer(value: &Bound<'_, PyInt>) -> PyResult<Option<i64>> {
@@ -444,6 +530,16 @@ struct Encoder<const CHECKED: bool = false> {
     base_depth: usize,
     // Dataclasses retain field order and check depth before counting their object.
     dataclass_root: bool,
+    #[cfg(all(
+        Py_3_12,
+        not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+        not(any(py_sys_config = "Py_TRACE_REFS", py_sys_config = "Py_REF_DEBUG")),
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64",
+        target_endian = "little",
+    ))]
+    integer_layout: IntegerLayout,
     // Retained owners make identity-based reuse safe for the whole call.
     keys: Vec<(Py<PyString>, Range<usize>)>,
 }
@@ -517,6 +613,16 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
             option: self.option,
             base_depth: self.base_depth,
             dataclass_root: self.dataclass_root,
+            #[cfg(all(
+                Py_3_12,
+                not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+                not(any(py_sys_config = "Py_TRACE_REFS", py_sys_config = "Py_REF_DEBUG")),
+                target_os = "linux",
+                target_arch = "x86_64",
+                target_pointer_width = "64",
+                target_endian = "little",
+            ))]
+            integer_layout: self.integer_layout,
             keys: self.keys,
         }
     }
@@ -682,6 +788,29 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
     }
 
     #[inline(always)]
+    fn integer(&mut self, value: &Bound<'_, PyInt>) -> PyResult<Integer> {
+        #[cfg(all(
+            Py_3_12,
+            not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+            not(any(py_sys_config = "Py_TRACE_REFS", py_sys_config = "Py_REF_DEBUG")),
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64",
+            target_endian = "little",
+        ))]
+        if let Some(integer) = copy_integer(value, &mut self.integer_layout) {
+            return Ok(integer);
+        }
+        if let Some(integer) = signed_integer(value)? {
+            Ok(Integer::Signed(integer))
+        } else {
+            let integer = unsigned_integer(value)
+                .map_err(|_| PyTypeError::new_err("Integer exceeds 64-bit range"))?;
+            Ok(Integer::Unsigned(integer))
+        }
+    }
+
+    #[inline(always)]
     fn scalar(&mut self, value: &Bound<'_, PyAny>) -> PyResult<bool> {
         if value.is_none() {
             self.extend(b"null")?;
@@ -693,20 +822,21 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
             self.extend(if boolean.is_true() { b"true" } else { b"false" })?;
         } else if let Ok(value) = value.downcast_exact::<PyInt>() {
             let mut buffer = itoa::Buffer::new();
-            if let Some(integer) = signed_integer(value)? {
-                if self.option & STRICT_INTEGER != 0
-                    && !(-9_007_199_254_740_991..=9_007_199_254_740_991).contains(&integer)
-                {
-                    return Err(PyTypeError::new_err("Integer exceeds 53-bit range"));
+            match self.integer(value)? {
+                Integer::Signed(integer) => {
+                    if self.option & STRICT_INTEGER != 0
+                        && !(-9_007_199_254_740_991..=9_007_199_254_740_991).contains(&integer)
+                    {
+                        return Err(PyTypeError::new_err("Integer exceeds 53-bit range"));
+                    }
+                    self.extend(buffer.format(integer).as_bytes())?;
                 }
-                self.extend(buffer.format(integer).as_bytes())?;
-            } else {
-                let integer = unsigned_integer(value)
-                    .map_err(|_| PyTypeError::new_err("Integer exceeds 64-bit range"))?;
-                if self.option & STRICT_INTEGER != 0 && integer > 9_007_199_254_740_991 {
-                    return Err(PyTypeError::new_err("Integer exceeds 53-bit range"));
+                Integer::Unsigned(integer) => {
+                    if self.option & STRICT_INTEGER != 0 && integer > 9_007_199_254_740_991 {
+                        return Err(PyTypeError::new_err("Integer exceeds 53-bit range"));
+                    }
+                    self.extend(buffer.format(integer).as_bytes())?;
                 }
-                self.extend(buffer.format(integer).as_bytes())?;
             }
         } else if let Ok(float) = value.downcast_exact::<PyFloat>() {
             let number = float.value();
@@ -923,6 +1053,16 @@ fn dump_long_string(py: Python<'_>, text: &str, flags: i32) -> PyResult<PyObject
         option: flags,
         base_depth: 0,
         dataclass_root: false,
+        #[cfg(all(
+            Py_3_12,
+            not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+            not(any(py_sys_config = "Py_TRACE_REFS", py_sys_config = "Py_REF_DEBUG")),
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64",
+            target_endian = "little",
+        ))]
+        integer_layout: IntegerLayout::Unchecked,
         keys: Vec::new(),
     };
     encoder.output.push(b'"');
@@ -970,6 +1110,16 @@ pub fn dumps(
         option: flags,
         base_depth: 0,
         dataclass_root: false,
+        #[cfg(all(
+            Py_3_12,
+            not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+            not(any(py_sys_config = "Py_TRACE_REFS", py_sys_config = "Py_REF_DEBUG")),
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64",
+            target_endian = "little",
+        ))]
+        integer_layout: IntegerLayout::Unchecked,
         keys: Vec::new(),
     };
     let encoded = if let Some(text) = root_string {
@@ -1003,6 +1153,16 @@ pub fn _dumps_fields(
         option,
         base_depth: depth,
         dataclass_root: true,
+        #[cfg(all(
+            Py_3_12,
+            not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+            not(any(py_sys_config = "Py_TRACE_REFS", py_sys_config = "Py_REF_DEBUG")),
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64",
+            target_endian = "little",
+        ))]
+        integer_layout: IntegerLayout::Unchecked,
         keys: Vec::new(),
     };
     if encoder.value(fields.as_any())? {

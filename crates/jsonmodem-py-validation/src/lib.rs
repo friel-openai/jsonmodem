@@ -1,5 +1,12 @@
 //! Tests Rust dependencies used by the Python bindings without linking Python.
 
+#[cfg(all(test, target_pointer_width = "64"))]
+#[path = "../../jsonmodem-py/src/compat/integer.rs"]
+mod integer;
+
+#[cfg(all(test, target_pointer_width = "64"))]
+mod integer_tests;
+
 #[cfg(test)]
 mod tests {
     fn report_features() {
