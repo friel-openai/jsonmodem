@@ -16,6 +16,7 @@ mod escape_mask;
 )]
 mod integer;
 mod objects;
+mod validate;
 
 #[cfg(all(
     Py_3_12,
@@ -336,6 +337,10 @@ fn decode(py: Python<'_>, input: &str) -> PyResult<PyObject> {
         keys: None,
         cache_keys: input.len() >= 1024,
     };
+    if validate::has_invalid_container_ending(input) {
+        decoder.validate_without_values()?;
+        decoder.reader = DocumentReader::new(input);
+    }
     let value = decoder.value()?;
     if decoder.reader.peek().is_some() {
         return Err(decoder.fail("unexpected content after document"));
