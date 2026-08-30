@@ -17,6 +17,17 @@ failures surface while the context is still fresh. Keeping the local workspace
 green makes it easier to hand off high-quality changes and prevents last-minute
 surprises when preparing a PR.
 
+Rustfmt uses the dated toolchain in `.agent/rustfmt-toolchain`. CI and
+`.agent/check.sh` read the same pin; `.agent/setup.sh` installs it. Nightly
+Rustfmt can change comment wrapping without source changes, so update this
+pin deliberately rather than using the current nightly. The compiler, Miri,
+and fuzzing toolchains are configured separately. To check formatting without
+rewriting files, run:
+
+```bash
+cargo +"$(cat .agent/rustfmt-toolchain)" fmt --all -- --check
+```
+
 The `setup.sh` script installs the stable and nightly toolchains as well as
 Clang 19 and the `llvm-tools-preview` component, which provide `llvm-nm` and
 other utilities required to build the fuzz crate. When new development tools are

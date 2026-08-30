@@ -10,9 +10,15 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import sys
 import time
 
 import orjson
+
+# Python's safe-path mode omits the script directory from module lookup.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from allocation_stats import summarize_allocations
 
 spec = importlib.util.spec_from_file_location(
     "bench_orjson_compat", Path(__file__).with_name("bench_orjson_compat.py")
@@ -133,19 +139,14 @@ def main():
 
             with memray.Tracker(args.output, native_traces=True, trace_python_allocators=True):
                 run()
-            reader = memray.FileReader(args.output)
-            events = allocated = 0
-            for record in reader.get_allocation_records():
-                if record.size > 0:
-                    events += record.n_allocations
-                    allocated += record.size
-            peak = sum(record.size for record in reader.get_high_watermark_allocation_records())
+            summary = summarize_allocations(args.output)
             result = {"module": args.module, "version": module.__version__,
                       "module_file": module.__file__, "gc_disabled": True,
                       "workload": args.workload, "input_type": type(value).__name__,
                       "calls": args.calls,
-                      "allocation_events": events, "allocated_bytes": allocated,
-                      "peak_live_bytes": peak}
+                      "allocation_events": summary["allocation_requests"],
+                      "allocated_bytes": summary["total_allocated_bytes"],
+                      "peak_live_bytes": summary["peak_live_bytes"]}
             Path(args.output + ".json").write_text(json.dumps(result, indent=2) + "\n")
             print(json.dumps(result))
     finally:

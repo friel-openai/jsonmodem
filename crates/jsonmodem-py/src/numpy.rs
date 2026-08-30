@@ -1,8 +1,6 @@
 //! NumPy formatting from checked immutable bytes, without borrowing NumPy
 //! memory.
 
-use std::io::Write;
-
 use chrono::{Datelike, NaiveDate, NaiveDateTime, Timelike};
 use pyo3::{exceptions::PyTypeError, prelude::*, types::PyBytes};
 
@@ -60,27 +58,56 @@ fn datetime(value: i64, unit: &str) -> PyResult<NaiveDateTime> {
     Ok(result)
 }
 
+/// Encode a checked value below 100 as two zero-padded ASCII digits.
+#[inline]
+fn two_digits(value: u32) -> [u8; 2] {
+    const DIGIT_PAIRS: [[u8; 2]; 100] = [
+        *b"00", *b"01", *b"02", *b"03", *b"04", *b"05", *b"06", *b"07", *b"08", *b"09", *b"10",
+        *b"11", *b"12", *b"13", *b"14", *b"15", *b"16", *b"17", *b"18", *b"19", *b"20", *b"21",
+        *b"22", *b"23", *b"24", *b"25", *b"26", *b"27", *b"28", *b"29", *b"30", *b"31", *b"32",
+        *b"33", *b"34", *b"35", *b"36", *b"37", *b"38", *b"39", *b"40", *b"41", *b"42", *b"43",
+        *b"44", *b"45", *b"46", *b"47", *b"48", *b"49", *b"50", *b"51", *b"52", *b"53", *b"54",
+        *b"55", *b"56", *b"57", *b"58", *b"59", *b"60", *b"61", *b"62", *b"63", *b"64", *b"65",
+        *b"66", *b"67", *b"68", *b"69", *b"70", *b"71", *b"72", *b"73", *b"74", *b"75", *b"76",
+        *b"77", *b"78", *b"79", *b"80", *b"81", *b"82", *b"83", *b"84", *b"85", *b"86", *b"87",
+        *b"88", *b"89", *b"90", *b"91", *b"92", *b"93", *b"94", *b"95", *b"96", *b"97", *b"98",
+        *b"99",
+    ];
+    debug_assert!(value < 100);
+    DIGIT_PAIRS[value as usize]
+}
+
 fn write_datetime(output: &mut Vec<u8>, value: i64, unit: &str, option: i32) -> PyResult<()> {
     let date = datetime(value, unit)?;
-    write!(
-        output,
-        "\"{:04}-{:02}-{:02}T{:02}:{:02}:{:02}",
-        date.year(),
-        date.month(),
-        date.day(),
-        date.hour(),
-        date.minute(),
-        date.second()
-    )
-    .expect("Vec write");
+    let mut text = *b"\"0000-00-00T00:00:00.000000+00:00\"";
+    let year = date.year() as u32;
+    text[1..3].copy_from_slice(&two_digits(year / 100));
+    text[3..5].copy_from_slice(&two_digits(year % 100));
+    text[6..8].copy_from_slice(&two_digits(date.month()));
+    text[9..11].copy_from_slice(&two_digits(date.day()));
+    text[12..14].copy_from_slice(&two_digits(date.hour()));
+    text[15..17].copy_from_slice(&two_digits(date.minute()));
+    text[18..20].copy_from_slice(&two_digits(date.second()));
+    let mut end = 20;
+    // datetime() constructs epoch-based or midnight values, never leap seconds.
     let micros = date.nanosecond() / 1000;
     if micros != 0 && option & 8 == 0 {
-        write!(output, ".{micros:06}").expect("Vec write");
+        text[21..23].copy_from_slice(&two_digits(micros / 10_000));
+        text[23..25].copy_from_slice(&two_digits(micros / 100 % 100));
+        text[25..27].copy_from_slice(&two_digits(micros % 100));
+        end = 27;
     }
     if option & 2 != 0 {
-        output.extend_from_slice(if option & 128 != 0 { b"Z" } else { b"+00:00" });
+        if option & 128 != 0 {
+            text[end] = b'Z';
+            end += 1;
+        } else {
+            text[end..end + 6].copy_from_slice(b"+00:00");
+            end += 6;
+        }
     }
-    output.push(b'"');
+    text[end] = b'"';
+    output.extend_from_slice(&text[..end + 1]);
     Ok(())
 }
 

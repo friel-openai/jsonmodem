@@ -15,6 +15,11 @@ import subprocess
 import sys
 import time
 
+# Python's safe-path mode omits the script directory from module lookup.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from allocation_stats import summarize_allocations
+
 
 def workloads(orjson):
     rng = random.Random(4813)
@@ -117,20 +122,16 @@ def profile(args):
     finally:
         if gc_enabled:
             gc.enable()
-    reader = memray.FileReader(args.output)
-    events = allocated = 0
-    for record in reader.get_allocation_records():
-        if record.size > 0:
-            events += record.n_allocations
-            allocated += record.size
+    summary = summarize_allocations(args.output)
     result = {
         "package": module.__file__ if args.module == "jsonmodem" else orjson.__file__,
         "jsonmodem_package": module.__file__, "module": args.module, "case": name,
         "python": platform.python_version(), "orjson": orjson.__version__, "calls": args.calls,
         "hash_seed": os.environ.get("PYTHONHASHSEED"),
         "gc_disabled": True,
-        "allocation_events": events, "allocated_bytes": allocated,
-        "peak_live_bytes": sum(record.size for record in reader.get_high_watermark_allocation_records()),
+        "allocation_events": summary["allocation_requests"],
+        "allocated_bytes": summary["total_allocated_bytes"],
+        "peak_live_bytes": summary["peak_live_bytes"],
     }
     Path(args.output + ".json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps(result))

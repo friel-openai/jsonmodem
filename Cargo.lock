@@ -538,6 +538,7 @@ dependencies = [
  "jsonmodem",
  "lexical-parse-float",
  "pyo3",
+ "pyo3-build-config",
  "simdutf8",
  "smallvec",
  "zmij",

@@ -1,0 +1,238 @@
+{
+  "schema_version": 1,
+  "name": "public-json-parser-corpus-v1",
+  "selection": "Selected before jsonmodem/orjson timings. These are existing parser benchmark documents, not a sample of all application traffic.",
+  "terms": {
+    "upstream-data-terms": {
+      "license": null,
+      "status": "Original data terms are unresolved. No redistribution permission is asserted.",
+      "note": "Download from upstream for local measurements. Publish metadata and results, not these documents. The simdjson-data README names benchmarking as an intended use and asks users to check each file's terms; a parser repository's software license is not a license for copied API responses or other third-party data.",
+      "evidence": [
+        "https://github.com/simdjson/simdjson-data/blob/4197c425e857f0ec38e89822fdd0bd9ea21f4daf/README.md"
+      ]
+    },
+    "chinese-poetry-mit": {
+      "license": "MIT",
+      "status": "The original data project declares MIT terms.",
+      "note": "yyjson_benchmark identifies chinese-poetry as the source. This file contains author biographies, not just ancient verse. The source project's declaration is recorded here; it is not an independent audit of every biography's origin. Keep the upstream notice with any redistributed data.",
+      "evidence": [
+        "https://github.com/ibireme/yyjson_benchmark/blob/aeefe6a44f37fccf1f9d730766abab9ffea43c6b/README.md",
+        "https://github.com/chinese-poetry/chinese-poetry/blob/b8594f81a89752241442f2ce267d6f66f96704ee/README.md",
+        "https://github.com/chinese-poetry/chinese-poetry/blob/b8594f81a89752241442f2ce267d6f66f96704ee/LICENSE"
+      ]
+    },
+    "noto-ofl": {
+      "license": "OFL-1.1",
+      "status": "The font's embedded name table explicitly states SIL Open Font License 1.1.",
+      "note": "An otfcc export of Noto Sans JP Regular 1.004. Copyright 2014, 2015 Adobe Systems Incorporated. Name-table entries 13 and 14 identify the license and its URL. No font data is committed to this repository.",
+      "evidence": [
+        "https://github.com/ibireme/yyjson_benchmark/blob/aeefe6a44f37fccf1f9d730766abab9ffea43c6b/README.md",
+        "https://github.com/ibireme/yyjson_benchmark/blob/aeefe6a44f37fccf1f9d730766abab9ffea43c6b/data/json/otfcc.json",
+        "https://openfontlicense.org/open-font-license-official-text/"
+      ]
+    }
+  },
+  "suites": {
+    "boost-json": {
+      "description": "Documents listed in Boost.JSON's parsing/serialization comparison with RapidJSON and nlohmann/json.",
+      "evidence": "https://github.com/boostorg/json/blob/e0e74f634194855b4daea49ed4016ef67aa38bff/doc/pages/benchmarks.adoc"
+    },
+    "simdjson-data": {
+      "description": "Additional documents from simdjson's public testing and benchmarking collection.",
+      "evidence": "https://github.com/simdjson/simdjson-data/blob/4197c425e857f0ec38e89822fdd0bd9ea21f4daf/README.md"
+    },
+    "yyjson": {
+      "description": "Documents listed in yyjson_benchmark's dataset table.",
+      "evidence": "https://github.com/ibireme/yyjson_benchmark/blob/aeefe6a44f37fccf1f9d730766abab9ffea43c6b/README.md"
+    }
+  },
+  "documents": [
+    {
+      "name": "apache_builds",
+      "filename": "apache_builds.json",
+      "description": "Apache Jenkins build metadata; nested objects and arrays.",
+      "suite": "boost-json",
+      "terms": "upstream-data-terms",
+      "url": "https://raw.githubusercontent.com/simdjson/simdjson-data/4197c425e857f0ec38e89822fdd0bd9ea21f4daf/jsonexamples/apache_builds.json",
+      "size_bytes": 127275,
+      "sha256": "f8e3422ac7d3c3550674afcb37e979e4e9bbeccffdb66933423495d55b6f5c74"
+    },
+    {
+      "name": "canada",
+      "filename": "canada.json",
+      "description": "Canada border coordinates; many short arrays of floating-point numbers. Also used by nativejson-benchmark, serde-rs/json-benchmark, and orjson.",
+      "suite": "boost-json",
+      "terms": "upstream-data-terms",
+      "url": "https://raw.githubusercontent.com/simdjson/simdjson-data/4197c425e857f0ec38e89822fdd0bd9ea21f4daf/jsonexamples/canada.json",
+      "size_bytes": 2251051,
+      "sha256": "f83b3b354030d5dd58740c68ac4fecef64cb730a0d12a90362a7f23077f50d78"
+    },
+    {
+      "name": "citm_catalog",
+      "filename": "citm_catalog.json",
+      "description": "Indented catalog with repeated keys, integers, strings, and nested containers. Also used by nativejson-benchmark, serde-rs/json-benchmark, and orjson.",
+      "suite": "boost-json",
+      "terms": "upstream-data-terms",
+      "url": "https://raw.githubusercontent.com/simdjson/simdjson-data/4197c425e857f0ec38e89822fdd0bd9ea21f4daf/jsonexamples/citm_catalog.json",
+      "size_bytes": 1727204,
+      "sha256": "a73e7a883f6ea8de113dff59702975e60119b4b58d451d518a929f31c92e2059"
+    },
+    {
+      "name": "github_events",
+      "filename": "github_events.json",
+      "description": "GitHub API events; an array of nested records.",
+      "suite": "boost-json",
+      "terms": "upstream-data-terms",
+      "url": "https://raw.githubusercontent.com/simdjson/simdjson-data/4197c425e857f0ec38e89822fdd0bd9ea21f4daf/jsonexamples/github_events.json",
+      "size_bytes": 65132,
+      "sha256": "c9eebb2cf2d46649059e9d48700919bacb3e8e0fb58452065a1a9de7778fd22e"
+    },
+    {
+      "name": "google_maps_api_response",
+      "filename": "google_maps_api_response.json",
+      "description": "A smaller indented Google Maps API response.",
+      "suite": "simdjson-data",
+      "terms": "upstream-data-terms",
+      "url": "https://raw.githubusercontent.com/simdjson/simdjson-data/4197c425e857f0ec38e89822fdd0bd9ea21f4daf/jsonexamples/google_maps_api_response.json",
+      "size_bytes": 26102,
+      "sha256": "5d65343aa0ac05be6c1f4ed1d0147ed5bf3f1529fda54fca0e3e752fa418cbbd"
+    },
+    {
+      "name": "gsoc-2018",
+      "filename": "gsoc-2018.json",
+      "description": "Google Summer of Code metadata with longer ASCII strings.",
+      "suite": "boost-json",
+      "terms": "upstream-data-terms",
+      "url": "https://raw.githubusercontent.com/simdjson/simdjson-data/4197c425e857f0ec38e89822fdd0bd9ea21f4daf/jsonexamples/gsoc-2018.json",
+      "size_bytes": 3327831,
+      "sha256": "72f1ef4898d88049da856c2ab8f4ec3e2c968ce209b2bbfd16cef842eb2e185f"
+    },
+    {
+      "name": "instruments",
+      "filename": "instruments.json",
+      "description": "Financial instrument metadata with large objects.",
+      "suite": "boost-json",
+      "terms": "upstream-data-terms",
+      "url": "https://raw.githubusercontent.com/simdjson/simdjson-data/4197c425e857f0ec38e89822fdd0bd9ea21f4daf/jsonexamples/instruments.json",
+      "size_bytes": 220346,
+      "sha256": "f3069235d4e2695d36c0c7735a435a7abb279fc4d64bbcf4ed9f888b8da1fdb9"
+    },
+    {
+      "name": "marine_ik",
+      "filename": "marine_ik.json",
+      "description": "A three.js model with numeric arrays and nested metadata.",
+      "suite": "boost-json",
+      "terms": "upstream-data-terms",
+      "url": "https://raw.githubusercontent.com/simdjson/simdjson-data/4197c425e857f0ec38e89822fdd0bd9ea21f4daf/jsonexamples/marine_ik.json",
+      "size_bytes": 2983466,
+      "sha256": "61590a397542ae274ccd8a47ba9f64e7c9216a223a5e7e702dea5b2375411d62"
+    },
+    {
+      "name": "mesh",
+      "filename": "mesh.json",
+      "description": "A compact 3D mesh with floating-point numbers.",
+      "suite": "boost-json",
+      "terms": "upstream-data-terms",
+      "url": "https://raw.githubusercontent.com/simdjson/simdjson-data/4197c425e857f0ec38e89822fdd0bd9ea21f4daf/jsonexamples/mesh.json",
+      "size_bytes": 723597,
+      "sha256": "45bc8bf429340a874a7af8ea7056d60497402f80f55dba1e6ecc4ca8f1e46aff"
+    },
+    {
+      "name": "numbers",
+      "filename": "numbers.json",
+      "description": "An array containing only floating-point numbers.",
+      "suite": "boost-json",
+      "terms": "upstream-data-terms",
+      "url": "https://raw.githubusercontent.com/simdjson/simdjson-data/4197c425e857f0ec38e89822fdd0bd9ea21f4daf/jsonexamples/numbers.json",
+      "size_bytes": 150124,
+      "sha256": "82e9ddfe00963110ed8a0704e7df4d1ad1af9c0f336d1b24431ebc63cf430a2b"
+    },
+    {
+      "name": "random",
+      "filename": "random.json",
+      "description": "Mixed data with many Cyrillic characters.",
+      "suite": "boost-json",
+      "terms": "upstream-data-terms",
+      "url": "https://raw.githubusercontent.com/simdjson/simdjson-data/4197c425e857f0ec38e89822fdd0bd9ea21f4daf/jsonexamples/random.json",
+      "size_bytes": 510476,
+      "sha256": "61a3544f2bc987b7378c66a9025b1f23eb5456d4f0443595c06d6fc20f3b0a68"
+    },
+    {
+      "name": "semanticscholar-corpus",
+      "filename": "semanticscholar-corpus.json",
+      "description": "An array of academic metadata records, larger than the common Canada/CITM/Twitter cases.",
+      "suite": "simdjson-data",
+      "terms": "upstream-data-terms",
+      "url": "https://raw.githubusercontent.com/simdjson/simdjson-data/4197c425e857f0ec38e89822fdd0bd9ea21f4daf/jsonexamples/semanticscholar-corpus.json",
+      "size_bytes": 8593351,
+      "sha256": "fd3a31c604da2529c51f0124fa74e186781185d3f4aeb49c0af2f740ffb63db3"
+    },
+    {
+      "name": "tree-pretty",
+      "filename": "tree-pretty.json",
+      "description": "An indented tree of nested objects.",
+      "suite": "simdjson-data",
+      "terms": "upstream-data-terms",
+      "url": "https://raw.githubusercontent.com/simdjson/simdjson-data/4197c425e857f0ec38e89822fdd0bd9ea21f4daf/jsonexamples/tree-pretty.json",
+      "size_bytes": 34556,
+      "sha256": "2ad825c7b90213ea4c0793565ae747b8c9ece26e44d51d9702bfc0e5869f454e"
+    },
+    {
+      "name": "twitter",
+      "filename": "twitter.json",
+      "description": "Twitter API data with CJK characters. Also used by nativejson-benchmark, serde-rs/json-benchmark, and orjson; their copies can differ in whitespace.",
+      "suite": "boost-json",
+      "terms": "upstream-data-terms",
+      "url": "https://raw.githubusercontent.com/simdjson/simdjson-data/4197c425e857f0ec38e89822fdd0bd9ea21f4daf/jsonexamples/twitter.json",
+      "size_bytes": 631515,
+      "sha256": "30721e496a8d73cfc50658923c34eb2c0fbe15ee6835005e43ee624d8dedf200"
+    },
+    {
+      "name": "twitterescaped",
+      "filename": "twitterescaped.json",
+      "description": "Twitter data with Unicode escapes and less whitespace. Keep this distinct for loads; do not count identical dumps inputs twice.",
+      "suite": "boost-json",
+      "terms": "upstream-data-terms",
+      "url": "https://raw.githubusercontent.com/simdjson/simdjson-data/4197c425e857f0ec38e89822fdd0bd9ea21f4daf/jsonexamples/twitterescaped.json",
+      "size_bytes": 562408,
+      "sha256": "2a288b5af4691c55b6f40fa534225b3e08b8d8b7f7ca4ed29bc5c7c81566ed4a"
+    },
+    {
+      "name": "update-center",
+      "filename": "update-center.json",
+      "description": "Jenkins update-center metadata with strings and nested objects.",
+      "suite": "boost-json",
+      "terms": "upstream-data-terms",
+      "url": "https://raw.githubusercontent.com/simdjson/simdjson-data/4197c425e857f0ec38e89822fdd0bd9ea21f4daf/jsonexamples/update-center.json",
+      "size_bytes": 533178,
+      "sha256": "e7b6a037bfdb5abdf122fa3445ddfacea78522a23df31c4799884c4ebf4c01fa"
+    },
+    {
+      "name": "poet",
+      "filename": "poet.json",
+      "description": "Chinese author biographies; an array with long CJK strings.",
+      "suite": "yyjson",
+      "terms": "chinese-poetry-mit",
+      "url": "https://raw.githubusercontent.com/ibireme/yyjson_benchmark/aeefe6a44f37fccf1f9d730766abab9ffea43c6b/data/json/poet.json",
+      "size_bytes": 3512883,
+      "sha256": "2c2689a3b5df460f02e4dee2a36ac32cc27c43e2964fba7965eba3469bf617ec"
+    },
+    {
+      "name": "otfcc",
+      "filename": "otfcc.json",
+      "description": "A 66 MB Noto Sans JP font export with many nested numeric records.",
+      "suite": "yyjson",
+      "terms": "noto-ofl",
+      "url": "https://raw.githubusercontent.com/ibireme/yyjson_benchmark/aeefe6a44f37fccf1f9d730766abab9ffea43c6b/data/json/otfcc.json",
+      "size_bytes": 66409302,
+      "sha256": "7cbdeac112ab424d7cc94c99f675b2b0b4b0315055437725cd47648426c831df"
+    }
+  ],
+  "exclusions": [
+    "No third-party JSON documents are redistributed in this repository.",
+    "JSONTestSuite and similar malformed-input collections are correctness tests, not throughput baselines.",
+    "mesh.pretty.json is omitted because mesh.json already represents those values.",
+    "The yyjson fgo game-data export is omitted; the other selected documents provide a large-file contrast without it.",
+    "Compact Google Maps/Twitter API variants and repeated copies across parser repositories are omitted to avoid unnecessary weighting of the same content."
+  ]
+}

@@ -1,0 +1,4 @@
+# Keep generated observations separate from source changes during PR review.
+public-baseline-*/*.json linguist-generated=true
+supplemental-memory-*/*.json linguist-generated=true
+final-*/*.json linguist-generated=true

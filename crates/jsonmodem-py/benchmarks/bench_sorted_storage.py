@@ -10,6 +10,11 @@ import platform
 import random
 import sys
 
+# Python's safe-path mode omits the script directory from module lookup.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from allocation_stats import summarize_allocations
+
 spec = importlib.util.spec_from_file_location(
     "bench_output_buffers", Path(__file__).with_name("bench_output_buffers.py")
 )
@@ -91,15 +96,10 @@ def worker(args):
         finally:
             if enabled:
                 gc.enable()
-        reader = memray.FileReader(profile)
-        events = allocated = 0
-        for record in reader.get_allocation_records():
-            if record.size > 0:
-                events += record.n_allocations
-                allocated += record.size
-        peak = sum(record.size for record in reader.get_high_watermark_allocation_records())
-        result["cases"][name] = {"allocation_events": events, "allocated_bytes": allocated,
-                                 "peak_live_bytes": peak}
+        summary = summarize_allocations(profile)
+        result["cases"][name] = {"allocation_events": summary["allocation_requests"],
+                                 "allocated_bytes": summary["total_allocated_bytes"],
+                                 "peak_live_bytes": summary["peak_live_bytes"]}
     return result
 
 

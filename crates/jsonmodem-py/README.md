@@ -277,7 +277,9 @@ remaining tests.
 
 See the [Python performance report](benchmarks/PERFORMANCE.md) for streaming
 comparisons, complete-document comparisons with orjson, and CPU and allocation
-profiles. The [earlier report](benchmarks/PROFILE.md) covers performance after
+profiles. The [public-document and date/time report](benchmarks/PERFORMANCE_36H.md)
+has the latest complete-call timings, allocations, RSS and recorded regressions.
+The [earlier report](benchmarks/PROFILE.md) covers performance after
 PR #74 and the SIMD build experiments from that revision.
 
 Install `orjson`, build jsonmodem in release mode, and run:

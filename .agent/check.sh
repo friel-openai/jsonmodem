@@ -7,6 +7,7 @@ set -euo pipefail
 ###############################################################################
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 REPO_NAME="$(basename "${REPO_ROOT}")"
+RUSTFMT_TOOLCHAIN="$(cat "$REPO_ROOT/.agent/rustfmt-toolchain")"
 FUZZ_CRATE="${REPO_NAME}-fuzz"        # convention: <repo>-fuzz
 TIMING_LOG="$(mktemp -t pre-push.timings.XXXX)"
 trap 'rm -f "$TIMING_LOG"' EXIT
@@ -28,8 +29,8 @@ run_step() {
 ###############################################################################
 # 1. Formatting
 ###############################################################################
-run_step "rustfmt (apply)"  cargo +nightly fmt --all
-run_step "rustfmt (check)"  cargo +nightly fmt --all -- --check
+run_step "rustfmt (apply)"  cargo +"$RUSTFMT_TOOLCHAIN" fmt --all
+run_step "rustfmt (check)"  cargo +"$RUSTFMT_TOOLCHAIN" fmt --all -- --check
 
 ###############################################################################
 # 2. Build, test, lint (skip fuzz crate)

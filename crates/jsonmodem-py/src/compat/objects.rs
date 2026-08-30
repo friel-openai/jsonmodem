@@ -1,5 +1,7 @@
 //! Callback-aware serialization retains every item before invoking Python.
 
+mod datetime;
+
 use pyo3::{
     Borrowed,
     exceptions::PyTypeError,
@@ -310,44 +312,47 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                 container = Some(self.dict_items(value.downcast::<PyDict>()?)?);
             } else {
                 let value_type = value.get_type();
-                let datetime_or_uuid = self.datetime_types.iter().any(|kind| value_type.is(kind))
-                    || value_type.is(self.uuid_type);
-                let attributes = self.class_attributes(&value_type)?;
-                if !datetime_or_uuid
-                    && attributes.contains(intern!(py, "__dataclass_fields__"))?
-                    && !value.is_instance_of::<PyType>()
-                    && option & PASSTHROUGH_DATACLASS == 0
-                {
-                    container = Some(self.dataclass_items(&value, &attributes)?);
-                    limit += 1;
-                } else {
-                    let prepared = if datetime_or_uuid || option & SERIALIZE_NUMPY != 0 {
-                        self.special
-                            .call1((&value, option, self.default_provided, depth))?
+                let is_datetime = self.datetime_types.iter().any(|kind| value_type.is(kind));
+                if !(is_datetime && datetime::write(&mut self.encoder, &value)?) {
+                    let datetime_or_uuid = is_datetime || value_type.is(self.uuid_type);
+                    let attributes = self.class_attributes(&value_type)?;
+                    if !datetime_or_uuid
+                        && attributes.contains(intern!(py, "__dataclass_fields__"))?
+                        && !value.is_instance_of::<PyType>()
+                        && option & PASSTHROUGH_DATACLASS == 0
+                    {
+                        container = Some(self.dataclass_items(&value, &attributes)?);
+                        limit += 1;
                     } else {
-                        py.None().into_bound(py)
-                    };
-                    if prepared.is_none() {
-                        if default_depth == 255 {
-                            return Err(PyTypeError::new_err(
-                                "default serializer exceeds recursion limit",
-                            ));
+                        let prepared = if datetime_or_uuid || option & SERIALIZE_NUMPY != 0 {
+                            self.special
+                                .call1((&value, option, self.default_provided, depth))?
+                        } else {
+                            py.None().into_bound(py)
+                        };
+                        if prepared.is_none() {
+                            if default_depth == 255 {
+                                return Err(PyTypeError::new_err(
+                                    "default serializer exceeds recursion limit",
+                                ));
+                            }
+                            value = self.default_value(&value)?;
+                            default_depth += 1;
+                            continue;
                         }
-                        value = self.default_value(&value)?;
-                        default_depth += 1;
-                        continue;
-                    }
-                    let (encoded, replacement): (bool, Bound<'_, PyAny>) = prepared.extract()?;
-                    if encoded {
-                        let bytes = replacement.downcast_into::<PyBytes>()?;
-                        if depth == 0 && option & APPEND_NEWLINE == 0 {
-                            self.root_bytes = Some(bytes);
-                            return Ok(());
+                        let (encoded, replacement): (bool, Bound<'_, PyAny>) =
+                            prepared.extract()?;
+                        if encoded {
+                            let bytes = replacement.downcast_into::<PyBytes>()?;
+                            if depth == 0 && option & APPEND_NEWLINE == 0 {
+                                self.root_bytes = Some(bytes);
+                                return Ok(());
+                            }
+                            self.encoder.extend(bytes.as_bytes())?;
+                        } else {
+                            value = replacement;
+                            continue;
                         }
-                        self.encoder.extend(bytes.as_bytes())?;
-                    } else {
-                        value = replacement;
-                        continue;
                     }
                 }
             }

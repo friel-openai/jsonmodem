@@ -1,0 +1,2765 @@
+{
+  "schema_version": 1,
+  "kind": "Read-only comparison of saved native libraries and prior observations.",
+  "new_native_execution": false,
+  "tools": {
+    "readobj": {
+      "sha256": "2a04392038eeb51e223aa5db703bc02062f2830f9d587daf51d09fc40b02c1b0"
+    },
+    "objdump": {
+      "sha256": "659a47b2ef3a057867e521496d026de2f6d10e3eef4f4491e0cb3acda6388a15"
+    },
+    "nm": {
+      "sha256": "22d2e41b390685caed96d1ee5523e580e51040e6458c3bd64b5c3330515dba92"
+    },
+    "dwarfdump": {
+      "sha256": "07cf5eb367dcf51a8f462e046b08409fbe4a6fe60506fb0d4e5604db024873a1"
+    },
+    "git": {
+      "sha256": "d4d2ba562243015206d4248edfec871a74786499292d00ed072dbca2f5ae8073"
+    }
+  },
+  "llvm_objdump_version": "21.1.8-rust-1.94.1-stable",
+  "builds": {
+    "original": {
+      "revision": "b7fe329765f3e90064cc38f127d3594165116c71",
+      "native_sha256": "5b1ab812d74c1df4c60d87e3d194c29c140a179a5e7bd2948a4fb6ea61d11ebe",
+      "functions": {
+        "decode_bytes": {
+          "symbol": "_ZN10_jsonmodem6compat12decode_bytes17h0c3edf085dc3cf0dE",
+          "address": 420928,
+          "size": 211,
+          "body_sha256": "9dc7712b4a1c7e582e533eb037ca8863580d26b8135ac904705beb520c379652",
+          "body_hex": "41574156534883ec504889fb4883fa7f7643f30f6f06f30f6f4e10660febc8660fd7c185c0742e488b0522450800488b00488d7c24084989f74989d6ffd0807c24100275224889df4c89fe4c89f2e8bd8d0000eb59488d7c2438ff15d8420800807c2438007451488d357dfbfaff488d7c2408ba16000000b9010000004531c04531c9e8b848fefff30f6f442408f30f6f4c24180f10542428f30f7f4b180f115328f30f7f430848c703010000004883c4505b415e415fc3488b742440488b5424484889df4883c4505b415e415fe93d8d0000"
+        },
+        "json_decode_error": {
+          "symbol": "_ZN10_jsonmodem17json_decode_error17h1e0a1f4028260855E",
+          "address": 308608,
+          "size": 1397,
+          "body_sha256": "82322aaf6235faf37b65a0006b8bc0d9ddc721a7d987fd4bcc5d0606c40f07ce",
+          "body_hex": "554157415641554154534881ece80000004c89cb4d89c548894c24584989d44889f54989fe488dbc2498000000e8ceef03004c8bbc24a000000083bc249800000001751f0f109424a8000000f30f6f8c24b8000000f30f7e8424c8000000e9d90300004c896c245048895c2448488d3d37acfcffbe0f000000ff15d1f709004885c00f84fe0300004989c54c89ff4889c6ff15c9f709004889c34885c0741648895c2408498b450085c00f89a1000000e9d0000000488d7c2460ff1550f70900837c246001752e488b44246848894424080f10542470f30f6f8c2480000000f30f7e842490000000498b450085c07961e990000000bf10000000ff1518f709004885c00f8459030000488d0df43afdff48890848c740082d000000488d0d86db090066480f6ec166480f6ec8660f6cc8b803000000660f6ec00f2815e05bfcff48c744240800000000498b450085c0783448ffc849894500752b4c89ef660f7f4c2430660f7f4424200f29542410ff15acf609000f28542410660f6f442420660f6f4c2430498b0785c0780c48ffc84989070f840d0100004885db488b5c24500f84380100004889ef4c89e6ff159ef609004885c00f84da0200004989c4488b7c24584889deff1584f609004885c00f84cf0200004989c5488b7c2448ff158df609004885c00f84c70200004889c34c89a424d00000004c89ac24d800000048898424e000000048c784249800000000000000488db424a00000004c89a424a00000004c89ac24a800000048898424b000000048ba0300000000000080488b7c240831c9ff15bef809004889c54885c074144989ef498b042485c00f89dd000000e90c010000488d7c2460ff159ff50900837c24600175704c8b7c24680f10542470f30f6f8c2480000000f30f7e842490000000498b042485c00f899e000000e9cd0000004c89ff660f7f4c2430660f7f4424200f29542410ff1561f509000f28542410660f6f442420660f6f4c24304885db488b5c24500f85c8feffff4c8b7c2408e954010000bf10000000ff1525f509004885c00f8478010000488d0dc3b9fcff48890848c740082d000000488d0d53c5090066480f6ec166480f6ec8660f6cc8b803000000660f6ec00f2815ed59fcff4531ff498b042485c0783448ffc849890424752b4c89e7660f7f4c2430660f7f4424200f29542410ff15bff409000f28542410660f6f442420660f6f4c2430498b450085c0783448ffc849894500752b4c89ef660f7f4c2430660f7f4424200f29542410ff1583f409000f28542410660f6f442420660f6f4c2430488b0385c0783348ffc8488903752b4889df660f7f4c2430660f7f4424200f29542410ff1549f409000f28542410660f6f442420660f6f4c2430488b7c2408488b0785c0780848ffc848890774134885ed743b4c89f74c89feff1503f70900eb41660f7f4c2430660f7f4424200f29542410ff15faf309000f28542410660f6f442420660f6f4c24304885ed75c54d893e410f115608f3410f7f4e1866410fd646284881c4e80000005b415c415d415e415f5dc3bf08000000be10000000ff15b6f30900eb4cbf08000000be10000000ff15a4f30900eb3a488d3d33dc0900ff15c5f30900eb2b488d3d24dc0900ff15b6f30900eb1c488d3d15dc0900ff15a7f30900eb0d488d3d96d70900ff1598f309000f0b4989c6498b450085c0781748ffc849894500750e4c89efff1541f30900eb034989c6498b042485c0782e48ffc84989042475254c89e7ff1522f30900eb1a4989c6eb154989c6eb4b4989c6488dbc24d0000000e8964a0300488b442408488b0085c07847488b4c24084989cf48ffc8488901742eeb354989c6498b450085c0781248ffc84989450075094c89efff15cbf20900498b0785c0781148ffc849890775094c89ffff15b3f209004c89f7e88b980900"
+        },
+        "decoder_error": {
+          "symbol": "_ZN10_jsonmodem6compat7Decoder5error17h83bdc822cc2e4010E",
+          "address": 465920,
+          "size": 173,
+          "body_sha256": "197362339aa9a7010b66b42f0a3f21c53b291a7bd2b1cc7cfe8638a923b54959",
+          "body_hex": "4889c84989d04889f14885d20f848c000000534a8d1401488b70104531d24531c94989cb6666662e0f1f840000000000410fb61b84db7818498d5b014939f2723feb4e666666662e0f1f84000000000080fbe0721080fbf07216498d5b044939f2721deb2c498d5b024939f27212eb21498d5b034939f273180f1f80000000004d29da4901da49ffc14989db4839d3759f5b488b30488b5008e9e298fdff4531c9488b30488b5008e9d398fdff"
+        },
+        "from_utf8": {
+          "symbol": "_ZN4core3str8converts9from_utf817h7500929ad9ac477eE",
+          "address": 623184,
+          "size": 503,
+          "body_sha256": "3d738bf93b17f7ac50010dd1f99e841a428dcc4ee097873162c16c2d8903252a",
+          "body_hex": "41574156534889f831ff4889d14883e90f480f43f94885d20f84a90100004c8d46074983e0f84929f031c94c8d157630f8ff49bb8080808080808080eb11669049ffc64c89f14839d10f83780100000fb61c0e84db78594589c14129c941f6c107741148ffc1ebde0f1f8400000000004883c1104839f9730e4c8b4c0e084c0b0c0e4d85d974e94839d173ba0f1f4000803c0e0078b048ffc14839ca75f2e924010000666666662e0f1f840000000000460fb6341341b1014183fe04745d4183fe0374294183fe020f850a0100004c8d71014939d60f83f800000042803c36bfb3010f8e58ffffffe9f10000004c8d71014939d60f83d9000000460fb634364881fbe0000000744181fbed00000075544180fe9f7e66e9bd0000004c8d71014939d60f83ab000000460fb634364881fbf0000000742281fbf400000075544180fe8f7e5ce98f0000004180e6e04180fea07429e9800000004180c6704180fe30723eeb74448d7b1f4180ff0c720880e3fe80fbee75624180fec07d5c4c8d71024939d6734e42803c36bf0f8eb0feffffeb4a80c30f80fb02773e4180fec07d38488d59024839d3732a803c1ebf7f2d4c8d71034939d6731b42803c36c00f8c7dfeffffb303eb17488970084889501031c9eb1b4531c9eb06b301eb02b3024889480844884810885811b9010000004889085b415e415fc3"
+        }
+      }
+    },
+    "rebuilt": {
+      "revision": "b7fe329765f3e90064cc38f127d3594165116c71",
+      "native_sha256": "fcd0937b294e256c73f668dcd702dda4bfcf6f930e5508b9a5d2a08921f09708",
+      "functions": {
+        "decode_bytes": {
+          "symbol": "_ZN10_jsonmodem6compat12decode_bytes17h0c3edf085dc3cf0dE",
+          "address": 420928,
+          "size": 211,
+          "body_sha256": "9dc7712b4a1c7e582e533eb037ca8863580d26b8135ac904705beb520c379652",
+          "body_hex": "41574156534883ec504889fb4883fa7f7643f30f6f06f30f6f4e10660febc8660fd7c185c0742e488b0522450800488b00488d7c24084989f74989d6ffd0807c24100275224889df4c89fe4c89f2e8bd8d0000eb59488d7c2438ff15d8420800807c2438007451488d357dfbfaff488d7c2408ba16000000b9010000004531c04531c9e8b848fefff30f6f442408f30f6f4c24180f10542428f30f7f4b180f115328f30f7f430848c703010000004883c4505b415e415fc3488b742440488b5424484889df4883c4505b415e415fe93d8d0000"
+        },
+        "json_decode_error": {
+          "symbol": "_ZN10_jsonmodem17json_decode_error17h1e0a1f4028260855E",
+          "address": 308608,
+          "size": 1397,
+          "body_sha256": "82322aaf6235faf37b65a0006b8bc0d9ddc721a7d987fd4bcc5d0606c40f07ce",
+          "body_hex": "554157415641554154534881ece80000004c89cb4d89c548894c24584989d44889f54989fe488dbc2498000000e8ceef03004c8bbc24a000000083bc249800000001751f0f109424a8000000f30f6f8c24b8000000f30f7e8424c8000000e9d90300004c896c245048895c2448488d3d37acfcffbe0f000000ff15d1f709004885c00f84fe0300004989c54c89ff4889c6ff15c9f709004889c34885c0741648895c2408498b450085c00f89a1000000e9d0000000488d7c2460ff1550f70900837c246001752e488b44246848894424080f10542470f30f6f8c2480000000f30f7e842490000000498b450085c07961e990000000bf10000000ff1518f709004885c00f8459030000488d0df43afdff48890848c740082d000000488d0d86db090066480f6ec166480f6ec8660f6cc8b803000000660f6ec00f2815e05bfcff48c744240800000000498b450085c0783448ffc849894500752b4c89ef660f7f4c2430660f7f4424200f29542410ff15acf609000f28542410660f6f442420660f6f4c2430498b0785c0780c48ffc84989070f840d0100004885db488b5c24500f84380100004889ef4c89e6ff159ef609004885c00f84da0200004989c4488b7c24584889deff1584f609004885c00f84cf0200004989c5488b7c2448ff158df609004885c00f84c70200004889c34c89a424d00000004c89ac24d800000048898424e000000048c784249800000000000000488db424a00000004c89a424a00000004c89ac24a800000048898424b000000048ba0300000000000080488b7c240831c9ff15bef809004889c54885c074144989ef498b042485c00f89dd000000e90c010000488d7c2460ff159ff50900837c24600175704c8b7c24680f10542470f30f6f8c2480000000f30f7e842490000000498b042485c00f899e000000e9cd0000004c89ff660f7f4c2430660f7f4424200f29542410ff1561f509000f28542410660f6f442420660f6f4c24304885db488b5c24500f85c8feffff4c8b7c2408e954010000bf10000000ff1525f509004885c00f8478010000488d0dc3b9fcff48890848c740082d000000488d0d53c5090066480f6ec166480f6ec8660f6cc8b803000000660f6ec00f2815ed59fcff4531ff498b042485c0783448ffc849890424752b4c89e7660f7f4c2430660f7f4424200f29542410ff15bff409000f28542410660f6f442420660f6f4c2430498b450085c0783448ffc849894500752b4c89ef660f7f4c2430660f7f4424200f29542410ff1583f409000f28542410660f6f442420660f6f4c2430488b0385c0783348ffc8488903752b4889df660f7f4c2430660f7f4424200f29542410ff1549f409000f28542410660f6f442420660f6f4c2430488b7c2408488b0785c0780848ffc848890774134885ed743b4c89f74c89feff1503f70900eb41660f7f4c2430660f7f4424200f29542410ff15faf309000f28542410660f6f442420660f6f4c24304885ed75c54d893e410f115608f3410f7f4e1866410fd646284881c4e80000005b415c415d415e415f5dc3bf08000000be10000000ff15b6f30900eb4cbf08000000be10000000ff15a4f30900eb3a488d3d33dc0900ff15c5f30900eb2b488d3d24dc0900ff15b6f30900eb1c488d3d15dc0900ff15a7f30900eb0d488d3d96d70900ff1598f309000f0b4989c6498b450085c0781748ffc849894500750e4c89efff1541f30900eb034989c6498b042485c0782e48ffc84989042475254c89e7ff1522f30900eb1a4989c6eb154989c6eb4b4989c6488dbc24d0000000e8964a0300488b442408488b0085c07847488b4c24084989cf48ffc8488901742eeb354989c6498b450085c0781248ffc84989450075094c89efff15cbf20900498b0785c0781148ffc849890775094c89ffff15b3f209004c89f7e88b980900"
+        },
+        "decoder_error": {
+          "symbol": "_ZN10_jsonmodem6compat7Decoder5error17h83bdc822cc2e4010E",
+          "address": 465920,
+          "size": 173,
+          "body_sha256": "197362339aa9a7010b66b42f0a3f21c53b291a7bd2b1cc7cfe8638a923b54959",
+          "body_hex": "4889c84989d04889f14885d20f848c000000534a8d1401488b70104531d24531c94989cb6666662e0f1f840000000000410fb61b84db7818498d5b014939f2723feb4e666666662e0f1f84000000000080fbe0721080fbf07216498d5b044939f2721deb2c498d5b024939f27212eb21498d5b034939f273180f1f80000000004d29da4901da49ffc14989db4839d3759f5b488b30488b5008e9e298fdff4531c9488b30488b5008e9d398fdff"
+        },
+        "from_utf8": {
+          "symbol": "_ZN4core3str8converts9from_utf817h7500929ad9ac477eE",
+          "address": 623184,
+          "size": 503,
+          "body_sha256": "3d738bf93b17f7ac50010dd1f99e841a428dcc4ee097873162c16c2d8903252a",
+          "body_hex": "41574156534889f831ff4889d14883e90f480f43f94885d20f84a90100004c8d46074983e0f84929f031c94c8d157630f8ff49bb8080808080808080eb11669049ffc64c89f14839d10f83780100000fb61c0e84db78594589c14129c941f6c107741148ffc1ebde0f1f8400000000004883c1104839f9730e4c8b4c0e084c0b0c0e4d85d974e94839d173ba0f1f4000803c0e0078b048ffc14839ca75f2e924010000666666662e0f1f840000000000460fb6341341b1014183fe04745d4183fe0374294183fe020f850a0100004c8d71014939d60f83f800000042803c36bfb3010f8e58ffffffe9f10000004c8d71014939d60f83d9000000460fb634364881fbe0000000744181fbed00000075544180fe9f7e66e9bd0000004c8d71014939d60f83ab000000460fb634364881fbf0000000742281fbf400000075544180fe8f7e5ce98f0000004180e6e04180fea07429e9800000004180c6704180fe30723eeb74448d7b1f4180ff0c720880e3fe80fbee75624180fec07d5c4c8d71024939d6734e42803c36bf0f8eb0feffffeb4a80c30f80fb02773e4180fec07d38488d59024839d3732a803c1ebf7f2d4c8d71034939d6731b42803c36c00f8c7dfeffffb303eb17488970084889501031c9eb1b4531c9eb06b301eb02b3024889480844884810885811b9010000004889085b415e415fc3"
+        }
+      }
+    },
+    "final": {
+      "revision": "b0f3190fb72af0396d9d25256f8d0174efd7ae23",
+      "native_sha256": "981801da64d841b4901738d3ec244da95d617b0b08d58fecea65e4cc96a7ddb0",
+      "functions": {
+        "decode_bytes": {
+          "symbol": "_ZN10_jsonmodem6compat12decode_bytes17hb4077fc9c42e8523E",
+          "address": 422400,
+          "size": 211,
+          "body_sha256": "d4e8077cace4cc57ce842252ae8387fa7f634bd10978aba0171e151255ad5f40",
+          "body_hex": "41574156534883ec504889fb4883fa7f7643f30f6f06f30f6f4e10660febc8660fd7c185c0742e488b055a5e0800488b00488d7c24084989f74989d6ffd0807c24100275224889df4c89fe4c89f2e8bd8d0000eb59488d7c2438ff15285c0800807c2438007451488d3576f9faff488d7c2408ba16000000b9010000004531c04531c9e81849fefff30f6f442408f30f6f4c24180f10542428f30f7f4b180f115328f30f7f430848c703010000004883c4505b415e415fc3488b742440488b5424484889df4883c4505b415e415fe93d8d0000"
+        },
+        "json_decode_error": {
+          "symbol": "_ZN10_jsonmodem17json_decode_error17h375c72b6f8e16fa9E",
+          "address": 310176,
+          "size": 1397,
+          "body_sha256": "21ccf997951d78b49e18dc64d7fbc7bebf690eddbec290efcc2cb2ec055c4ca7",
+          "body_hex": "554157415641554154534881ece80000004c89cb4d89c548894c24584989d44889f54989fe488dbc2498000000e8ce0304004c8bbc24a000000083bc249800000001751f0f109424a8000000f30f6f8c24b8000000f30f7e8424c8000000e9d90300004c896c245048895c2448488d3d37a9fcffbe0f000000ff15d1100a004885c00f84fe0300004989c54c89ff4889c6ff15c9100a004889c34885c0741648895c2408498b450085c00f89a1000000e9d0000000488d7c2460ff1558100a00837c246001752e488b44246848894424080f10542470f30f6f8c2480000000f30f7e842490000000498b450085c07961e990000000bf10000000ff15980f0a004885c00f8459030000488d0d8c37fdff48890848c740082d000000488d0de6f3090066480f6ec166480f6ec8660f6cc8b803000000660f6ec00f2815c057fcff48c744240800000000498b450085c0783448ffc849894500752b4c89ef660f7f4c2430660f7f4424200f29542410ff15ac0f0a000f28542410660f6f442420660f6f4c2430498b0785c0780c48ffc84989070f840d0100004885db488b5c24500f84380100004889ef4c89e6ff159e0f0a004885c00f84da0200004989c4488b7c24584889deff15840f0a004885c00f84cf0200004989c5488b7c2448ff15850f0a004885c00f84c70200004889c34c89a424d00000004c89ac24d800000048898424e000000048c784249800000000000000488db424a00000004c89a424a00000004c89ac24a800000048898424b000000048ba0300000000000080488b7c240831c9ff15ae110a004889c54885c074144989ef498b042485c00f89dd000000e90c010000488d7c2460ff15a70e0a00837c24600175704c8b7c24680f10542470f30f6f8c2480000000f30f7e842490000000498b042485c00f899e000000e9cd0000004c89ff660f7f4c2430660f7f4424200f29542410ff15610e0a000f28542410660f6f442420660f6f4c24304885db488b5c24500f85c8feffff4c8b7c2408e954010000bf10000000ff15a50d0a004885c00f8478010000488d0d5db6fcff48890848c740082d000000488d0db3dd090066480f6ec166480f6ec8660f6cc8b803000000660f6ec00f2815cd55fcff4531ff498b042485c0783448ffc849890424752b4c89e7660f7f4c2430660f7f4424200f29542410ff15bf0d0a000f28542410660f6f442420660f6f4c2430498b450085c0783448ffc849894500752b4c89ef660f7f4c2430660f7f4424200f29542410ff15830d0a000f28542410660f6f442420660f6f4c2430488b0385c0783348ffc8488903752b4889df660f7f4c2430660f7f4424200f29542410ff15490d0a000f28542410660f6f442420660f6f4c2430488b7c2408488b0785c0780848ffc848890774134885ed743b4c89f74c89feff15f30f0a00eb41660f7f4c2430660f7f4424200f29542410ff15fa0c0a000f28542410660f6f442420660f6f4c24304885ed75c54d893e410f115608f3410f7f4e1866410fd646284881c4e80000005b415c415d415e415f5dc3bf08000000be10000000ff15b60c0a00eb4cbf08000000be10000000ff15a40c0a00eb3a488d3d93f40900ff15c50c0a00eb2b488d3d84f40900ff15b60c0a00eb1c488d3d75f40900ff15a70c0a00eb0d488d3df6ef0900ff15980c0a000f0b4989c6498b450085c0781748ffc849894500750e4c89efff15410c0a00eb034989c6498b042485c0782e48ffc84989042475254c89e7ff15220c0a00eb1a4989c6eb154989c6eb4b4989c6488dbc24d0000000e8965e0300488b442408488b0085c07847488b4c24084989cf48ffc8488901742eeb354989c6498b450085c0781248ffc84989450075094c89efff15cb0b0a00498b0785c0781148ffc849890775094c89ffff15b30b0a004c89f7e80bb10900"
+        },
+        "decoder_error": {
+          "symbol": "_ZN10_jsonmodem6compat7Decoder5error17hc90f437f63fd3d70E",
+          "address": 467392,
+          "size": 855,
+          "body_sha256": "cf848156f3410a14595fe348ddefa3b0b59a6e547ac52a8dcef6f8889a9436f8",
+          "body_hex": "41574156415453504989ce4889d34889f1498b76104885f60f84b30000004839de7308803c31c07d04eb2b75244989ff4883fe1f0f879f0000004883fe040f83af00000031c04531c94c89ffe9db0200004885db747b488d041931d24531c94989c8eb2e6666662e0f1f8400000000004d8d50014839f20f83c00200004c29c24c01d249ffc14d89d04939c20f84ab020000450fb6104584d279d54180fae072144180faf0721c4d8d50044839f272cde9880200004d8d50024839f272bfe97a0200004d8d50034839f272b1e96c0200004531c9e9640200004889cf4989ccff1543ad07004c89e14989c14c89ffe94a02000089f083e01c0fb711660f6ec20fb75102660f6eca660f6f1511f4f9ff660f64c2660f60c0f20f70c0d4660f70c0d4660f6f1d27f4f9ff660fdbc3660f64ca660f60c9f20f70c9d4660f70c9d4660fdbcb4883f80475084c89ffe9c40100000fb75104660f6ee20fb75106660f6eea660f64e2660f60e4f20f70e4d4660f70e4d4660fdbe3660f64ea660f60edf20f70edd4660f70edd4660fdbeb660fd4c4660fd4cd83f8084c89ff0f84740100000fb75108660f6ee20fb7510a660f6eea660f64e2660f60e4f20f70e4d4660f70e4d4660fdbe3660f64ea660f60edf20f70edd4660f70edd4660fdbeb660fd4c4660fd4cd83f80c0f84270100000fb7510c660f6ee20fb7510e660f6eea660f64e2660f60e4f20f70e4d4660f70e4d4660fdbe3660f64ea660f60edf20f70edd4660f70edd4660fdbeb660fd4c4660fd4cd83f8100f84da0000000fb75110660f6ee20fb75112660f6eea660f64e2660f60e4f20f70e4d4660f70e4d4660fdbe3660f64ea660f60edf20f70edd4660f70edd4660fdbeb660fd4c4660fd4cd83f8140f848d0000000fb75114660f6ee20fb75116660f6eea660f64e2660f60e4f20f70e4d4660f70e4d4660fdbe3660f64ea660f60edf20f70edd4660f70edd4660fdbeb660fd4c4660fd4cd83f81874440fb75118660f6ee20fb7511a660f6eea660f64e2660f60e4f20f70e4d4660f70e4d4660fdbe3660f64ea660f60edf20f70d5d4660f70d2d4660fdbd3660fd4c4660fd4ca660fd4c1660f70c8ee660fd4c866490f7ec94839c6741131d2803c01c00f9dc24901d148ffc0ebea498b36498b56084989d84883c4085b415c415e415fe98996fdff"
+        },
+        "from_utf8": {
+          "symbol": "_ZN4core3str8converts9from_utf817h7500929ad9ac477eE",
+          "address": 629760,
+          "size": 503,
+          "body_sha256": "c9a8b33bdf5cf3a29d3afeb6cb509d5e6f8640f8f772a381ca20c60d75289530",
+          "body_hex": "41574156534889f831ff4889d14883e90f480f43f94885d20f84a90100004c8d46074983e0f84929f031c94c8d157e19f8ff49bb8080808080808080eb11669049ffc64c89f14839d10f83780100000fb61c0e84db78594589c14129c941f6c107741148ffc1ebde0f1f8400000000004883c1104839f9730e4c8b4c0e084c0b0c0e4d85d974e94839d173ba0f1f4000803c0e0078b048ffc14839ca75f2e924010000666666662e0f1f840000000000460fb6341341b1014183fe04745d4183fe0374294183fe020f850a0100004c8d71014939d60f83f800000042803c36bfb3010f8e58ffffffe9f10000004c8d71014939d60f83d9000000460fb634364881fbe0000000744181fbed00000075544180fe9f7e66e9bd0000004c8d71014939d60f83ab000000460fb634364881fbf0000000742281fbf400000075544180fe8f7e5ce98f0000004180e6e04180fea07429e9800000004180c6704180fe30723eeb74448d7b1f4180ff0c720880e3fe80fbee75624180fec07d5c4c8d71024939d6734e42803c36bf0f8eb0feffffeb4a80c30f80fb02773e4180fec07d38488d59024839d3732a803c1ebf7f2d4c8d71034939d6731b42803c36c00f8c7dfeffffb303eb17488970084889501031c9eb1b4531c9eb06b301eb02b3024889480844884810885811b9010000004889085b415e415fc3"
+        }
+      }
+    }
+  },
+  "function_comparisons": {
+    "original_to_rebuilt": {
+      "decode_bytes": {
+        "identical_bytes": true,
+        "same_size": true,
+        "before_bytes": 211,
+        "after_bytes": 211,
+        "differing_offsets": []
+      },
+      "json_decode_error": {
+        "identical_bytes": true,
+        "same_size": true,
+        "before_bytes": 1397,
+        "after_bytes": 1397,
+        "differing_offsets": []
+      },
+      "decoder_error": {
+        "identical_bytes": true,
+        "same_size": true,
+        "before_bytes": 173,
+        "after_bytes": 173,
+        "differing_offsets": []
+      },
+      "from_utf8": {
+        "identical_bytes": true,
+        "same_size": true,
+        "before_bytes": 503,
+        "after_bytes": 503,
+        "differing_offsets": []
+      }
+    },
+    "rebuilt_to_final": {
+      "decode_bytes": {
+        "identical_bytes": false,
+        "same_size": true,
+        "before_bytes": 211,
+        "after_bytes": 211,
+        "differing_offsets": [
+          42,
+          43,
+          92,
+          93,
+          106,
+          107,
+          132,
+          133
+        ]
+      },
+      "json_decode_error": {
+        "identical_bytes": false,
+        "same_size": true,
+        "before_bytes": 1397,
+        "after_bytes": 1397,
+        "differing_offsets": [
+          47,
+          48,
+          113,
+          124,
+          125,
+          148,
+          149,
+          188,
+          189,
+          190,
+          252,
+          253,
+          254,
+          268,
+          269,
+          286,
+          287,
+          316,
+          317,
+          369,
+          370,
+          431,
+          432,
+          457,
+          458,
+          479,
+          480,
+          481,
+          582,
+          583,
+          584,
+          621,
+          622,
+          623,
+          700,
+          701,
+          751,
+          752,
+          753,
+          767,
+          768,
+          785,
+          786,
+          815,
+          816,
+          862,
+          863,
+          922,
+          923,
+          980,
+          981,
+          1033,
+          1034,
+          1035,
+          1059,
+          1060,
+          1135,
+          1136,
+          1153,
+          1154,
+          1161,
+          1162,
+          1168,
+          1169,
+          1176,
+          1177,
+          1183,
+          1184,
+          1191,
+          1192,
+          1198,
+          1199,
+          1206,
+          1207,
+          1213,
+          1214,
+          1244,
+          1245,
+          1275,
+          1276,
+          1303,
+          1362,
+          1363,
+          1386,
+          1387,
+          1393,
+          1394
+        ]
+      },
+      "decoder_error": {
+        "identical_bytes": false,
+        "same_size": false,
+        "before_bytes": 173,
+        "after_bytes": 855,
+        "differing_offsets": null
+      },
+      "from_utf8": {
+        "identical_bytes": false,
+        "same_size": true,
+        "before_bytes": 503,
+        "after_bytes": 503,
+        "differing_offsets": [
+          46,
+          47
+        ]
+      }
+    }
+  },
+  "reviewed_address_operands": {
+    "decode_bytes": {
+      "all_non_address_bytes_identical": true,
+      "bytes": 211,
+      "reviewed_address_operands": [
+        {
+          "instruction_offset": 39,
+          "kind": "load_rax",
+          "targets": {
+            "rebuilt": {
+              "address": 962960,
+              "relocations": [
+                {
+                  "Offset": 962960,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 972184
+                }
+              ],
+              "exact_symbols": [],
+              "relocated_target_symbols": [
+                "_ZN8simdutf814implementation3x8620validate_utf8_compat2FN17he864d7cfae01bb4dE"
+              ]
+            },
+            "final": {
+              "address": 970888,
+              "relocations": [
+                {
+                  "Offset": 970888,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 980240
+                }
+              ],
+              "exact_symbols": [],
+              "relocated_target_symbols": [
+                "_ZN8simdutf814implementation3x8620validate_utf8_compat2FN17he864d7cfae01bb4dE"
+              ]
+            }
+          }
+        },
+        {
+          "instruction_offset": 90,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 962424,
+              "relocations": [
+                {
+                  "Offset": 962424,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 623184
+                }
+              ],
+              "exact_symbols": [],
+              "relocated_target_symbols": [
+                "_ZN4core3str8converts9from_utf817h7500929ad9ac477eE"
+              ]
+            },
+            "final": {
+              "address": 970376,
+              "relocations": [
+                {
+                  "Offset": 970376,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 629760
+                }
+              ],
+              "exact_symbols": [],
+              "relocated_target_symbols": [
+                "_ZN4core3str8converts9from_utf817h7500929ad9ac477eE"
+              ]
+            }
+          }
+        },
+        {
+          "instruction_offset": 103,
+          "kind": "lea_rsi",
+          "targets": {
+            "rebuilt": {
+              "address": 92203,
+              "relocations": [],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 93156,
+              "relocations": [],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 131,
+          "kind": "direct_call",
+          "targets": {
+            "rebuilt": {
+              "address": 308608,
+              "relocations": [],
+              "exact_symbols": [
+                "_ZN10_jsonmodem17json_decode_error17h1e0a1f4028260855E"
+              ]
+            },
+            "final": {
+              "address": 310176,
+              "relocations": [],
+              "exact_symbols": [
+                "_ZN10_jsonmodem17json_decode_error17h375c72b6f8e16fa9E"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "from_utf8": {
+      "all_non_address_bytes_identical": true,
+      "bytes": 503,
+      "reviewed_address_operands": [
+        {
+          "instruction_offset": 43,
+          "kind": "lea_r10",
+          "targets": {
+            "rebuilt": {
+              "address": 111352,
+              "relocations": [],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 112048,
+              "relocations": [],
+              "exact_symbols": []
+            }
+          }
+        }
+      ]
+    },
+    "json_decode_error": {
+      "all_non_address_bytes_identical": true,
+      "bytes": 1397,
+      "reviewed_address_operands": [
+        {
+          "instruction_offset": 45,
+          "kind": "direct_call",
+          "targets": {
+            "rebuilt": {
+              "address": 566656,
+              "relocations": [],
+              "exact_symbols": [
+                "_ZN4pyo35types6module8PyModule6import17hb8831485be92229eE"
+              ]
+            },
+            "final": {
+              "address": 573344,
+              "relocations": [],
+              "exact_symbols": [
+                "_ZN4pyo35types6module8PyModule6import17heee6fbc155fce2ddE"
+              ]
+            }
+          }
+        },
+        {
+          "instruction_offset": 109,
+          "kind": "lea_rdi",
+          "targets": {
+            "rebuilt": {
+              "address": 90667,
+              "relocations": [],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 91467,
+              "relocations": [],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 121,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 962000,
+              "relocations": [
+                {
+                  "Offset": 962000,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "PyUnicode_FromStringAndSize",
+                    "Value": 15
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 969968,
+              "relocations": [
+                {
+                  "Offset": 969968,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "PyUnicode_FromStringAndSize",
+                    "Value": 21
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 145,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 962016,
+              "relocations": [
+                {
+                  "Offset": 962016,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "PyObject_GetAttr",
+                    "Value": 16
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 969984,
+              "relocations": [
+                {
+                  "Offset": 969984,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "PyObject_GetAttr",
+                    "Value": 22
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 186,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 961936,
+              "relocations": [
+                {
+                  "Offset": 961936,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 678288
+                }
+              ],
+              "exact_symbols": [],
+              "relocated_target_symbols": [
+                "_ZN4pyo33err5PyErr4take17h26b8d6798b74cf88E"
+              ]
+            },
+            "final": {
+              "address": 969912,
+              "relocations": [
+                {
+                  "Offset": 969912,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 684736
+                }
+              ],
+              "exact_symbols": [],
+              "relocated_target_symbols": [
+                "_ZN4pyo33err5PyErr4take17h26b8d6798b74cf88E"
+              ]
+            }
+          }
+        },
+        {
+          "instruction_offset": 250,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 961944,
+              "relocations": [
+                {
+                  "Offset": 961944,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "malloc@GLIBC_2.2.5",
+                    "Value": 8
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 969784,
+              "relocations": [
+                {
+                  "Offset": 969784,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "malloc@GLIBC_2.2.5",
+                    "Value": 5
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 265,
+          "kind": "lea_rcx",
+          "targets": {
+            "rebuilt": {
+              "address": 127364,
+              "relocations": [],
+              "exact_symbols": [
+                "anon.9591423fb51e30779b9b993b03236478.152.llvm.10851838689063390003"
+              ]
+            },
+            "final": {
+              "address": 128060,
+              "relocations": [],
+              "exact_symbols": [
+                "anon.9591423fb51e30779b9b993b03236478.152.llvm.10851838689063390003"
+              ]
+            }
+          }
+        },
+        {
+          "instruction_offset": 283,
+          "kind": "lea_rcx",
+          "targets": {
+            "rebuilt": {
+              "address": 954920,
+              "relocations": [],
+              "exact_symbols": [
+                "anon.9591423fb51e30779b9b993b03236478.153.llvm.10851838689063390003"
+              ]
+            },
+            "final": {
+              "address": 962728,
+              "relocations": [],
+              "exact_symbols": [
+                "anon.9591423fb51e30779b9b993b03236478.153.llvm.10851838689063390003"
+              ]
+            }
+          }
+        },
+        {
+          "instruction_offset": 313,
+          "kind": "load_xmm2",
+          "targets": {
+            "rebuilt": {
+              "address": 70304,
+              "relocations": [],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 70816,
+              "relocations": [],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 366,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 961952,
+              "relocations": [
+                {
+                  "Offset": 961952,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "_Py_Dealloc",
+                    "Value": 9
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 969920,
+              "relocations": [
+                {
+                  "Offset": 969920,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "_Py_Dealloc",
+                    "Value": 15
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 428,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 962000,
+              "relocations": [
+                {
+                  "Offset": 962000,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "PyUnicode_FromStringAndSize",
+                    "Value": 15
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 969968,
+              "relocations": [
+                {
+                  "Offset": 969968,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "PyUnicode_FromStringAndSize",
+                    "Value": 21
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 454,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 962000,
+              "relocations": [
+                {
+                  "Offset": 962000,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "PyUnicode_FromStringAndSize",
+                    "Value": 15
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 969968,
+              "relocations": [
+                {
+                  "Offset": 969968,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "PyUnicode_FromStringAndSize",
+                    "Value": 21
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 477,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 962032,
+              "relocations": [
+                {
+                  "Offset": 962032,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "PyLong_FromUnsignedLongLong",
+                    "Value": 18
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 969992,
+              "relocations": [
+                {
+                  "Offset": 969992,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "PyLong_FromUnsignedLongLong",
+                    "Value": 23
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 580,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 962696,
+              "relocations": [
+                {
+                  "Offset": 962696,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "PyObject_Vectorcall",
+                    "Value": 60
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 970648,
+              "relocations": [
+                {
+                  "Offset": 970648,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "PyObject_Vectorcall",
+                    "Value": 64
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 619,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 961936,
+              "relocations": [
+                {
+                  "Offset": 961936,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 678288
+                }
+              ],
+              "exact_symbols": [],
+              "relocated_target_symbols": [
+                "_ZN4pyo33err5PyErr4take17h26b8d6798b74cf88E"
+              ]
+            },
+            "final": {
+              "address": 969912,
+              "relocations": [
+                {
+                  "Offset": 969912,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 684736
+                }
+              ],
+              "exact_symbols": [],
+              "relocated_target_symbols": [
+                "_ZN4pyo33err5PyErr4take17h26b8d6798b74cf88E"
+              ]
+            }
+          }
+        },
+        {
+          "instruction_offset": 697,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 961952,
+              "relocations": [
+                {
+                  "Offset": 961952,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "_Py_Dealloc",
+                    "Value": 9
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 969920,
+              "relocations": [
+                {
+                  "Offset": 969920,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "_Py_Dealloc",
+                    "Value": 15
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 749,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 961944,
+              "relocations": [
+                {
+                  "Offset": 961944,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "malloc@GLIBC_2.2.5",
+                    "Value": 8
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 969784,
+              "relocations": [
+                {
+                  "Offset": 969784,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "malloc@GLIBC_2.2.5",
+                    "Value": 5
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 764,
+          "kind": "lea_rcx",
+          "targets": {
+            "rebuilt": {
+              "address": 94790,
+              "relocations": [],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 95488,
+              "relocations": [],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 782,
+          "kind": "lea_rcx",
+          "targets": {
+            "rebuilt": {
+              "address": 949736,
+              "relocations": [],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 957544,
+              "relocations": [],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 812,
+          "kind": "load_xmm2",
+          "targets": {
+            "rebuilt": {
+              "address": 70304,
+              "relocations": [],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 70816,
+              "relocations": [],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 859,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 961952,
+              "relocations": [
+                {
+                  "Offset": 961952,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "_Py_Dealloc",
+                    "Value": 9
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 969920,
+              "relocations": [
+                {
+                  "Offset": 969920,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "_Py_Dealloc",
+                    "Value": 15
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 919,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 961952,
+              "relocations": [
+                {
+                  "Offset": 961952,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "_Py_Dealloc",
+                    "Value": 9
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 969920,
+              "relocations": [
+                {
+                  "Offset": 969920,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "_Py_Dealloc",
+                    "Value": 15
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 977,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 961952,
+              "relocations": [
+                {
+                  "Offset": 961952,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "_Py_Dealloc",
+                    "Value": 9
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 969920,
+              "relocations": [
+                {
+                  "Offset": 969920,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "_Py_Dealloc",
+                    "Value": 15
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 1031,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 962704,
+              "relocations": [
+                {
+                  "Offset": 962704,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 677280
+                }
+              ],
+              "exact_symbols": [],
+              "relocated_target_symbols": [
+                "_ZN4pyo33err5PyErr10from_value17h71ed68b6b780ee7aE"
+              ]
+            },
+            "final": {
+              "address": 970656,
+              "relocations": [
+                {
+                  "Offset": 970656,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 683728
+                }
+              ],
+              "exact_symbols": [],
+              "relocated_target_symbols": [
+                "_ZN4pyo33err5PyErr10from_value17h71ed68b6b780ee7aE"
+              ]
+            }
+          }
+        },
+        {
+          "instruction_offset": 1056,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 961952,
+              "relocations": [
+                {
+                  "Offset": 961952,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "_Py_Dealloc",
+                    "Value": 9
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 969920,
+              "relocations": [
+                {
+                  "Offset": 969920,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "_Py_Dealloc",
+                    "Value": 15
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 1132,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 961960,
+              "relocations": [
+                {
+                  "Offset": 961960,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 604670
+                }
+              ],
+              "exact_symbols": [],
+              "relocated_target_symbols": [
+                "_ZN5alloc5alloc18handle_alloc_error17h9898627cde6f100aE"
+              ]
+            },
+            "final": {
+              "address": 969928,
+              "relocations": [
+                {
+                  "Offset": 969928,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 611246
+                }
+              ],
+              "exact_symbols": [],
+              "relocated_target_symbols": [
+                "_ZN5alloc5alloc18handle_alloc_error17h9898627cde6f100aE"
+              ]
+            }
+          }
+        },
+        {
+          "instruction_offset": 1150,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 961960,
+              "relocations": [
+                {
+                  "Offset": 961960,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 604670
+                }
+              ],
+              "exact_symbols": [],
+              "relocated_target_symbols": [
+                "_ZN5alloc5alloc18handle_alloc_error17h9898627cde6f100aE"
+              ]
+            },
+            "final": {
+              "address": 969928,
+              "relocations": [
+                {
+                  "Offset": 969928,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 611246
+                }
+              ],
+              "exact_symbols": [],
+              "relocated_target_symbols": [
+                "_ZN5alloc5alloc18handle_alloc_error17h9898627cde6f100aE"
+              ]
+            }
+          }
+        },
+        {
+          "instruction_offset": 1158,
+          "kind": "lea_rdi",
+          "targets": {
+            "rebuilt": {
+              "address": 955968,
+              "relocations": [
+                {
+                  "Offset": 955968,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 80186
+                }
+              ],
+              "exact_symbols": [
+                "anon.9591423fb51e30779b9b993b03236478.300.llvm.10851838689063390003"
+              ],
+              "relocated_target_symbols": [
+                "anon.9591423fb51e30779b9b993b03236478.293.llvm.10851838689063390003"
+              ]
+            },
+            "final": {
+              "address": 963776,
+              "relocations": [
+                {
+                  "Offset": 963776,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 80772
+                }
+              ],
+              "exact_symbols": [
+                "anon.9591423fb51e30779b9b993b03236478.300.llvm.10851838689063390003"
+              ],
+              "relocated_target_symbols": [
+                "anon.9591423fb51e30779b9b993b03236478.293.llvm.10851838689063390003"
+              ]
+            }
+          }
+        },
+        {
+          "instruction_offset": 1165,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 962008,
+              "relocations": [
+                {
+                  "Offset": 962008,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 677248
+                }
+              ],
+              "exact_symbols": [],
+              "relocated_target_symbols": [
+                "_ZN4pyo33err17panic_after_error17h7b13e51d58d78c31E"
+              ]
+            },
+            "final": {
+              "address": 969976,
+              "relocations": [
+                {
+                  "Offset": 969976,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 683696
+                }
+              ],
+              "exact_symbols": [],
+              "relocated_target_symbols": [
+                "_ZN4pyo33err17panic_after_error17h7b13e51d58d78c31E"
+              ]
+            }
+          }
+        },
+        {
+          "instruction_offset": 1173,
+          "kind": "lea_rdi",
+          "targets": {
+            "rebuilt": {
+              "address": 955968,
+              "relocations": [
+                {
+                  "Offset": 955968,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 80186
+                }
+              ],
+              "exact_symbols": [
+                "anon.9591423fb51e30779b9b993b03236478.300.llvm.10851838689063390003"
+              ],
+              "relocated_target_symbols": [
+                "anon.9591423fb51e30779b9b993b03236478.293.llvm.10851838689063390003"
+              ]
+            },
+            "final": {
+              "address": 963776,
+              "relocations": [
+                {
+                  "Offset": 963776,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 80772
+                }
+              ],
+              "exact_symbols": [
+                "anon.9591423fb51e30779b9b993b03236478.300.llvm.10851838689063390003"
+              ],
+              "relocated_target_symbols": [
+                "anon.9591423fb51e30779b9b993b03236478.293.llvm.10851838689063390003"
+              ]
+            }
+          }
+        },
+        {
+          "instruction_offset": 1180,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 962008,
+              "relocations": [
+                {
+                  "Offset": 962008,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 677248
+                }
+              ],
+              "exact_symbols": [],
+              "relocated_target_symbols": [
+                "_ZN4pyo33err17panic_after_error17h7b13e51d58d78c31E"
+              ]
+            },
+            "final": {
+              "address": 969976,
+              "relocations": [
+                {
+                  "Offset": 969976,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 683696
+                }
+              ],
+              "exact_symbols": [],
+              "relocated_target_symbols": [
+                "_ZN4pyo33err17panic_after_error17h7b13e51d58d78c31E"
+              ]
+            }
+          }
+        },
+        {
+          "instruction_offset": 1188,
+          "kind": "lea_rdi",
+          "targets": {
+            "rebuilt": {
+              "address": 955968,
+              "relocations": [
+                {
+                  "Offset": 955968,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 80186
+                }
+              ],
+              "exact_symbols": [
+                "anon.9591423fb51e30779b9b993b03236478.300.llvm.10851838689063390003"
+              ],
+              "relocated_target_symbols": [
+                "anon.9591423fb51e30779b9b993b03236478.293.llvm.10851838689063390003"
+              ]
+            },
+            "final": {
+              "address": 963776,
+              "relocations": [
+                {
+                  "Offset": 963776,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 80772
+                }
+              ],
+              "exact_symbols": [
+                "anon.9591423fb51e30779b9b993b03236478.300.llvm.10851838689063390003"
+              ],
+              "relocated_target_symbols": [
+                "anon.9591423fb51e30779b9b993b03236478.293.llvm.10851838689063390003"
+              ]
+            }
+          }
+        },
+        {
+          "instruction_offset": 1195,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 962008,
+              "relocations": [
+                {
+                  "Offset": 962008,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 677248
+                }
+              ],
+              "exact_symbols": [],
+              "relocated_target_symbols": [
+                "_ZN4pyo33err17panic_after_error17h7b13e51d58d78c31E"
+              ]
+            },
+            "final": {
+              "address": 969976,
+              "relocations": [
+                {
+                  "Offset": 969976,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 683696
+                }
+              ],
+              "exact_symbols": [],
+              "relocated_target_symbols": [
+                "_ZN4pyo33err17panic_after_error17h7b13e51d58d78c31E"
+              ]
+            }
+          }
+        },
+        {
+          "instruction_offset": 1203,
+          "kind": "lea_rdi",
+          "targets": {
+            "rebuilt": {
+              "address": 954832,
+              "relocations": [
+                {
+                  "Offset": 954832,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 78754
+                }
+              ],
+              "exact_symbols": [
+                "anon.9591423fb51e30779b9b993b03236478.119.llvm.10851838689063390003"
+              ],
+              "relocated_target_symbols": [
+                "anon.9591423fb51e30779b9b993b03236478.108.llvm.10851838689063390003"
+              ]
+            },
+            "final": {
+              "address": 962640,
+              "relocations": [
+                {
+                  "Offset": 962640,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 79340
+                }
+              ],
+              "exact_symbols": [
+                "anon.9591423fb51e30779b9b993b03236478.119.llvm.10851838689063390003"
+              ],
+              "relocated_target_symbols": [
+                "anon.9591423fb51e30779b9b993b03236478.108.llvm.10851838689063390003"
+              ]
+            }
+          }
+        },
+        {
+          "instruction_offset": 1210,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 962008,
+              "relocations": [
+                {
+                  "Offset": 962008,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 677248
+                }
+              ],
+              "exact_symbols": [],
+              "relocated_target_symbols": [
+                "_ZN4pyo33err17panic_after_error17h7b13e51d58d78c31E"
+              ]
+            },
+            "final": {
+              "address": 969976,
+              "relocations": [
+                {
+                  "Offset": 969976,
+                  "Type": {
+                    "Name": "R_X86_64_RELATIVE",
+                    "Value": 8
+                  },
+                  "Symbol": {
+                    "Name": "-",
+                    "Value": 0
+                  },
+                  "Addend": 683696
+                }
+              ],
+              "exact_symbols": [],
+              "relocated_target_symbols": [
+                "_ZN4pyo33err17panic_after_error17h7b13e51d58d78c31E"
+              ]
+            }
+          }
+        },
+        {
+          "instruction_offset": 1241,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 961952,
+              "relocations": [
+                {
+                  "Offset": 961952,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "_Py_Dealloc",
+                    "Value": 9
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 969920,
+              "relocations": [
+                {
+                  "Offset": 969920,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "_Py_Dealloc",
+                    "Value": 15
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 1272,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 961952,
+              "relocations": [
+                {
+                  "Offset": 961952,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "_Py_Dealloc",
+                    "Value": 9
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 969920,
+              "relocations": [
+                {
+                  "Offset": 969920,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "_Py_Dealloc",
+                    "Value": 15
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 1301,
+          "kind": "direct_call",
+          "targets": {
+            "rebuilt": {
+              "address": 525616,
+              "relocations": [],
+              "exact_symbols": [
+                "_ZN4core3ptr94drop_in_place$LT$$u5b$pyo3..instance..Bound$LT$pyo3..types..any..PyAny$GT$$u3b$$u20$3$u5d$$GT$17hb1c5568cfbf06f29E"
+              ]
+            },
+            "final": {
+              "address": 532304,
+              "relocations": [],
+              "exact_symbols": [
+                "_ZN4core3ptr94drop_in_place$LT$$u5b$pyo3..instance..Bound$LT$pyo3..types..any..PyAny$GT$$u3b$$u20$3$u5d$$GT$17hc9c6be0c31f47436E"
+              ]
+            }
+          }
+        },
+        {
+          "instruction_offset": 1359,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 961952,
+              "relocations": [
+                {
+                  "Offset": 961952,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "_Py_Dealloc",
+                    "Value": 9
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 969920,
+              "relocations": [
+                {
+                  "Offset": 969920,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "_Py_Dealloc",
+                    "Value": 15
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 1383,
+          "kind": "indirect_call",
+          "targets": {
+            "rebuilt": {
+              "address": 961952,
+              "relocations": [
+                {
+                  "Offset": 961952,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "_Py_Dealloc",
+                    "Value": 9
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 969920,
+              "relocations": [
+                {
+                  "Offset": 969920,
+                  "Type": {
+                    "Name": "R_X86_64_GLOB_DAT",
+                    "Value": 6
+                  },
+                  "Symbol": {
+                    "Name": "_Py_Dealloc",
+                    "Value": 15
+                  },
+                  "Addend": 0
+                }
+              ],
+              "exact_symbols": []
+            }
+          }
+        },
+        {
+          "instruction_offset": 1392,
+          "kind": "direct_call",
+          "targets": {
+            "rebuilt": {
+              "address": 938880,
+              "relocations": [],
+              "exact_symbols": []
+            },
+            "final": {
+              "address": 946720,
+              "relocations": [],
+              "exact_symbols": []
+            }
+          }
+        }
+      ]
+    }
+  },
+  "equal_long_string_ranges": {
+    "ascii_validator_loop": {
+      "rebuilt": {
+        "function": "from_utf8",
+        "start_offset": 112,
+        "stop_offset_exclusive": 135,
+        "address": 623296,
+        "address_hex": "0x982c0",
+        "address_mod_64": 0,
+        "size": 23,
+        "bytes": "4883c1104839f9730e4c8b4c0e084c0b0c0e4d85d974e9",
+        "sha256": "a05318eee3999f9b8e36af1be0022543654520fc0aaff958f0516cd2ba75ddc9",
+        "spans_64_byte_boundary": false
+      },
+      "final": {
+        "function": "from_utf8",
+        "start_offset": 112,
+        "stop_offset_exclusive": 135,
+        "address": 629872,
+        "address_hex": "0x99c70",
+        "address_mod_64": 48,
+        "size": 23,
+        "bytes": "4883c1104839f9730e4c8b4c0e084c0b0c0e4d85d974e9",
+        "sha256": "a05318eee3999f9b8e36af1be0022543654520fc0aaff958f0516cd2ba75ddc9",
+        "spans_64_byte_boundary": true
+      },
+      "byte_equal": true
+    },
+    "scanner_vector_loop": {
+      "rebuilt": {
+        "function": "string_prefix",
+        "start_offset": 336,
+        "stop_offset_exclusive": 470,
+        "address": 600816,
+        "address_hex": "0x92af0",
+        "address_mod_64": 48,
+        "size": 134,
+        "bytes": "4889f04883fb200f82b5000000488d70304839d60f8725010000f30f6f5c0710f30f6f640720660f6feb660fdae8660f74eb660f6ff4660fdaf0660f74f4660f6ffb660f74f966440f6fc466440f74c1660f74da660febdf660febdd660f74e266410febe0660febe6660febe3660f71f407660fd7ec488d70204883c3e085ed0f847affffff",
+        "sha256": "4f53e8135c7d1f2c628b3beee93ac58fedc3325b9613d99858431637b91c430d",
+        "spans_64_byte_boundary": true
+      },
+      "final": {
+        "function": "string_prefix",
+        "start_offset": 336,
+        "stop_offset_exclusive": 470,
+        "address": 607392,
+        "address_hex": "0x944a0",
+        "address_mod_64": 32,
+        "size": 134,
+        "bytes": "4889f04883fb200f82b5000000488d70304839d60f8725010000f30f6f5c0710f30f6f640720660f6feb660fdae8660f74eb660f6ff4660fdaf0660f74f4660f6ffb660f74f966440f6fc466440f74c1660f74da660febdf660febdd660f74e266410febe0660febe6660febe3660f71f407660fd7ec488d70204883c3e085ed0f847affffff",
+        "sha256": "4f53e8135c7d1f2c628b3beee93ac58fedc3325b9613d99858431637b91c430d",
+        "spans_64_byte_boundary": true
+      },
+      "byte_equal": true
+    },
+    "string_valid_return": {
+      "rebuilt": {
+        "function": "string_with_buffer",
+        "start_offset": 117,
+        "stop_offset_exclusive": 383,
+        "address": 601301,
+        "address_hex": "0x92cd5",
+        "address_mod_64": 21,
+        "size": 266,
+        "bytes": "4883f92275d54c8d65014c89e04c8966104829d80f87740100004989ed49f7d54e8d042b4d8d3c2e49ffc74983f80848895424104c897c241873614885c00f84e5000000498d4e014989e94929d931c066662e0f1f8400000000004c8d1401460fb65415004183fa20724c4183fa2274464183fa5c74404d8d140148ffc04983fafe75d74c89e14c89c04801c148894e104839d90f83a0000000eb2a48897c24084c89ff4989f74c89c6e81cfcffff4c89fe488b7c24084c89e14801c148894e104839d97374410fb6040e3c22753b4939cc488b4424180f87c70000004883fdff74098038bf0f8eb80000004901cd48ffc148894e10488947084c896f1048c70700000000e9e7feffff",
+        "sha256": "61b4d08e71f883315d4cef4c5b4eecffad6874105efaef6dee59e3bed0a1763d",
+        "spans_64_byte_boundary": true
+      },
+      "final": {
+        "function": "string_with_buffer",
+        "start_offset": 117,
+        "stop_offset_exclusive": 383,
+        "address": 607877,
+        "address_hex": "0x94685",
+        "address_mod_64": 5,
+        "size": 266,
+        "bytes": "4883f92275d54c8d65014c89e04c8966104829d80f87740100004989ed49f7d54e8d042b4d8d3c2e49ffc74983f80848895424104c897c241873614885c00f84e5000000498d4e014989e94929d931c066662e0f1f8400000000004c8d1401460fb65415004183fa20724c4183fa2274464183fa5c74404d8d140148ffc04983fafe75d74c89e14c89c04801c148894e104839d90f83a0000000eb2a48897c24084c89ff4989f74c89c6e81cfcffff4c89fe488b7c24084c89e14801c148894e104839d97374410fb6040e3c22753b4939cc488b4424180f87c70000004883fdff74098038bf0f8eb80000004901cd48ffc148894e10488947084c896f1048c70700000000e9e7feffff",
+        "sha256": "61b4d08e71f883315d4cef4c5b4eecffad6874105efaef6dee59e3bed0a1763d",
+        "spans_64_byte_boundary": true
+      },
+      "byte_equal": true
+    },
+    "ascii_dispatch_test": {
+      "rebuilt": {
+        "function": "decode_bytes",
+        "start_offset": 0,
+        "stop_offset_exclusive": 39,
+        "address": 420928,
+        "address_hex": "0x66c40",
+        "address_mod_64": 0,
+        "size": 39,
+        "bytes": "41574156534883ec504889fb4883fa7f7643f30f6f06f30f6f4e10660febc8660fd7c185c0742e",
+        "sha256": "0bfffa52f51c15d00304bf086f00606442c3b93b1d537cec1a0b820761c54034",
+        "spans_64_byte_boundary": false
+      },
+      "final": {
+        "function": "decode_bytes",
+        "start_offset": 0,
+        "stop_offset_exclusive": 39,
+        "address": 422400,
+        "address_hex": "0x67200",
+        "address_mod_64": 0,
+        "size": 39,
+        "bytes": "41574156534883ec504889fb4883fa7f7643f30f6f06f30f6f4e10660febc8660fd7c185c0742e",
+        "sha256": "0bfffa52f51c15d00304bf086f00606442c3b93b1d537cec1a0b820761c54034",
+        "spans_64_byte_boundary": false
+      },
+      "byte_equal": true
+    }
+  },
+  "long_string_callsite_regions": {
+    "python_string_construction": {
+      "function": "decode",
+      "start_offset": 781,
+      "stop_offset_exclusive": 898,
+      "differing_offsets": [
+        806,
+        807,
+        873,
+        874
+      ],
+      "verified_displacement_starts": [
+        806,
+        873
+      ],
+      "all_other_bytes_equal": true,
+      "rebuilt_sha256": "ee298020ba497867956bb50a0bdb6e7172ee87dea2dcee51e90d0cb80b259f4d",
+      "final_sha256": "72ec7c8f73849d1da389472bc673d5bcda0411136a5444aafe2b8803e1e73ca4"
+    },
+    "bytes_handler": {
+      "function": "pyfunction_loads",
+      "start_offset": 294,
+      "stop_offset_exclusive": 336,
+      "differing_offsets": [
+        299,
+        300,
+        311,
+        312
+      ],
+      "verified_displacement_starts": [
+        299,
+        311
+      ],
+      "all_other_bytes_equal": true,
+      "rebuilt_sha256": "218a2a974ecad581ca943bca1fc71b0e33bccaf23e44058823834dd08ce307d4",
+      "final_sha256": "00d8a3cfc04255657fa2d2e002b2251c7d01e09d19ec56a1fa3e405b7c246220"
+    }
+  },
+  "long_string_calls_and_constants": {
+    "rebuilt": [
+      {
+        "name": "string_with_buffer_call",
+        "instruction_offset": 805,
+        "instruction_address": 458101,
+        "instruction_bytes": "e8e62e0200",
+        "displacement_field_offset": 806,
+        "displacement": 143078,
+        "target_address": 601184,
+        "target_hex": "0x92c60",
+        "kind": "direct",
+        "exact_target_symbols": [
+          "jsonmodem::document::DocumentReader::string_with_buffer::he1aa638948b04735"
+        ]
+      },
+      {
+        "name": "python_string_call",
+        "instruction_offset": 871,
+        "instruction_address": 458167,
+        "instruction_bytes": "ff1513b00700",
+        "displacement_field_offset": 873,
+        "displacement": 503827,
+        "target_address": 962000,
+        "target_hex": "0xeadd0",
+        "kind": "indirect",
+        "exact_target_symbols": [],
+        "target_section": ".got",
+        "target_bytes": "0000000000000000",
+        "target_sha256": "af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc",
+        "relocation": {
+          "Offset": 962000,
+          "Type": {
+            "Name": "R_X86_64_GLOB_DAT",
+            "Value": 6
+          },
+          "Symbol": {
+            "Name": "PyUnicode_FromStringAndSize",
+            "Value": 15
+          },
+          "Addend": 0
+        }
+      },
+      {
+        "name": "width_table",
+        "instruction_offset": 43,
+        "instruction_address": 623227,
+        "instruction_bytes": "4c8d157630f8ff",
+        "displacement_field_offset": 46,
+        "displacement": -511882,
+        "target_address": 111352,
+        "target_hex": "0x1b2f8",
+        "kind": "data",
+        "exact_target_symbols": [],
+        "target_section": ".rodata",
+        "target_bytes": "01010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000202020202020202020202020202020202020202020202020202020202020303030303030303030303030303030304040404040000000000000000000000",
+        "target_sha256": "02b189407fa32e9604226dec547e4849ffaa560a3bf60c7e2cf4d48db5aa2f90"
+      },
+      {
+        "name": "control_vector",
+        "instruction_offset": 299,
+        "instruction_address": 600779,
+        "instruction_bytes": "660f6f056deaf7ff",
+        "displacement_field_offset": 303,
+        "displacement": -529811,
+        "target_address": 70976,
+        "target_hex": "0x11540",
+        "kind": "data",
+        "exact_target_symbols": [],
+        "target_section": ".rodata",
+        "target_bytes": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+        "target_sha256": "20350fa59e5994be4a9b534ad3ef5ede70ddc594e3644bb9632cd5915d73cb98"
+      },
+      {
+        "name": "quote_vector",
+        "instruction_offset": 307,
+        "instruction_address": 600787,
+        "instruction_bytes": "660f6f0df5e6f7ff",
+        "displacement_field_offset": 311,
+        "displacement": -530699,
+        "target_address": 70096,
+        "target_hex": "0x111d0",
+        "kind": "data",
+        "exact_target_symbols": [],
+        "target_section": ".rodata",
+        "target_bytes": "22222222222222222222222222222222",
+        "target_sha256": "3dc30fbac8417f76943e9c10e15eeacbc86e546a3cb024e368cbfa894603b266"
+      },
+      {
+        "name": "backslash_vector",
+        "instruction_offset": 315,
+        "instruction_address": 600795,
+        "instruction_bytes": "660f6f15cde7f7ff",
+        "displacement_field_offset": 319,
+        "displacement": -530483,
+        "target_address": 70320,
+        "target_hex": "0x112b0",
+        "kind": "data",
+        "exact_target_symbols": [],
+        "target_section": ".rodata",
+        "target_bytes": "5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c",
+        "target_sha256": "926d0aa23043a6894de6d86c8a61de75f39e54a9de0facdf87ace0a191efb931"
+      }
+    ],
+    "final": [
+      {
+        "name": "string_with_buffer_call",
+        "instruction_offset": 805,
+        "instruction_address": 459573,
+        "instruction_bytes": "e8d6420200",
+        "displacement_field_offset": 806,
+        "displacement": 148182,
+        "target_address": 607760,
+        "target_hex": "0x94610",
+        "kind": "direct",
+        "exact_target_symbols": [
+          "jsonmodem::document::DocumentReader::string_with_buffer::he1aa638948b04735"
+        ]
+      },
+      {
+        "name": "python_string_call",
+        "instruction_offset": 871,
+        "instruction_address": 459639,
+        "instruction_bytes": "ff1573c90700",
+        "displacement_field_offset": 873,
+        "displacement": 510323,
+        "target_address": 969968,
+        "target_hex": "0xeccf0",
+        "kind": "indirect",
+        "exact_target_symbols": [],
+        "target_section": ".got",
+        "target_bytes": "0000000000000000",
+        "target_sha256": "af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc",
+        "relocation": {
+          "Offset": 969968,
+          "Type": {
+            "Name": "R_X86_64_GLOB_DAT",
+            "Value": 6
+          },
+          "Symbol": {
+            "Name": "PyUnicode_FromStringAndSize",
+            "Value": 21
+          },
+          "Addend": 0
+        }
+      },
+      {
+        "name": "width_table",
+        "instruction_offset": 43,
+        "instruction_address": 629803,
+        "instruction_bytes": "4c8d157e19f8ff",
+        "displacement_field_offset": 46,
+        "displacement": -517762,
+        "target_address": 112048,
+        "target_hex": "0x1b5b0",
+        "kind": "data",
+        "exact_target_symbols": [],
+        "target_section": ".rodata",
+        "target_bytes": "01010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000202020202020202020202020202020202020202020202020202020202020303030303030303030303030303030304040404040000000000000000000000",
+        "target_sha256": "02b189407fa32e9604226dec547e4849ffaa560a3bf60c7e2cf4d48db5aa2f90"
+      },
+      {
+        "name": "control_vector",
+        "instruction_offset": 299,
+        "instruction_address": 607355,
+        "instruction_bytes": "660f6f05bdd2f7ff",
+        "displacement_field_offset": 303,
+        "displacement": -535875,
+        "target_address": 71488,
+        "target_hex": "0x11740",
+        "kind": "data",
+        "exact_target_symbols": [],
+        "target_section": ".rodata",
+        "target_bytes": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
+        "target_sha256": "20350fa59e5994be4a9b534ad3ef5ede70ddc594e3644bb9632cd5915d73cb98"
+      },
+      {
+        "name": "quote_vector",
+        "instruction_offset": 307,
+        "instruction_address": 607363,
+        "instruction_bytes": "660f6f0d45cff7ff",
+        "displacement_field_offset": 311,
+        "displacement": -536763,
+        "target_address": 70608,
+        "target_hex": "0x113d0",
+        "kind": "data",
+        "exact_target_symbols": [],
+        "target_section": ".rodata",
+        "target_bytes": "22222222222222222222222222222222",
+        "target_sha256": "3dc30fbac8417f76943e9c10e15eeacbc86e546a3cb024e368cbfa894603b266"
+      },
+      {
+        "name": "backslash_vector",
+        "instruction_offset": 315,
+        "instruction_address": 607371,
+        "instruction_bytes": "660f6f151dd0f7ff",
+        "displacement_field_offset": 319,
+        "displacement": -536547,
+        "target_address": 70832,
+        "target_hex": "0x114b0",
+        "kind": "data",
+        "exact_target_symbols": [],
+        "target_section": ".rodata",
+        "target_bytes": "5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c5c",
+        "target_sha256": "926d0aa23043a6894de6d86c8a61de75f39e54a9de0facdf87ace0a191efb931"
+      }
+    ]
+  },
+  "zero_offset_error": {
+    "function": "Decoder::error",
+    "final_instruction_offsets": {
+      "load_offset_and_branch_if_zero": [
+        17,
+        30
+      ],
+      "set_zero_and_jump": [
+        209,
+        217
+      ],
+      "prepare_and_tail_call_exception": [
+        829,
+        855
+      ]
+    },
+    "new_counting_loops_executed": false,
+    "complete_call_still_validates_input_and_constructs_document_string": true
+  },
+  "earlier_same_source": {
+    "libraries_executed": false,
+    "result_sha256": "a104ca501210242d3ad23d68b7e2c5f23faa14f9d3af68f460b6b984cdda5f07",
+    "case": {
+      "name": "syntax_early_1048576",
+      "family": "syntax_early",
+      "rejection_category": "syntax",
+      "input_bytes": 1048576,
+      "sha256": "ab41a39bc1d2f84d07f3aeaf8f701d04145a8ade01f7a5fee27c3f6f05eede8f",
+      "depth": null
+    },
+    "builds": {
+      "earlier_original": {
+        "revision": "75a445db1987d45677002faaebb9504c8bc6b930",
+        "native_sha256": "781b3c87352b55feb8ae2c1d2d3ad722d8e7c2b1634e953bfcb049724ff35f97",
+        "elf_metadata_sha256": "06973ced690f91e4c56394bf67dcdde7a199c183e688f86e2d66e63a3d06537a",
+        "functions": {
+          "from_utf8": {
+            "symbol": "_ZN4core3str8converts9from_utf817h7500929ad9ac477eE",
+            "address": 629040,
+            "size": 503,
+            "sha256": "5dac1fcd6bc95364db6b2c9892fe836f35245ae7efe6b479a35401534f6cf9fb",
+            "body_hex": "41574156534889f831ff4889d14883e90f480f43f94885d20f84a90100004c8d46074983e0f84929f031c94c8d154e1cf8ff49bb8080808080808080eb11669049ffc64c89f14839d10f83780100000fb61c0e84db78594589c14129c941f6c107741148ffc1ebde0f1f8400000000004883c1104839f9730e4c8b4c0e084c0b0c0e4d85d974e94839d173ba0f1f4000803c0e0078b048ffc14839ca75f2e924010000666666662e0f1f840000000000460fb6341341b1014183fe04745d4183fe0374294183fe020f850a0100004c8d71014939d60f83f800000042803c36bfb3010f8e58ffffffe9f10000004c8d71014939d60f83d9000000460fb634364881fbe0000000744181fbed00000075544180fe9f7e66e9bd0000004c8d71014939d60f83ab000000460fb634364881fbf0000000742281fbf400000075544180fe8f7e5ce98f0000004180e6e04180fea07429e9800000004180c6704180fe30723eeb74448d7b1f4180ff0c720880e3fe80fbee75624180fec07d5c4c8d71024939d6734e42803c36bf0f8eb0feffffeb4a80c30f80fb02773e4180fec07d38488d59024839d3732a803c1ebf7f2d4c8d71034939d6731b42803c36c00f8c7dfeffffb303eb17488970084889501031c9eb1b4531c9eb06b301eb02b3024889480844884810885811b9010000004889085b415e415fc3",
+            "table": {
+              "address": 112048,
+              "size": 256,
+              "sha256": "02b189407fa32e9604226dec547e4849ffaa560a3bf60c7e2cf4d48db5aa2f90",
+              "body_hex": "01010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000202020202020202020202020202020202020202020202020202020202020303030303030303030303030303030304040404040000000000000000000000"
+            },
+            "ascii_loop": {
+              "function_offset": 112,
+              "size": 23,
+              "address": 629152,
+              "address_hex": "0x999a0",
+              "offset_within_64_bytes": 32,
+              "crosses_64_byte_boundary": false,
+              "sha256": "a05318eee3999f9b8e36af1be0022543654520fc0aaff958f0516cd2ba75ddc9"
+            }
+          },
+          "decoder_error": {
+            "symbol": "_ZN10_jsonmodem6compat7Decoder5error17hc90f437f63fd3d70E",
+            "address": 467360,
+            "size": 173,
+            "sha256": "502f4a3f7f5460760c07b0b16e7533c628fce77bcb48ff48ad2ef22bdcd8d8d2",
+            "body_hex": "4889c84989d04889f14885d20f848c000000534a8d1401488b70104531d24531c94989cb6666662e0f1f840000000000410fb61b84db7818498d5b014939f2723feb4e666666662e0f1f84000000000080fbe0721080fbf07216498d5b044939f2721deb2c498d5b024939f27212eb21498d5b034939f273180f1f80000000004d29da4901da49ffc14989db4839d3759f5b488b30488b5008e94299fdff4531c9488b30488b5008e93399fdff"
+          }
+        },
+        "early_error_process_median_ns": [
+          107366.15176151761,
+          108850.16847826086,
+          107764.448,
+          107468.50666666667,
+          107352.36043360434,
+          107749.58045977012,
+          107301.09840425532,
+          108019.14713896457
+        ],
+        "early_error_median_ns": 107609.0435632184
+      },
+      "earlier_rebuilt": {
+        "revision": "75a445db1987d45677002faaebb9504c8bc6b930",
+        "native_sha256": "685504ad656d439dd11419c0157406afdb2958b0f2e721865c00f1bd10849f67",
+        "elf_metadata_sha256": "2857be9c4234992d18348cecce011e8a7620d44a00a40b678540e55b81e71092",
+        "functions": {
+          "from_utf8": {
+            "symbol": "_ZN4core3str8converts9from_utf817h7500929ad9ac477eE",
+            "address": 628800,
+            "size": 503,
+            "sha256": "e91a873d4f3e9c6df486a2f4e5750e3b7400ff43149cc005fc406273ae342871",
+            "body_hex": "41574156534889f831ff4889d14883e90f480f43f94885d20f84a90100004c8d46074983e0f84929f031c94c8d153e1df8ff49bb8080808080808080eb11669049ffc64c89f14839d10f83780100000fb61c0e84db78594589c14129c941f6c107741148ffc1ebde0f1f8400000000004883c1104839f9730e4c8b4c0e084c0b0c0e4d85d974e94839d173ba0f1f4000803c0e0078b048ffc14839ca75f2e924010000666666662e0f1f840000000000460fb6341341b1014183fe04745d4183fe0374294183fe020f850a0100004c8d71014939d60f83f800000042803c36bfb3010f8e58ffffffe9f10000004c8d71014939d60f83d9000000460fb634364881fbe0000000744181fbed00000075544180fe9f7e66e9bd0000004c8d71014939d60f83ab000000460fb634364881fbf0000000742281fbf400000075544180fe8f7e5ce98f0000004180e6e04180fea07429e9800000004180c6704180fe30723eeb74448d7b1f4180ff0c720880e3fe80fbee75624180fec07d5c4c8d71024939d6734e42803c36bf0f8eb0feffffeb4a80c30f80fb02773e4180fec07d38488d59024839d3732a803c1ebf7f2d4c8d71034939d6731b42803c36c00f8c7dfeffffb303eb17488970084889501031c9eb1b4531c9eb06b301eb02b3024889480844884810885811b9010000004889085b415e415fc3",
+            "table": {
+              "address": 112048,
+              "size": 256,
+              "sha256": "02b189407fa32e9604226dec547e4849ffaa560a3bf60c7e2cf4d48db5aa2f90",
+              "body_hex": "01010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000202020202020202020202020202020202020202020202020202020202020303030303030303030303030303030304040404040000000000000000000000"
+            },
+            "ascii_loop": {
+              "function_offset": 112,
+              "size": 23,
+              "address": 628912,
+              "address_hex": "0x998b0",
+              "offset_within_64_bytes": 48,
+              "crosses_64_byte_boundary": true,
+              "sha256": "a05318eee3999f9b8e36af1be0022543654520fc0aaff958f0516cd2ba75ddc9"
+            }
+          },
+          "decoder_error": {
+            "symbol": "_ZN10_jsonmodem6compat7Decoder5error17h33af2e04155f1be0E",
+            "address": 467120,
+            "size": 173,
+            "sha256": "502f4a3f7f5460760c07b0b16e7533c628fce77bcb48ff48ad2ef22bdcd8d8d2",
+            "body_hex": "4889c84989d04889f14885d20f848c000000534a8d1401488b70104531d24531c94989cb6666662e0f1f840000000000410fb61b84db7818498d5b014939f2723feb4e666666662e0f1f84000000000080fbe0721080fbf07216498d5b044939f2721deb2c498d5b024939f27212eb21498d5b034939f273180f1f80000000004d29da4901da49ffc14989db4839d3759f5b488b30488b5008e94299fdff4531c9488b30488b5008e93399fdff"
+          }
+        },
+        "early_error_process_median_ns": [
+          127124.60062893081,
+          127091.71111111112,
+          126569.72641509434,
+          126335.89215686274,
+          126903.99288256228,
+          126473.11146496815,
+          134864.4708029197,
+          127071.92
+        ],
+        "early_error_median_ns": 126987.95644128113
+      }
+    },
+    "comparison": {
+      "utf8_bytes_equal_except_reviewed_table_address_operand": true,
+      "utf8_table_bytes_equal": true,
+      "utf8_ascii_loop_bytes_equal": true,
+      "slower_rebuild_in_all_eight_process_pairs": true,
+      "causal_inference": "None: other code placement, data and process state were not held equal."
+    },
+    "helper_sha256": "a84e0a64eece98368a4a0ac9a389b9aa177c7a00e6c2e7ca01a8db7692e5a9c2"
+  },
+  "identical_file_controls": {
+    "workload": "dumps_small",
+    "input_is_not_long_string_or_early_error": true,
+    "two_files_fixed_names_then_exchanged_and_restored": [
+      {
+        "phase": "before",
+        "result_sha256": "e317bbf9d4341d83b2af7b30716fe89759ad97ebd6f8a54244d693566f12c733",
+        "process_pairs": 6,
+        "copy_slower_in_pairs": 6,
+        "median_latency_ns": {
+          "original_file": 209.44957637786865,
+          "identical_copy": 254.11446952819824
+        },
+        "orjson_worker_median_latency_ns": {
+          "original_file": 126.66800880432129,
+          "identical_copy": 126.66275405883789
+        }
+      },
+      {
+        "phase": "exchanged",
+        "result_sha256": "fab18ee42e5f01aa0b96a63a58fe0c5eecaf3015f31e5996588320049aee2af8",
+        "process_pairs": 6,
+        "copy_slower_in_pairs": 6,
+        "median_latency_ns": {
+          "original_file": 207.3648567199707,
+          "identical_copy": 256.5304985046387
+        },
+        "orjson_worker_median_latency_ns": {
+          "original_file": 127.12122344970703,
+          "identical_copy": 126.51301193237305
+        }
+      },
+      {
+        "phase": "restored",
+        "result_sha256": "7b15391f522afb2ff804cafd02ef1edd45b5675d8baeb1ab2df73a7a305ebc18",
+        "process_pairs": 6,
+        "copy_slower_in_pairs": 6,
+        "median_latency_ns": {
+          "original_file": 207.23293590545654,
+          "identical_copy": 263.80970573425293
+        },
+        "orjson_worker_median_latency_ns": {
+          "original_file": 126.67893886566162,
+          "identical_copy": 125.95150375366211
+        }
+      }
+    ],
+    "one_file_negative_control": {
+      "result_sha256": "f5b8b91d4427bcc7ee7b153cf45ef37e095a3966bc7f732c5e2a517a1c582209",
+      "identical_assignments": {
+        "condition_a": {
+          "source_sha256": "5b1ab812d74c1df4c60d87e3d194c29c140a179a5e7bd2948a4fb6ea61d11ebe",
+          "padded_sha256": "399ca03071e177edd6ea257a57719203cd466a4f3516e7cef88e08baa1dacec4"
+        },
+        "condition_b": {
+          "source_sha256": "5b1ab812d74c1df4c60d87e3d194c29c140a179a5e7bd2948a4fb6ea61d11ebe",
+          "padded_sha256": "399ca03071e177edd6ea257a57719203cd466a4f3516e7cef88e08baa1dacec4"
+        }
+      },
+      "summary": {
+        "loads_small": {
+          "condition_b_over_a": 0.9932888800041445,
+          "ratio_range": [
+            0.9694170993839096,
+            1.0487523691920777
+          ],
+          "paired_ratios": [
+            1.0487523691920777,
+            1.026806517785806,
+            0.9694170993839096,
+            1.0081445403378582,
+            0.9776003744428432,
+            0.9784332196704308
+          ],
+          "ns": {
+            "condition_a": 347.71416664123535,
+            "condition_b": 348.01544189453125
+          },
+          "orjson_ns": {
+            "condition_a": 262.0395698547363,
+            "condition_b": 261.1831245422363
+          },
+          "over_orjson": {
+            "condition_a": 1.3404022572960703,
+            "condition_b": 1.3397515404860627
+          },
+          "b_slower_over_3_percent": 1,
+          "a_slower_over_3_percent": 1
+        },
+        "loads_tiny_integers": {
+          "condition_b_over_a": 1.0172023640584693,
+          "ratio_range": [
+            0.9450720456589627,
+            1.0558891026605748
+          ],
+          "paired_ratios": [
+            1.0273913459513953,
+            0.9966912186946398,
+            1.0070133821655436,
+            0.9450720456589627,
+            1.0485326606382774,
+            1.0558891026605748
+          ],
+          "ns": {
+            "condition_a": 217.7174940109253,
+            "condition_b": 221.6633243560791
+          },
+          "orjson_ns": {
+            "condition_a": 196.92058658599854,
+            "condition_b": 196.72092151641846
+          },
+          "over_orjson": {
+            "condition_a": 1.109339027409811,
+            "condition_b": 1.1165356896999379
+          },
+          "b_slower_over_3_percent": 2,
+          "a_slower_over_3_percent": 1
+        },
+        "loads_scalar_integer": {
+          "condition_b_over_a": 0.9928077636791879,
+          "ratio_range": [
+            0.979756277851368,
+            1.0157424297331725
+          ],
+          "paired_ratios": [
+            0.982050388893468,
+            0.979756277851368,
+            0.9955738346016931,
+            0.9900416927566825,
+            0.9992888643894161,
+            1.0157424297331725
+          ],
+          "ns": {
+            "condition_a": 87.47571754455566,
+            "condition_b": 86.84636306762695
+          },
+          "orjson_ns": {
+            "condition_a": 116.13547992706299,
+            "condition_b": 116.19926643371582
+          },
+          "over_orjson": {
+            "condition_a": 0.7498327886360127,
+            "condition_b": 0.7473301299238133
+          },
+          "b_slower_over_3_percent": 0,
+          "a_slower_over_3_percent": 0
+        },
+        "dumps_small": {
+          "condition_b_over_a": 0.9914268266268588,
+          "ratio_range": [
+            0.972394562009816,
+            1.1242089295108573
+          ],
+          "paired_ratios": [
+            0.9876398359782866,
+            0.9787399991501149,
+            1.1242089295108573,
+            0.972394562009816,
+            1.0100856875872055,
+            0.9952138172754309
+          ],
+          "ns": {
+            "condition_a": 202.80877113342285,
+            "condition_b": 203.12475967407227
+          },
+          "orjson_ns": {
+            "condition_a": 123.43166637420654,
+            "condition_b": 123.69097805023193
+          },
+          "over_orjson": {
+            "condition_a": 1.63683652226038,
+            "condition_b": 1.6446640916632633
+          },
+          "b_slower_over_3_percent": 1,
+          "a_slower_over_3_percent": 0
+        },
+        "dumps_tiny_integers": {
+          "condition_b_over_a": 1.0063072764320005,
+          "ratio_range": [
+            0.9718087227406748,
+            1.072115809754655
+          ],
+          "paired_ratios": [
+            1.0291537771780659,
+            0.9834607756859349,
+            1.072115809754655,
+            0.9759769498792219,
+            1.0340433796174584,
+            0.9718087227406748
+          ],
+          "ns": {
+            "condition_a": 150.21649169921875,
+            "condition_b": 150.70672988891602
+          },
+          "orjson_ns": {
+            "condition_a": 110.1690616607666,
+            "condition_b": 108.24999332427979
+          },
+          "over_orjson": {
+            "condition_a": 1.3600357665930507,
+            "condition_b": 1.3939977891425632
+          },
+          "b_slower_over_3_percent": 2,
+          "a_slower_over_3_percent": 0
+        },
+        "dumps_scalar_integer": {
+          "condition_b_over_a": 1.0037556547167763,
+          "ratio_range": [
+            0.9818168297749138,
+            1.0116853296071047
+          ],
+          "paired_ratios": [
+            1.002744174789303,
+            1.0116853296071047,
+            1.0047671346442497,
+            0.9818168297749138,
+            1.0087276866894523,
+            0.9833782701517546
+          ],
+          "ns": {
+            "condition_a": 78.33834552764893,
+            "condition_b": 78.8061900138855
+          },
+          "orjson_ns": {
+            "condition_a": 81.77212333679199,
+            "condition_b": 80.98212623596191
+          },
+          "over_orjson": {
+            "condition_a": 0.9641097692934173,
+            "condition_b": 0.973052828052765
+          },
+          "b_slower_over_3_percent": 0,
+          "a_slower_over_3_percent": 0
+        }
+      }
+    }
+  },
+  "limits": [
+    "Equal named functions and instruction ranges do not prove the entire call graph equal.",
+    "ELF imports name requested functions, not live resolved pointers.",
+    "No input addresses, runtime mappings or hardware counters were collected here.",
+    "The same-source placement/latency association is not a controlled placement intervention.",
+    "The identical-file controls used a different workload and do not explain these regressions.",
+    "No frozen benchmark values or measured native files were changed."
+  ]
+}
