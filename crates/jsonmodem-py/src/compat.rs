@@ -3,6 +3,17 @@
 
 mod objects;
 
+#[cfg(all(
+    Py_3_12,
+    not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+    not(py_sys_config = "Py_TRACE_REFS"),
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64",
+    target_endian = "little",
+))]
+mod borrowed_dict;
+
 use std::{borrow::Cow, collections::HashMap, ops::Range};
 
 use jsonmodem::document::{DocumentError, DocumentReader, IntegerToken, plain_string_prefix};
@@ -440,9 +451,39 @@ struct Encoder<const CHECKED: bool = false> {
 /// Owning iterators keep each container alive without native recursion.
 enum EncodeIterator<'py> {
     Dict(BoundDictIterator<'py>),
+    #[cfg(all(
+        Py_3_12,
+        not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+        not(py_sys_config = "Py_TRACE_REFS"),
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64",
+        target_endian = "little",
+    ))]
+    ScalarDict(borrowed_dict::DictScalarCursor<'py>),
     Sorted(std::vec::IntoIter<(Bound<'py, PyAny>, Bound<'py, PyAny>)>),
     List(BoundListIterator<'py>),
     Tuple(BoundTupleIterator<'py>),
+}
+
+impl<'py> EncodeIterator<'py> {
+    /// The caller has already selected the sorted-dictionary branch, if needed.
+    fn dict<const CHECKED: bool>(dict: &Bound<'py, PyDict>, dataclass_root: bool) -> Self {
+        #[cfg(all(
+            Py_3_12,
+            not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+            not(py_sys_config = "Py_TRACE_REFS"),
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64",
+            target_endian = "little",
+        ))]
+        if !CHECKED && !dataclass_root {
+            return Self::ScalarDict(borrowed_dict::DictScalarCursor::new(dict.clone()));
+        }
+        let _ = dataclass_root;
+        Self::Dict(dict.iter())
+    }
 }
 
 /// An unfinished container, including identity for active-ancestor cycle
@@ -753,7 +794,11 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                     });
                     (EncodeIterator::Sorted(items.into_iter()), b'{', b'}')
                 } else {
-                    (EncodeIterator::Dict(dict.iter()), b'{', b'}')
+                    (
+                        EncodeIterator::dict::<CHECKED>(dict, self.dataclass_root),
+                        b'{',
+                        b'}',
+                    )
                 }
             } else if let Ok(list) = current.downcast_exact::<PyList>() {
                 (EncodeIterator::List(list.iter()), b'[', b']')
@@ -795,6 +840,22 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                 }
                 let item = match &mut frame.iter {
                     EncodeIterator::Dict(iter) => iter.next().map(|(key, item)| (Some(key), item)),
+                    #[cfg(all(
+                        Py_3_12,
+                        not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+                        not(py_sys_config = "Py_TRACE_REFS"),
+                        target_os = "linux",
+                        target_arch = "x86_64",
+                        target_pointer_width = "64",
+                        target_endian = "little",
+                    ))]
+                    EncodeIterator::ScalarDict(iter) => {
+                        match iter.next(self, &mut frame.count, depth)? {
+                            borrowed_dict::DictStep::Written => continue,
+                            borrowed_dict::DictStep::Owned(key, item) => Some((Some(key), item)),
+                            borrowed_dict::DictStep::End => None,
+                        }
+                    }
                     EncodeIterator::Sorted(iter) => {
                         iter.next().map(|(key, item)| (Some(key), item))
                     }
