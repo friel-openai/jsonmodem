@@ -6,7 +6,10 @@ import pytest
 
 import jsonmodem
 
-orjson = pytest.importorskip("orjson")
+try:
+    import orjson
+except ImportError:
+    orjson = None
 
 
 SIMPLE_ESCAPES = [
@@ -29,7 +32,8 @@ def _inputs(text):
 def _assert_values(text, expected):
     for value in _inputs(text):
         assert jsonmodem.loads(value) == expected
-        assert orjson.loads(value) == expected
+        if orjson is not None:
+            assert orjson.loads(value) == expected
 
 
 @pytest.mark.parametrize("spelling,decoded", SIMPLE_ESCAPES)
