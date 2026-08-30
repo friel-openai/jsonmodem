@@ -8,6 +8,10 @@ mod integer;
 mod integer_tests;
 
 #[cfg(test)]
+#[path = "../../jsonmodem-py/src/compat/escape_mask.rs"]
+mod escape_mask;
+
+#[cfg(test)]
 mod tests {
     fn report_features() {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]

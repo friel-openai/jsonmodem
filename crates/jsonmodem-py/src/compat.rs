@@ -1,6 +1,7 @@
 //! Complete-document operations: no streaming events and no Python
 //! preprocessing.
 
+mod escape_mask;
 #[cfg_attr(
     not(all(
         Py_3_12,
@@ -749,30 +750,56 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
             self.extend(&remaining[..prefix])?;
             remaining = &remaining[prefix..];
             if let Some((&byte, tail)) = remaining.split_first() {
-                match byte {
-                    b'"' => self.extend(b"\\\"")?,
-                    b'\\' => self.extend(b"\\\\")?,
-                    b'\n' => self.extend(b"\\n")?,
-                    b'\r' => self.extend(b"\\r")?,
-                    b'\t' => self.extend(b"\\t")?,
-                    8 => self.extend(b"\\b")?,
-                    12 => self.extend(b"\\f")?,
-                    _ => {
-                        const HEX: &[u8] = b"0123456789abcdef";
-                        self.extend(&[
-                            b'\\',
-                            b'u',
-                            b'0',
-                            b'0',
-                            HEX[usize::from(byte >> 4)],
-                            HEX[usize::from(byte & 15)],
-                        ])?;
+                if let Some(block) = remaining.first_chunk::<16>() {
+                    let mut escapes = escape_mask::mask(block);
+                    if escapes & escapes.wrapping_sub(1) != 0 {
+                        let mut start = 0;
+                        while escapes != 0 {
+                            let index = escapes.trailing_zeros() as usize;
+                            if start < index {
+                                self.extend(&block[start..index])?;
+                            }
+                            self.escape_byte(block[index])?;
+                            start = index + 1;
+                            escapes &= escapes - 1;
+                        }
+                        if start < block.len() {
+                            self.extend(&block[start..])?;
+                        }
+                        remaining = &remaining[block.len()..];
+                        continue;
                     }
                 }
+                self.escape_byte(byte)?;
                 remaining = tail;
             }
         }
         Ok(())
+    }
+
+    /// Write a byte already identified as a JSON escape by either scanner.
+    #[inline]
+    fn escape_byte(&mut self, byte: u8) -> Result<(), OutputAllocationError> {
+        match byte {
+            b'"' => self.extend(b"\\\""),
+            b'\\' => self.extend(b"\\\\"),
+            b'\n' => self.extend(b"\\n"),
+            b'\r' => self.extend(b"\\r"),
+            b'\t' => self.extend(b"\\t"),
+            8 => self.extend(b"\\b"),
+            12 => self.extend(b"\\f"),
+            _ => {
+                const HEX: &[u8] = b"0123456789abcdef";
+                self.extend(&[
+                    b'\\',
+                    b'u',
+                    b'0',
+                    b'0',
+                    HEX[usize::from(byte >> 4)],
+                    HEX[usize::from(byte & 15)],
+                ])
+            }
+        }
     }
 
     fn newline(&mut self, depth: usize) -> Result<(), OutputAllocationError> {
