@@ -7,7 +7,12 @@ import json
 import pytest
 import jsonmodem
 
-orjson = pytest.importorskip("orjson")
+try:
+    import orjson
+except ImportError:
+    orjson = None
+
+MODULES = (jsonmodem,) if orjson is None else (jsonmodem, orjson)
 
 
 def as_input(text, kind):
@@ -32,7 +37,7 @@ def test_trailing_error_after_long_unicode_prefix(character, length, kind):
     text = prefix + "!"
     value = as_input(text, kind)
     errors = []
-    for module in (jsonmodem, orjson):
+    for module in MODULES:
         with pytest.raises(module.JSONDecodeError) as caught:
             module.loads(value)
         error = caught.value
@@ -41,7 +46,8 @@ def test_trailing_error_after_long_unicode_prefix(character, length, kind):
         assert error.colno == len(prefix) - prefix.rfind("\n")
         assert error.doc == text
         errors.append(fields(error))
-    assert errors[0] == errors[1]
+    if orjson is not None:
+        assert errors[0] == errors[1]
 
 
 @pytest.mark.parametrize("tail", [

@@ -181,10 +181,13 @@ Python materialization is part of the measured work; these results are not
 directly comparable to published C++ DOM-only or partial-field measurements.
 
 Library order alternates for two builds. With more builds, it rotates and
-reverses to balance positions. Document order is shuffled deterministically for
-each process repeat and shared across builds. Hash seeds and both orders are
-recorded. Calibration chooses an iteration count near `--seconds` for each
-sample; the actual counts and durations are retained.
+reverses so the same build does not always run first. Equal use of each
+position depends on the repetition count: four builds and eight repetitions
+are balanced; four builds and three memory repetitions are not. Document
+order is shuffled deterministically for each process repeat and shared across
+builds. Hash seeds and both orders are recorded. Calibration chooses an
+iteration count near `--seconds` for each sample; the actual counts and
+durations are retained.
 
 **Latency: lower is better.** `summary.cases.*.measurements.*.latency_ns` is the
 median of the process medians, in nanoseconds per call. Each process median is
