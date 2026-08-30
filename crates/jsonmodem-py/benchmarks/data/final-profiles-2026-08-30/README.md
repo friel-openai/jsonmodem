@@ -15,6 +15,11 @@ CPU controls use the unchanged PR #3 rebuild at `b7fe329`. See the
   stack groups, request and byte counts, medians, profiler diagnostics and
   artifact hashes. The first failed attempt is described separately and
   excluded from those counts.
+- [native-code.json](native-code.json) contains a read-only comparison of
+  the saved native libraries: equal instruction ranges, changed addresses,
+  checked call targets and earlier control observations. See the
+  [native-code report](../../PERFORMANCE_NATIVE_CODE.md) for what this rules
+  out and what remains untested. It contains no new timing measurements.
 
 Each CPU sample and allocation stack can contain several functions. Function
 counts overlap and must not be added. Allocation stack groups partition the

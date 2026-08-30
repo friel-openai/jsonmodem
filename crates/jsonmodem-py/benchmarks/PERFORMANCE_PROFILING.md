@@ -72,6 +72,13 @@ rebuilds already showed slower early-error rejection before the error-position
 change. The [timing report](PERFORMANCE_36H.md) retains those losses; neither
 profiling nor source inspection establishes their cause.
 
+A [native-code comparison](PERFORMANCE_NATIVE_CODE.md) checks the saved
+binaries directly. The UTF-8 and string-scanning loops retain their instructions,
+but the UTF-8 loop moves across a 64-byte boundary. Errors at byte zero skip
+the new character-count loop. The comparison records tests that could
+disprove a loop-placement explanation; it does not claim that explanation
+is established.
+
 ## Final-build allocation profiles
 
 Memray 1.20.0 records native stacks for `citm_catalog`, `twitter` and `mesh`,
@@ -114,9 +121,9 @@ stack group.
 
 These are questions for another measured change, not additional retained code:
 
-- Test whether the existing SIMD UTF-8 validator helps large ASCII inputs,
-  while keeping small, non-ASCII and invalid-input controls. The current
-  selection already uses SIMD for long inputs with early non-ASCII bytes.
+- Test the [UTF-8 loop's placement](PERFORMANCE_NATIVE_CODE.md) before changing
+  its scanning algorithm. The measured builds use identical instructions for
+  long ASCII input. Keep small, non-ASCII and invalid-input controls.
 - Separate dictionary iteration from escaping costs while preserving owned
   references and callback behavior. Earlier cache and borrowing prototypes
   remain [rejected](PERFORMANCE_EXPERIMENTS.md).
