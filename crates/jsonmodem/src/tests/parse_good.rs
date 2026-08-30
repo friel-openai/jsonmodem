@@ -175,7 +175,7 @@ fn reconstruct_values(
     let mut building_root = false;
 
     for evt in events {
-        eprintln!("event: {:?}", &evt);
+        eprintln!("event: {evt:?}");
         match evt {
             ParseEvent::ArrayBegin { path } => {
                 insert_at_path(&mut current_root, &path, Value::Array(Vec::new()));
