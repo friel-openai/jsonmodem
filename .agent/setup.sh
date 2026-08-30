@@ -9,13 +9,13 @@ REPO_NAME="$(basename "$REPO_ROOT")"
 FUZZ_CRATE="${REPO_NAME}-fuzz"           # convention: <repo>-fuzz
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SETUP_DONE_FILE="${SCRIPT_DIR}/.setup_done"
-[[ -f "$SETUP_DONE_FILE" ]] && { echo "✅ Rust development environment already set up."; exit 0; }
 
 ################################################################################
 # Toolchains – “stable” floats automatically, no version parsing needed
 ################################################################################
 STABLE_TOOLCHAIN="stable"
 NIGHTLY_TOOLCHAIN="nightly"
+RUSTFMT_TOOLCHAIN="$(cat "$SCRIPT_DIR/rustfmt-toolchain")"
 CLANG_VERSION=19
 
 if ! command -v rustup >/dev/null 2>&1; then
@@ -23,6 +23,10 @@ if ! command -v rustup >/dev/null 2>&1; then
     sh -s -- -y --profile minimal
   export PATH="$HOME/.cargo/bin:$PATH"
 fi
+
+# Install a changed formatter pin even when the rest of setup is complete.
+rustup toolchain install "$RUSTFMT_TOOLCHAIN" --profile minimal --component rustfmt --no-self-update
+[[ -f "$SETUP_DONE_FILE" ]] && { echo "✅ Rust development environment already set up."; exit 0; }
 
 rustup toolchain install "$STABLE_TOOLCHAIN"  || true   # already installed in most images
 rustup default          "$STABLE_TOOLCHAIN"
