@@ -1,0 +1,538 @@
+{
+  "schema_version": 1,
+  "case": "datetime_D_scalar",
+  "method": {
+    "analysis": "Read the twelve existing Memray captures; no new recording or workload execution.",
+    "interpreter": "CPython 3.12.13",
+    "memray_version": "1.20.0",
+    "orjson_version": "3.11.9",
+    "calls_per_capture": 1,
+    "warmup_calls": 10,
+    "trace_python_allocators": true,
+    "native_traces": false,
+    "grouping": "Disjoint groups of complete recorded Python stacks. Group descriptions do not identify native subfunctions or object counts.",
+    "allocation_counts": "Include allocation-kind records, including zero-byte requests. Exclude FREE, PYMALLOC_FREE and MUNMAP. Reallocations count their full requested new size.",
+    "harness": "Keep benchmark and tracker requests in full-capture totals; no subtraction from published memory results.",
+    "diagnostics": "Every selected recording emitted the previously reported malloc/free symbol-correction warnings. Reading captures cannot prove complete hook coverage.",
+    "comparison": "Allocation requests and requested bytes only; not CPU time, peak live memory or RSS.",
+    "identities": "Build identities and the full memory comparison are in PERFORMANCE_24H_REPRODUCTION.md and data/final-2026-08-31/data.json.",
+    "source_memory_audit_sha256": "a743f8ef4b5b2eadfc3bf0a0f4bea4dafca06ee514952d690786dd99bd2117a3"
+  },
+  "groups": {
+    "harness": "Benchmark loop and tracker calls, without a dumps call on the recorded Python stack.",
+    "outer_dumps": "Outer dumps call without a Python serializer-helper frame; native functions are not resolved.",
+    "numpy_import": "Relative import in special(), including importlib's parent getter.",
+    "scalar_snapshot": "The np.generic.tobytes(value) statement. These are requests attributed to the statement, not separate snapshots.",
+    "snapshot_encoder": "Preparing arguments and calling native._numpy_dumps. Native formatting is not isolated.",
+    "call_encode": "The call to encode() before a more specific Python helper frame is recorded.",
+    "dtype_access": "The value.dtype statement.",
+    "datetime_metadata": "The np.datetime_data(dtype) statement.",
+    "return_encoded": "The return (True, encoded) statement."
+  },
+  "observations": [
+    {
+      "library": "original",
+      "python_hash_seed": 1729,
+      "capture": {
+        "name": "1729.numpy.original.datetime_D_scalar.bin",
+        "size_bytes": 3161,
+        "sha256": "310e53f4317c0f9dec61014974221a31ef87e89e0a6de0e4bdd570784d7c9134"
+      },
+      "requests": 49,
+      "allocated_bytes": 3803,
+      "groups": {
+        "scalar_snapshot": {
+          "requests": 10,
+          "allocated_bytes": 625
+        },
+        "outer_dumps": {
+          "requests": 7,
+          "allocated_bytes": 802
+        },
+        "snapshot_encoder": {
+          "requests": 7,
+          "allocated_bytes": 227
+        },
+        "numpy_import": {
+          "requests": 8,
+          "allocated_bytes": 685
+        },
+        "harness": {
+          "requests": 10,
+          "allocated_bytes": 848
+        },
+        "call_encode": {
+          "requests": 2,
+          "allocated_bytes": 360
+        },
+        "dtype_access": {
+          "requests": 2,
+          "allocated_bytes": 160
+        },
+        "datetime_metadata": {
+          "requests": 2,
+          "allocated_bytes": 64
+        },
+        "return_encoded": {
+          "requests": 1,
+          "allocated_bytes": 32
+        }
+      }
+    },
+    {
+      "library": "rebuilt",
+      "python_hash_seed": 1729,
+      "capture": {
+        "name": "1729.numpy.rebuilt.datetime_D_scalar.bin",
+        "size_bytes": 3179,
+        "sha256": "bc9e941a81b7788a7bb84cc85ae3a5d2c948632c6b91f941f2a15ec5d7dfae41"
+      },
+      "requests": 49,
+      "allocated_bytes": 3803,
+      "groups": {
+        "scalar_snapshot": {
+          "requests": 10,
+          "allocated_bytes": 625
+        },
+        "outer_dumps": {
+          "requests": 7,
+          "allocated_bytes": 802
+        },
+        "snapshot_encoder": {
+          "requests": 7,
+          "allocated_bytes": 227
+        },
+        "numpy_import": {
+          "requests": 8,
+          "allocated_bytes": 685
+        },
+        "harness": {
+          "requests": 10,
+          "allocated_bytes": 848
+        },
+        "call_encode": {
+          "requests": 2,
+          "allocated_bytes": 360
+        },
+        "dtype_access": {
+          "requests": 2,
+          "allocated_bytes": 160
+        },
+        "datetime_metadata": {
+          "requests": 2,
+          "allocated_bytes": 64
+        },
+        "return_encoded": {
+          "requests": 1,
+          "allocated_bytes": 32
+        }
+      }
+    },
+    {
+      "library": "final",
+      "python_hash_seed": 1729,
+      "capture": {
+        "name": "1729.numpy.final.datetime_D_scalar.bin",
+        "size_bytes": 3158,
+        "sha256": "06ae0d8139bb019e96ad7bb2823608d88ee7010a9d77da8f67a5c112b3ecb26e"
+      },
+      "requests": 49,
+      "allocated_bytes": 3803,
+      "groups": {
+        "scalar_snapshot": {
+          "requests": 10,
+          "allocated_bytes": 625
+        },
+        "outer_dumps": {
+          "requests": 7,
+          "allocated_bytes": 802
+        },
+        "snapshot_encoder": {
+          "requests": 7,
+          "allocated_bytes": 227
+        },
+        "numpy_import": {
+          "requests": 8,
+          "allocated_bytes": 685
+        },
+        "harness": {
+          "requests": 10,
+          "allocated_bytes": 848
+        },
+        "call_encode": {
+          "requests": 2,
+          "allocated_bytes": 360
+        },
+        "dtype_access": {
+          "requests": 2,
+          "allocated_bytes": 160
+        },
+        "datetime_metadata": {
+          "requests": 2,
+          "allocated_bytes": 64
+        },
+        "return_encoded": {
+          "requests": 1,
+          "allocated_bytes": 32
+        }
+      }
+    },
+    {
+      "library": "orjson",
+      "python_hash_seed": 1729,
+      "capture": {
+        "name": "1729.numpy.orjson.datetime_D_scalar.bin",
+        "size_bytes": 2356,
+        "sha256": "94a9d5cd48782c0e773de77ceb698c6b565cffe57e0f634ef0d96f944715d08b"
+      },
+      "requests": 22,
+      "allocated_bytes": 2663,
+      "groups": {
+        "outer_dumps": {
+          "requests": 12,
+          "allocated_bytes": 1815
+        },
+        "harness": {
+          "requests": 10,
+          "allocated_bytes": 848
+        }
+      }
+    },
+    {
+      "library": "original",
+      "python_hash_seed": 1730,
+      "capture": {
+        "name": "1730.numpy.original.datetime_D_scalar.bin",
+        "size_bytes": 3161,
+        "sha256": "667103943c4e22e392c2feabaa1678dfc04f8734038b5a8091741068a8bffef9"
+      },
+      "requests": 49,
+      "allocated_bytes": 3803,
+      "groups": {
+        "scalar_snapshot": {
+          "requests": 10,
+          "allocated_bytes": 625
+        },
+        "outer_dumps": {
+          "requests": 7,
+          "allocated_bytes": 802
+        },
+        "snapshot_encoder": {
+          "requests": 7,
+          "allocated_bytes": 227
+        },
+        "numpy_import": {
+          "requests": 8,
+          "allocated_bytes": 685
+        },
+        "harness": {
+          "requests": 10,
+          "allocated_bytes": 848
+        },
+        "call_encode": {
+          "requests": 2,
+          "allocated_bytes": 360
+        },
+        "dtype_access": {
+          "requests": 2,
+          "allocated_bytes": 160
+        },
+        "datetime_metadata": {
+          "requests": 2,
+          "allocated_bytes": 64
+        },
+        "return_encoded": {
+          "requests": 1,
+          "allocated_bytes": 32
+        }
+      }
+    },
+    {
+      "library": "rebuilt",
+      "python_hash_seed": 1730,
+      "capture": {
+        "name": "1730.numpy.rebuilt.datetime_D_scalar.bin",
+        "size_bytes": 3173,
+        "sha256": "32b8f0271bbbb6e7e7d23a834c16f7a4dda41dc44a4832dc03a7dad1b39d415b"
+      },
+      "requests": 49,
+      "allocated_bytes": 3803,
+      "groups": {
+        "scalar_snapshot": {
+          "requests": 10,
+          "allocated_bytes": 625
+        },
+        "outer_dumps": {
+          "requests": 7,
+          "allocated_bytes": 802
+        },
+        "snapshot_encoder": {
+          "requests": 7,
+          "allocated_bytes": 227
+        },
+        "numpy_import": {
+          "requests": 8,
+          "allocated_bytes": 685
+        },
+        "harness": {
+          "requests": 10,
+          "allocated_bytes": 848
+        },
+        "call_encode": {
+          "requests": 2,
+          "allocated_bytes": 360
+        },
+        "dtype_access": {
+          "requests": 2,
+          "allocated_bytes": 160
+        },
+        "datetime_metadata": {
+          "requests": 2,
+          "allocated_bytes": 64
+        },
+        "return_encoded": {
+          "requests": 1,
+          "allocated_bytes": 32
+        }
+      }
+    },
+    {
+      "library": "final",
+      "python_hash_seed": 1730,
+      "capture": {
+        "name": "1730.numpy.final.datetime_D_scalar.bin",
+        "size_bytes": 3171,
+        "sha256": "33cd6c217fca40935b83297216291706b22be2f35f8c0861841078b1478e33c1"
+      },
+      "requests": 49,
+      "allocated_bytes": 3803,
+      "groups": {
+        "scalar_snapshot": {
+          "requests": 10,
+          "allocated_bytes": 625
+        },
+        "outer_dumps": {
+          "requests": 7,
+          "allocated_bytes": 802
+        },
+        "snapshot_encoder": {
+          "requests": 7,
+          "allocated_bytes": 227
+        },
+        "numpy_import": {
+          "requests": 8,
+          "allocated_bytes": 685
+        },
+        "harness": {
+          "requests": 10,
+          "allocated_bytes": 848
+        },
+        "call_encode": {
+          "requests": 2,
+          "allocated_bytes": 360
+        },
+        "dtype_access": {
+          "requests": 2,
+          "allocated_bytes": 160
+        },
+        "datetime_metadata": {
+          "requests": 2,
+          "allocated_bytes": 64
+        },
+        "return_encoded": {
+          "requests": 1,
+          "allocated_bytes": 32
+        }
+      }
+    },
+    {
+      "library": "orjson",
+      "python_hash_seed": 1730,
+      "capture": {
+        "name": "1730.numpy.orjson.datetime_D_scalar.bin",
+        "size_bytes": 2358,
+        "sha256": "d7c9fa948e8f6cb8d44201732d94b1e95cc6dd7306a94ba6e835569bd80f7111"
+      },
+      "requests": 22,
+      "allocated_bytes": 2663,
+      "groups": {
+        "outer_dumps": {
+          "requests": 12,
+          "allocated_bytes": 1815
+        },
+        "harness": {
+          "requests": 10,
+          "allocated_bytes": 848
+        }
+      }
+    },
+    {
+      "library": "original",
+      "python_hash_seed": 1731,
+      "capture": {
+        "name": "1731.numpy.original.datetime_D_scalar.bin",
+        "size_bytes": 3171,
+        "sha256": "d8e3823236f917318d2e5ac13533bae199f286ca9a5ebdddd7d449a06be84a24"
+      },
+      "requests": 49,
+      "allocated_bytes": 3803,
+      "groups": {
+        "scalar_snapshot": {
+          "requests": 10,
+          "allocated_bytes": 625
+        },
+        "outer_dumps": {
+          "requests": 7,
+          "allocated_bytes": 802
+        },
+        "snapshot_encoder": {
+          "requests": 7,
+          "allocated_bytes": 227
+        },
+        "numpy_import": {
+          "requests": 8,
+          "allocated_bytes": 685
+        },
+        "harness": {
+          "requests": 10,
+          "allocated_bytes": 848
+        },
+        "call_encode": {
+          "requests": 2,
+          "allocated_bytes": 360
+        },
+        "dtype_access": {
+          "requests": 2,
+          "allocated_bytes": 160
+        },
+        "datetime_metadata": {
+          "requests": 2,
+          "allocated_bytes": 64
+        },
+        "return_encoded": {
+          "requests": 1,
+          "allocated_bytes": 32
+        }
+      }
+    },
+    {
+      "library": "rebuilt",
+      "python_hash_seed": 1731,
+      "capture": {
+        "name": "1731.numpy.rebuilt.datetime_D_scalar.bin",
+        "size_bytes": 3173,
+        "sha256": "f923c6a588f7502a4cec1b2f5865027711851c759b98383ed690fd3e264fa5d6"
+      },
+      "requests": 49,
+      "allocated_bytes": 3803,
+      "groups": {
+        "scalar_snapshot": {
+          "requests": 10,
+          "allocated_bytes": 625
+        },
+        "outer_dumps": {
+          "requests": 7,
+          "allocated_bytes": 802
+        },
+        "snapshot_encoder": {
+          "requests": 7,
+          "allocated_bytes": 227
+        },
+        "numpy_import": {
+          "requests": 8,
+          "allocated_bytes": 685
+        },
+        "harness": {
+          "requests": 10,
+          "allocated_bytes": 848
+        },
+        "call_encode": {
+          "requests": 2,
+          "allocated_bytes": 360
+        },
+        "dtype_access": {
+          "requests": 2,
+          "allocated_bytes": 160
+        },
+        "datetime_metadata": {
+          "requests": 2,
+          "allocated_bytes": 64
+        },
+        "return_encoded": {
+          "requests": 1,
+          "allocated_bytes": 32
+        }
+      }
+    },
+    {
+      "library": "final",
+      "python_hash_seed": 1731,
+      "capture": {
+        "name": "1731.numpy.final.datetime_D_scalar.bin",
+        "size_bytes": 3164,
+        "sha256": "68f08f26f7c8f89ef06a0e5fa178c7308067e68550395824e341450a991c5364"
+      },
+      "requests": 49,
+      "allocated_bytes": 3803,
+      "groups": {
+        "scalar_snapshot": {
+          "requests": 10,
+          "allocated_bytes": 625
+        },
+        "outer_dumps": {
+          "requests": 7,
+          "allocated_bytes": 802
+        },
+        "snapshot_encoder": {
+          "requests": 7,
+          "allocated_bytes": 227
+        },
+        "numpy_import": {
+          "requests": 8,
+          "allocated_bytes": 685
+        },
+        "harness": {
+          "requests": 10,
+          "allocated_bytes": 848
+        },
+        "call_encode": {
+          "requests": 2,
+          "allocated_bytes": 360
+        },
+        "dtype_access": {
+          "requests": 2,
+          "allocated_bytes": 160
+        },
+        "datetime_metadata": {
+          "requests": 2,
+          "allocated_bytes": 64
+        },
+        "return_encoded": {
+          "requests": 1,
+          "allocated_bytes": 32
+        }
+      }
+    },
+    {
+      "library": "orjson",
+      "python_hash_seed": 1731,
+      "capture": {
+        "name": "1731.numpy.orjson.datetime_D_scalar.bin",
+        "size_bytes": 2357,
+        "sha256": "af6e52927bb7fb116c74715b1d0172a857f9f97171d9282ff672652d1257da59"
+      },
+      "requests": 22,
+      "allocated_bytes": 2663,
+      "groups": {
+        "outer_dumps": {
+          "requests": 12,
+          "allocated_bytes": 1815
+        },
+        "harness": {
+          "requests": 10,
+          "allocated_bytes": 848
+        }
+      }
+    }
+  ]
+}

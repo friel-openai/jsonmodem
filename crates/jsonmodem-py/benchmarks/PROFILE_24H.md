@@ -117,14 +117,86 @@ Python values for the invalid document: 29 allocation requests instead of
 262,083 for the 1 MiB case. orjson records 28. Those counts are allocations,
 not sampled stacks, and come from separate Memray runs.
 
-## Remaining questions
+## Unique escaped keys
 
 The largest maintained relative gap is decoding unique escaped keys. It
 still takes 143.339 us versus orjson's 36.870 us in the Original comparison.
-The large-document profiles show key and dictionary work, but do not by
-themselves establish which change would fix this separate fixture. Any new
-key-cache experiment must include unique keys, changing documents and RSS,
-not just repeated-key examples.
+The fixture contains 600 distinct short keys, each with one newline escape.
+[Decoder::key](../src/compat.rs#L184) attempts 600 local-cache lookups, all misses.
+It copies the first 512 decoded keys into owned Rust strings for the cache
+and retains their Python strings. All 600 Python strings are constructed
+again on the next call because this cache lasts only for one document.
+The final native code contains separate lookup and insertion hashes, plus
+the owned-key allocation and copy. The escape buffer itself is reused.
+
+These keys stop within the scanner's first eight-byte check, before its
+32-byte loop. Wider scanning alone would not remove this cache work.
+orjson 3.11.9's [short-key cache](https://github.com/ijl/orjson/blob/3.11.9/src/deserialize/pyobject.rs)
+can retain Python keys across calls. Neither source inspection nor the
+large-document profiles establish how much of this fixture's gap comes from
+key reuse. The persistent-cache experiments rejected for broader regressions
+remain rejected.
+
+A follow-up measurement could compare repeated decoding of one document with
+cycling through 64 documents whose keys differ only in their three-letter
+prefix. Keep key lengths, escape positions, values and result destruction
+unchanged. Check allocations separately. If reduced key reuse changes the
+allocation counts but leaves the timing gap unchanged, reject key reuse as
+the dominant explanation. This measurement has not been run. Any eventual
+cache change also needs the complete suites, changing documents and RSS.
+
+## Scalar NumPy timestamps
+
+A day-resolution NumPy scalar takes 3.083 us versus orjson's 0.869 us in the
+[Original comparison](data/final-2026-08-31/NUMPY_ORIGINAL.md). The saved
+[allocation analysis](data/profiles-2026-08-31/scalar-numpy-allocations.json)
+record 49 requests for each jsonmodem build and 22 for orjson. Both totals
+include ten requests from the benchmark and tracker calls. No requests are
+subtracted from the published totals.
+
+All three Final captures attribute eight requests to resolving the already
+loaded NumPy helper in [special()](../python/jsonmodem/_compat.py#L70). NumPy is
+not reloaded each time. Ten requests are attributed to the scalar `tobytes`
+statement, and seven to preparing arguments and calling `_numpy_dumps`.
+These counts do not mean ten snapshots or seven formatter allocations:
+the recordings contain Python stacks, not native function stacks or time
+measurements. They cannot establish the cost of checked calendar arithmetic.
+
+A future test could retain the optional helper after its first import without
+changing the native `dumps` wrapper. That differs from the earlier experiment
+that retained the outer compatibility module and slowed ordinary values.
+Check that NumPy stays optional and that reloading `jsonmodem._numpy` works.
+Replacing `_numpy.encode` and invoking `default` callbacks must retain their
+current behavior.
+If removing the import-associated requests does not improve complete-call
+timing against both unchanged controls, reject the performance hypothesis.
+This test has not been run. Snapshot ownership and checked arithmetic remain
+required.
+
+## Sorted output
+
+`sorted_medium` increased from 256.133 to 285.742 us in the Original
+comparison; orjson measured with Final takes 129.707 us. The fixture contains
+1,000 dictionaries, each with four keys and integer, float, boolean and
+short ASCII string values.
+
+Both builds collect owning pairs, validate the keys and compare their UTF-8
+text while sorting. The new non-string-key validation routine and borrowed
+dictionary cursor are not selected by this fixture's `OPT_SORT_KEYS` option.
+Final adds option and cache-length checks while avoiding some integer and
+ASCII-string C API calls. The recorded allocation counts are unchanged.
+These observations do not establish the cause of the 11% loss; the existing
+sorted CPU recording belongs to Original, not Final.
+
+A follow-up measurement could use the unchanged binaries with the same keys
+and insertion order but all values set to `False`. If the absolute loss
+remains comparable, that would weigh against numeric and name-string
+serialization as its main cause. A smaller gap would not establish causality
+because output size also changes. This measurement has not been run and
+would not replace the original benchmark. The rejected sorting experiments
+remain rejected.
+
+## Other unresolved costs
 
 Depth-limit rejection also remains slow: 30.864 us versus 3.912 us for 1,025
 nested arrays. This fixture was not CPU-profiled here. Source inspection
