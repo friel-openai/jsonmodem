@@ -15,6 +15,31 @@ python -c "import jsonmodem, sys; print(jsonmodem.__version__)"
 
 ## Streaming usage
 
+Use `JsonModemEvents` when you need event payloads but not their paths:
+
+```python
+from jsonmodem import JsonModemEvents
+
+parser = JsonModemEvents()
+for kind, path, payload in parser.feed('[1, true]'):
+    assert path is None
+    print(kind, payload)
+list(parser.finish())
+```
+
+`JsonModemEvents(track_paths=True)` enables paths for that instance. Without
+tracking, the parser keeps the parent container kinds needed to validate JSON,
+but does not retain property names or count array indices. Omitted paths are
+`None`; an empty path still means the document root. Parsing, UTF-8 checks,
+number handling, error locations, and the nesting limit are unchanged.
+
+`JsonModemEvents` does not build values or cumulative string prefixes. Its
+`feed()` still collects the current call's events before returning an iterator.
+Use `JsonModemValues` to build values, and `JsonModem` for path filters or byte
+views. Existing `JsonModem()` calls continue to include paths. These choices are
+per instance, not Cargo features, so another dependency cannot enable tracking
+for your parser.
+
 `JsonModem` returns parser events as `(kind, path, payload)` tuples.
 `path` is a `PathView` identifying the location in the document. String
 payloads are `StringPayload` objects with `.fragment`,

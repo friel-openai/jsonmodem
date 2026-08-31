@@ -5,6 +5,7 @@ compile_error!(
 
 mod buffer;
 mod compat;
+mod events;
 mod numpy;
 
 use std::{
@@ -3906,6 +3907,7 @@ fn jsonmodem(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     register_decode_mode_constants(py)?;
     m.add_class::<PyParserOptions>()?;
     m.add_class::<PyJsonModem>()?;
+    m.add_class::<events::PyJsonModemEvents>()?;
     m.add_class::<PyEventIter>()?;
     m.add_class::<PyPathView>()?;
     m.add_class::<PyStringPayload>()?;
