@@ -109,6 +109,10 @@ def test_string_subclasses_do_not_invoke_overrides(text, placement, option):
             raise AssertionError(f"attribute lookup: {name}")
 
     value = placed(Text(text), placement)
+    if placement == "dict_key":
+        with pytest.raises(TypeError, match="Dict key must be str"):
+            jsonmodem.dumps(value, option=option)
+        option |= jsonmodem.OPT_NON_STR_KEYS
     assert jsonmodem.dumps(value, option=option) == expected_bytes(placed(text, placement), option)
 
 
