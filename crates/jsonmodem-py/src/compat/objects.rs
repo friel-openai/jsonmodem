@@ -4,7 +4,7 @@ mod datetime;
 
 use pyo3::{
     Borrowed,
-    exceptions::{PyOverflowError, PyTypeError, PyUnicodeEncodeError},
+    exceptions::{PyOverflowError, PyTypeError, PyUnicodeEncodeError, PyValueError},
     intern,
     prelude::*,
     types::{PyBytes, PyDict, PyInt, PyList, PyString, PyTuple, PyType},
@@ -294,7 +294,10 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
             .downcast_exact::<PyInt>()?
             .extract::<u128>()
             .map_err(|error| {
-                if error.is_instance_of::<PyOverflowError>(value.py()) {
+                // Python 3.13 reports negative unsigned conversion as ValueError.
+                if error.is_instance_of::<PyOverflowError>(value.py())
+                    || error.is_instance_of::<PyValueError>(value.py())
+                {
                     PyTypeError::new_err("UUID.int is outside 128-bit range")
                 } else {
                     error
