@@ -13,7 +13,7 @@ use smallvec::SmallVec;
 
 use super::{
     APPEND_NEWLINE, Encoder, INITIAL_OUTPUT_CAPACITY, MAX_ENCODE_DEPTH, NON_STR_KEYS, SORT_KEYS,
-    allocation_error, key_utf8_error, output,
+    allocation_error, key_utf8_error, output, string_text,
 };
 
 const PASSTHROUGH_SUBCLASS: i32 = 256;
@@ -222,7 +222,7 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                 let mut items = ObjectItems::new();
                 for (key, item) in attributes.iter() {
                     if let Ok(text) = key.downcast_exact::<PyString>() {
-                        match text.to_str() {
+                        match string_text(text) {
                             Ok(text) if text.starts_with('_') => continue,
                             Ok(_) => (),
                             // Invalid names fail at key emission, after earlier callbacks.
