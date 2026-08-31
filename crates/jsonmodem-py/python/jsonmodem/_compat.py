@@ -40,10 +40,12 @@ def datetime_text(value, option):
 
 
 def key_text(value, option):
-    if isinstance(value, str):
-        return str.__str__(value)
+    if type(value) is str:
+        return value
     if not option & 4:
         raise TypeError("Dict key must be str")
+    if isinstance(value, str):
+        return str.__str__(value)
     if value is None:
         return "null"
     if type(value) in (bool, int, float):

@@ -2,6 +2,7 @@
 
 import dataclasses
 import json
+import sys
 
 import pytest
 
@@ -123,31 +124,35 @@ def test_callback_uses_retained_entries_after_source_is_cleared():
     assert calls == [first, last]
 
 
+@pytest.mark.skipif(
+    sys.implementation.name != "cpython" or bool(getattr(sys, "_is_gil_enabled", lambda: True)()) is False,
+    reason="checks GIL-enabled CPython reference counts",
+)
 def test_checked_cache_retains_first_sixteen_field_owners():
-    events = []
-
-    class FieldName(str):
-        def __del__(self):
-            events.append(str(self))
-
     @dataclasses.dataclass
     class Record:
         pass
 
     record = Record()
     names = [f"field_{index}" for index in range(17)]
-    for index, name in enumerate(names):
-        record.__dict__[FieldName(name)] = index
+    # Avoid references retained by CPython's shared instance-key table.
+    record.__dict__ = dict(zip(names, range(17)))
     value = ["x" * 2048, record, object()]
     expected = [value[0], dict(zip(names, range(17))), None]
+    references = [sys.getrefcount(name) for name in names]
+    calls = []
 
-    def default(value):
+    def default(item):
+        calls.append(item)
         record.__dict__.clear()
-        assert events == [names[16]]
+        assert [sys.getrefcount(name) for name in names] == [
+            count - int(index == 16) for index, count in enumerate(references)
+        ]
         return None
 
     assert jsonmodem.dumps(value, default=default) == expected_bytes(expected)
-    assert events == [names[16], *names[:16]]
+    assert calls == [value[2]]
+    assert [sys.getrefcount(name) for name in names] == [count - 1 for count in references]
 
 
 @pytest.mark.parametrize("key", ["\ud800", "\udfff", "key\ud800"])

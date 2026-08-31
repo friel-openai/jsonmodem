@@ -599,6 +599,14 @@ fn allocation_error() -> PyErr {
     PyMemoryError::new_err("JSON serialization allocation failed")
 }
 
+/// Retain Python's conversion error as the cause of an invalid JSON key.
+#[cold]
+fn key_utf8_error(py: Python<'_>, cause: PyErr) -> PyErr {
+    let error = PyTypeError::new_err("str is not valid UTF-8");
+    error.set_cause(py, Some(cause));
+    error
+}
+
 /// Output writes fail only on allocation; callers construct the Python
 /// exception.
 struct OutputAllocationError;
@@ -728,7 +736,7 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                 return Ok(());
             }
         }
-        let text = string_text(key).map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
+        let text = string_text(key).map_err(|cause| key_utf8_error(key.py(), cause))?;
         let start = self.output.len();
         self.string(text)?;
         if cache && self.keys.len() < 16 && text.len() <= 64 {
@@ -943,6 +951,18 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                 return Err(PyTypeError::new_err("circular reference"));
             }
             let (iter, opening, closing) = if let Ok(dict) = current.downcast_exact::<PyDict>() {
+                // NON_STR_KEYS validates every key before values, even without sorting.
+                if self.option & (NON_STR_KEYS | SORT_KEYS) == NON_STR_KEYS
+                    && (!self.dataclass_root || !stack.is_empty())
+                {
+                    for (key, _) in dict.iter() {
+                        let Ok(key) = key.downcast_exact::<PyString>() else {
+                            return Ok(false);
+                        };
+                        key.to_str()
+                            .map_err(|cause| key_utf8_error(key.py(), cause))?;
+                    }
+                }
                 if self.option & SORT_KEYS != 0 && (!self.dataclass_root || !stack.is_empty()) {
                     let mut items: Vec<_> = dict.iter().collect();
                     for (key, _) in &items {
@@ -950,7 +970,7 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                             return Ok(false);
                         };
                         key.to_str()
-                            .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
+                            .map_err(|cause| key_utf8_error(key.py(), cause))?;
                     }
                     items.sort_unstable_by(|(left, _), (right, _)| {
                         left.downcast::<PyString>()

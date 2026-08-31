@@ -184,7 +184,10 @@ def test_string_subclass_key_keeps_fallback():
         def __str__(self):
             raise AssertionError("__str__")
 
-    assert jsonmodem.dumps({"before": 257, Key("key"): 1, "after": -1}) == (
+    value = {"before": 257, Key("key"): 1, "after": -1}
+    with pytest.raises(TypeError, match="Dict key must be str"):
+        jsonmodem.dumps(value)
+    assert jsonmodem.dumps(value, option=jsonmodem.OPT_NON_STR_KEYS) == (
         b'{"before":257,"key":1,"after":-1}'
     )
 

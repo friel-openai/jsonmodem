@@ -189,38 +189,33 @@ def test_callback_restarts_after_ascii_keys_and_reenters_encoder():
 
 @pytest.mark.skipif(
     sys.implementation.name != "cpython" or bool(getattr(sys, "_is_gil_enabled", lambda: True)()) is False,
-    reason="checks GIL-enabled CPython finalization order",
+    reason="checks GIL-enabled CPython reference counts",
 )
 @pytest.mark.parametrize("suffix", ["", "\x00\n", "\u00e9"])
-def test_checked_key_cache_keeps_subclass_field_owners(suffix):
-    events = []
-
-    class FieldName(str):
-        """Releasing a field name must remain observable at the same point."""
-
-        def __del__(self):
-            events.append(str.__str__(self))
-
+def test_checked_key_cache_keeps_field_owners(suffix):
     @dataclasses.dataclass
     class Record:
         pass
 
     record = Record()
     names = [f"field_{index}{suffix}" for index in range(17)]
-    for index, name in enumerate(names):
-        record.__dict__[FieldName(name)] = index
+    # Avoid references retained by CPython's shared instance-key table.
+    record.__dict__ = dict(zip(names, range(17)))
     marker = object()
     value = ["p" * 2048, record, marker]
     expected = [value[0], dict(zip(names, range(17))), None]
+    references = [sys.getrefcount(name) for name in names]
     calls = []
 
     def default(item):
         assert item is marker
         calls.append(item)
         record.__dict__.clear()
-        assert events == [names[16]]
+        assert [sys.getrefcount(name) for name in names] == [
+            count - int(index == 16) for index, count in enumerate(references)
+        ]
         return None
 
     assert jsonmodem.dumps(value, default=default) == expected_bytes(expected)
     assert calls == [marker]
-    assert events == [names[16], *names[:16]]
+    assert [sys.getrefcount(name) for name in names] == [count - 1 for count in references]

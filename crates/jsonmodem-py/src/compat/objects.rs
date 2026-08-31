@@ -4,7 +4,7 @@ mod datetime;
 
 use pyo3::{
     Borrowed,
-    exceptions::PyTypeError,
+    exceptions::{PyTypeError, PyUnicodeEncodeError},
     intern,
     prelude::*,
     types::{PyBytes, PyDict, PyInt, PyList, PyString, PyTuple, PyType},
@@ -12,7 +12,8 @@ use pyo3::{
 use smallvec::SmallVec;
 
 use super::{
-    APPEND_NEWLINE, Encoder, INITIAL_OUTPUT_CAPACITY, MAX_ENCODE_DEPTH, SORT_KEYS, allocation_error,
+    APPEND_NEWLINE, Encoder, INITIAL_OUTPUT_CAPACITY, MAX_ENCODE_DEPTH, NON_STR_KEYS, SORT_KEYS,
+    allocation_error, key_utf8_error,
 };
 
 const PASSTHROUGH_SUBCLASS: i32 = 256;
@@ -155,17 +156,20 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
         for (key, value) in dict.iter() {
             push_field(&mut items, key, value)?;
         }
-        for (key, _) in &mut items {
-            if !key.is_exact_instance_of::<PyString>() {
-                *key = self.key_text.call1((&*key, self.encoder.option))?;
+        let option = self.encoder.option;
+        // Without key options, earlier value callbacks precede a later invalid key.
+        if option & (SORT_KEYS | NON_STR_KEYS) != 0 {
+            for (key, _) in &mut items {
+                if option & NON_STR_KEYS != 0 && !key.is_exact_instance_of::<PyString>() {
+                    *key = self.key_text.call1((&*key, option))?;
+                }
+                key.downcast_exact::<PyString>()
+                    .map_err(|_| PyTypeError::new_err("Dict key must be str"))?
+                    .to_str()
+                    .map_err(|cause| key_utf8_error(key.py(), cause))?;
             }
         }
-        if self.encoder.option & SORT_KEYS != 0 {
-            for (key, _) in &items {
-                key.downcast::<PyString>()?
-                    .to_str()
-                    .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
-            }
+        if option & SORT_KEYS != 0 {
             // Original positions preserve equal converted keys without the
             // infallible scratch allocation used by slice::sort_by.
             let mut order: SmallVec<[usize; 16]> = SmallVec::new();
@@ -217,13 +221,18 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                 let attributes = attributes.downcast::<PyDict>()?;
                 let mut items = ObjectItems::new();
                 for (key, item) in attributes.iter() {
-                    let text = key
-                        .downcast::<PyString>()?
-                        .to_str()
-                        .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
-                    if !text.starts_with('_') {
-                        push_field(&mut items, key, item)?;
+                    if let Ok(text) = key.downcast_exact::<PyString>() {
+                        match text.to_str() {
+                            Ok(text) if text.starts_with('_') => continue,
+                            Ok(_) => (),
+                            // Invalid names fail at key emission, after earlier callbacks.
+                            Err(error) if error.is_instance_of::<PyUnicodeEncodeError>(py) => {
+                                drop(error);
+                            }
+                            Err(error) => return Err(key_utf8_error(py, error)),
+                        }
                     }
+                    push_field(&mut items, key, item)?;
                 }
                 items
             } else {
@@ -393,7 +402,10 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                     frame.count += 1;
                     self.encoder.newline(depth)?;
                     if let Some(key) = key {
-                        self.encoder.key(key.downcast::<PyString>()?)?;
+                        let key = key
+                            .downcast_exact::<PyString>()
+                            .map_err(|_| PyTypeError::new_err("Dict key must be str"))?;
+                        self.encoder.key(key)?;
                         self.encoder.push(b':')?;
                         if option & super::INDENT != 0 {
                             self.encoder.push(b' ')?;
