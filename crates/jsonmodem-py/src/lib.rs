@@ -20,7 +20,7 @@ use ::jsonmodem::{
 use pyo3::{
     class::basic::CompareOp,
     create_exception,
-    exceptions::{PyException, PyIndexError, PyTypeError},
+    exceptions::{PyException, PyIndexError, PyOverflowError, PyTypeError},
     ffi,
     prelude::*,
     types::{
@@ -28,6 +28,7 @@ use pyo3::{
         PyStringMethods, PyTuple,
     },
 };
+use smallvec::SmallVec;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum DecodeMode {
@@ -372,6 +373,34 @@ fn build_byte_view_payload_with_interns<'py>(
     }
 }
 
+/// Build a tuple from prepared owners without running Python during filling.
+/// An arbitrary iterator is not accepted: producing an item could allocate and
+/// let a GC callback observe the outer tuple's uninitialized slots.
+fn tuple_from_owned_items<'py>(
+    py: Python<'py>,
+    items: SmallVec<[Bound<'py, PyAny>; 8]>,
+) -> PyResult<Bound<'py, PyTuple>> {
+    let length = ffi::Py_ssize_t::try_from(items.len())
+        .map_err(|_| PyOverflowError::new_err("tuple is too large"))?;
+    // SAFETY: Python is attached, and a NULL allocation becomes MemoryError.
+    let tuple = unsafe { Bound::from_owned_ptr_or_err(py, ffi::PyTuple_New(length))? };
+    for (index, item) in items.into_iter().enumerate() {
+        // SAFETY: all owners were prepared before allocating the tuple. Moving
+        // them into NULL slots cannot allocate, release the GIL, or call Python.
+        // Thus the tuple remains uniquely owned and every index is in bounds.
+        // SetItem consumes item on both success and failure.
+        let status = unsafe {
+            ffi::PyTuple_SetItem(tuple.as_ptr(), index as ffi::Py_ssize_t, item.into_ptr())
+        };
+        if status != 0 {
+            drop(tuple);
+            return Err(PyErr::fetch(py));
+        }
+    }
+    // SAFETY: PyTuple_New returned this exact tuple, now fully initialized.
+    Ok(unsafe { tuple.downcast_into_unchecked() })
+}
+
 fn build_path_tuple<'py>(
     py: Python<'py>,
     path: &[OwnedPathComponent],
@@ -381,35 +410,11 @@ fn build_path_tuple<'py>(
         return Ok(PyTuple::empty(py));
     }
 
-    // SAFETY: each index belongs to the newly allocated, private tuple. Each
-    // pair is transferred exactly once; DECREF handles incomplete initialization.
-    unsafe {
-        let tuple_ptr = ffi::PyTuple_New(path.len() as ffi::Py_ssize_t);
-        if tuple_ptr.is_null() {
-            return Err(PyErr::fetch(py));
-        }
-
-        for (index, component) in path.iter().enumerate() {
-            let pair = match build_path_component_tuple(py, component, interns) {
-                Ok(pair) => pair,
-                Err(err) => {
-                    ffi::Py_DECREF(tuple_ptr);
-                    return Err(err);
-                }
-            };
-            let status = ffi::PyTuple_SetItem(
-                tuple_ptr,
-                index as ffi::Py_ssize_t,
-                pair.into_any().unbind().into_ptr(),
-            );
-            if status != 0 {
-                ffi::Py_DECREF(tuple_ptr);
-                return Err(PyErr::fetch(py));
-            }
-        }
-
-        Ok(Bound::from_owned_ptr(py, tuple_ptr).downcast_into_unchecked())
+    let mut items = SmallVec::with_capacity(path.len());
+    for component in path {
+        items.push(build_path_component_tuple(py, component, interns)?.into_any());
     }
+    tuple_from_owned_items(py, items)
 }
 
 fn build_path_component_tuple<'py>(
@@ -440,35 +445,11 @@ fn build_path_tuple_for_event(py: Python<'_>, path: &[OwnedPathComponent]) -> Py
         return Ok(PyTuple::empty(py).into_any().unbind());
     }
 
-    // SAFETY: SetItem receives an in-bounds index and an owned reference in a
-    // private tuple. Failure releases the tuple and all initialized elements.
-    unsafe {
-        let tuple_ptr = ffi::PyTuple_New(path.len() as ffi::Py_ssize_t);
-        if tuple_ptr.is_null() {
-            return Err(PyErr::fetch(py));
-        }
-
-        for (index, component) in path.iter().enumerate() {
-            let pair = match build_path_component_tuple_for_event(py, component) {
-                Ok(pair) => pair,
-                Err(err) => {
-                    ffi::Py_DECREF(tuple_ptr);
-                    return Err(err);
-                }
-            };
-            let status = ffi::PyTuple_SetItem(
-                tuple_ptr,
-                index as ffi::Py_ssize_t,
-                pair.into_any().unbind().into_ptr(),
-            );
-            if status != 0 {
-                ffi::Py_DECREF(tuple_ptr);
-                return Err(PyErr::fetch(py));
-            }
-        }
-
-        Ok(Bound::from_owned_ptr(py, tuple_ptr).into_any().unbind())
+    let mut items = SmallVec::with_capacity(path.len());
+    for component in path {
+        items.push(build_path_component_tuple_for_event(py, component)?.into_any());
     }
+    Ok(tuple_from_owned_items(py, items)?.into_any().unbind())
 }
 
 fn build_path_component_tuple_for_event<'py>(
@@ -867,44 +848,21 @@ impl PyPathView {
             return Ok(PyTuple::empty(py).into_any().unbind());
         }
 
-        // SAFETY: the slice indices are checked against self.path, and every
-        // target index is within the private tuple allocated here.
-        unsafe {
-            let tuple_ptr = ffi::PyTuple_New(length as ffi::Py_ssize_t);
-            if tuple_ptr.is_null() {
-                return Err(PyErr::fetch(py));
+        let mut items = SmallVec::with_capacity(length);
+        let mut source_index = start;
+        for target_index in 0..length {
+            let component = usize::try_from(source_index)
+                .ok()
+                .and_then(|index| self.path.get(index))
+                .ok_or_else(|| PyIndexError::new_err("PathView index out of range"))?;
+            items.push(build_path_component_tuple_for_event(py, component)?.into_any());
+            if target_index + 1 < length {
+                source_index = source_index
+                    .checked_add(step)
+                    .ok_or_else(|| PyIndexError::new_err("PathView index out of range"))?;
             }
-
-            let mut source_index = start;
-            for target_index in 0..length {
-                let Some(component) = usize::try_from(source_index)
-                    .ok()
-                    .and_then(|index| self.path.get(index))
-                else {
-                    ffi::Py_DECREF(tuple_ptr);
-                    return Err(PyIndexError::new_err("PathView index out of range"));
-                };
-                let pair = match build_path_component_tuple_for_event(py, component) {
-                    Ok(pair) => pair,
-                    Err(err) => {
-                        ffi::Py_DECREF(tuple_ptr);
-                        return Err(err);
-                    }
-                };
-                let status = ffi::PyTuple_SetItem(
-                    tuple_ptr,
-                    target_index as ffi::Py_ssize_t,
-                    pair.into_any().unbind().into_ptr(),
-                );
-                if status != 0 {
-                    ffi::Py_DECREF(tuple_ptr);
-                    return Err(PyErr::fetch(py));
-                }
-                source_index += step;
-            }
-
-            Ok(Bound::from_owned_ptr(py, tuple_ptr).into_any().unbind())
         }
+        Ok(tuple_from_owned_items(py, items)?.into_any().unbind())
     }
 
     fn item_at(&self, py: Python<'_>, index: isize) -> PyResult<PyObject> {

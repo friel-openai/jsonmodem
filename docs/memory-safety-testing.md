@@ -152,9 +152,20 @@ callback during Python 3.9 parsing. Ordinary buffer input is now copied unless
 its storage is known to be immutable. `scripts/gc_buffer_regression.py` runs in a
 subprocess and requires actual callbacks inside `feed` on Python 3.9-3.11.
 
-The tuple-building unsafe operations are exercised by saved nested events,
-path conversion, path slicing, and no-copy byte events. The buffer operations
-are exercised through `with_buffer_text`, `with_readonly_byte_text`,
+Path conversion, slicing, and no-copy byte events prepare every tuple element
+before allocating the outer tuple. `tuple_from_owned_items` accepts owned
+objects in a concrete collection; it cannot call an arbitrary iterator while
+filling slots. The helper checks the allocation and length, then transfers each
+reference once without calling Python or allocating Python objects.
+
+This ordering matters on Python 3.9: allocating an element can run a garbage
+collection callback, and `gc.get_objects()` can expose an incomplete outer
+tuple. `test_path_tuple_gc.py` observes this on the old implementation without
+dereferencing NULL slots. The same test checks conversion, slicing, and byte
+events after the fix. The tests also retain nested events and exercise slicing
+with large positive and negative steps.
+
+The buffer operations are exercised through `with_buffer_text`, `with_readonly_byte_text`,
 `supports_buffer_protocol`, and `PyBufferGuard::drop`. The exporter must supply a
 valid allocation for the requested length, and the guard must keep the export
 alive until the Rust borrow or copy ends. Unknown read-only exporters are copied
