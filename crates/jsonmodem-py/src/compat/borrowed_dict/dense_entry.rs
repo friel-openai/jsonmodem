@@ -66,9 +66,9 @@ pub(super) unsafe fn read_entry(keys: *const u8, used: isize, position: isize) -
     else {
         return EntryLookup::Fallback;
     };
-    if !offset
+    if offset
         .checked_add(ENTRY_BYTES)
-        .is_some_and(|end| end <= isize::MAX as usize)
+        .is_none_or(|end| end > isize::MAX as usize)
     {
         return EntryLookup::Fallback;
     }
