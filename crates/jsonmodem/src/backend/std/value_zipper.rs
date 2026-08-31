@@ -33,7 +33,7 @@ impl ValueZipper {
 
     #[inline]
     pub fn insert_value(&mut self, path: &Path, value: Value) {
-        let slot = self.align_path(path);
+        let (_, slot) = self.align_path(path);
         *slot = value;
     }
 
@@ -58,27 +58,19 @@ impl ValueZipper {
     where
         F: FnOnce(&mut Value),
     {
-        let slot = self.align_path(path);
+        let (path, slot) = self.align_path(path);
         mutate(slot);
-        let slot_ptr = core::ptr::from_mut::<Value>(slot);
-        let path = &self.path_components;
-        // SAFETY: align_path returned this live leaf; only the separate path
-        // vector was borrowed afterward. The result borrows the whole zipper.
-        let leaf = unsafe { &*slot_ptr };
-        (path, leaf)
+        (path, slot)
     }
 
     #[inline]
     pub(crate) fn with_leaf<'a>(&'a mut self, path: &Path) -> (&'a StdPath, &'a Value) {
-        let slot = core::ptr::from_mut::<Value>(self.align_path(path));
-        let path = &self.path_components;
-        // SAFETY: borrowing path_components does not move the tree's values.
-        let leaf = unsafe { &*slot };
-        (path, leaf)
+        let (path, slot) = self.align_path(path);
+        (path, slot)
     }
 
     #[inline]
-    fn align_path(&mut self, path: &Path) -> &mut Value {
+    fn align_path(&mut self, path: &Path) -> (&StdPath, &mut Value) {
         let current_depth = self.path_components.len();
         let target_depth = path.len();
 
@@ -132,8 +124,10 @@ impl ValueZipper {
         }
 
         // SAFETY: the branches above retain only pointers to live ancestors
-        // and the current leaf. The exclusive borrow prevents concurrent access.
-        unsafe { self.current_ptr().as_mut() }
+        // and the current leaf. The leaf belongs to the boxed tree, disjoint
+        // from path_components. Both references remain tied to this zipper.
+        let leaf = unsafe { self.current_ptr().as_mut() };
+        (&self.path_components, leaf)
     }
 
     #[inline]
