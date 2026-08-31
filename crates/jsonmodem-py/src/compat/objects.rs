@@ -421,6 +421,7 @@ pub(super) fn dumps(
 ) -> PyResult<PyObject> {
     encoder.output.clear();
     encoder.keys.clear();
+    encoder.key_mask = 0;
     let helpers = py
         .import(intern!(py, "jsonmodem._compat"))?
         .getattr(intern!(py, "_ENCODER_HELPERS"))?;
@@ -463,6 +464,7 @@ pub fn _dumps_objects(
         ))]
         integer_layout: super::IntegerLayout::Unchecked,
         keys: Vec::new(),
+        key_mask: 0,
     };
     encoder.reserve(INITIAL_OUTPUT_CAPACITY)?;
     ObjectEncoder::new(encoder, default, default_provided, &helpers)?.finish(py, obj)

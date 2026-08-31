@@ -543,6 +543,8 @@ struct Encoder<const CHECKED: bool = false> {
     integer_layout: IntegerLayout,
     // Retained owners make identity-based reuse safe for the whole call.
     keys: Vec<(Py<PyString>, Range<usize>)>,
+    // In callback-free encoding, an unset identity bit rules out a cache hit.
+    key_mask: u64,
 }
 
 /// Owning iterators keep each container alive without native recursion.
@@ -625,6 +627,7 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
             ))]
             integer_layout: self.integer_layout,
             keys: self.keys,
+            key_mask: self.key_mask,
         }
     }
 
@@ -707,7 +710,11 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
 
     fn key(&mut self, key: &Bound<'_, PyString>) -> PyResult<()> {
         let cache = self.output.len() >= 1024;
-        if cache {
+        if cache
+            && (CHECKED
+                || self.keys.len() < 16
+                || self.key_mask & key_identity_bit(key.as_ptr() as usize) != 0)
+        {
             if let Some((_, encoded)) = self
                 .keys
                 .iter()
@@ -730,6 +737,9 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
             }
             self.keys
                 .push((key.clone().unbind(), start..self.output.len()));
+            if !CHECKED {
+                self.key_mask |= key_identity_bit(key.as_ptr() as usize);
+            }
         }
         Ok(())
     }
@@ -1050,6 +1060,11 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
     }
 }
 
+#[inline]
+fn key_identity_bit(identity: usize) -> u64 {
+    1 << (((identity >> 4) ^ (identity >> 10)) & 63)
+}
+
 fn supplied_default<'py>(value: &Bound<'py, PyAny>) -> PyResult<Option<Bound<'py, PyAny>>> {
     // Explicit None is an invalid callback; an omitted argument has no callback
     // cause.
@@ -1091,6 +1106,7 @@ fn dump_long_string(py: Python<'_>, text: &str, flags: i32) -> PyResult<PyObject
         ))]
         integer_layout: IntegerLayout::Unchecked,
         keys: Vec::new(),
+        key_mask: 0,
     };
     encoder.output.push(b'"');
     encoder.output.extend_from_slice(&bytes[..prefix]);
@@ -1148,6 +1164,7 @@ pub fn dumps(
         ))]
         integer_layout: IntegerLayout::Unchecked,
         keys: Vec::new(),
+        key_mask: 0,
     };
     let encoded = if let Some(text) = root_string {
         encoder.string(text)?;
@@ -1191,6 +1208,7 @@ pub fn _dumps_fields(
         ))]
         integer_layout: IntegerLayout::Unchecked,
         keys: Vec::new(),
+        key_mask: 0,
     };
     if encoder.value(fields.as_any())? {
         Ok(Some(PyBytes::new(py, &encoder.output).unbind()))

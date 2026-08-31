@@ -11,7 +11,7 @@ use pyo3::{
     types::{PyDict, PyString},
 };
 
-use super::{Encoder, INDENT, OutputAllocationError};
+use super::{Encoder, INDENT, OutputAllocationError, key_identity_bit};
 
 /// An entry has either been written or promoted to two owning references.
 pub(super) enum DictStep<'py> {
@@ -231,7 +231,11 @@ unsafe fn write_key<const CHECKED: bool>(
     text: &str,
 ) -> Result<(), OutputAllocationError> {
     let cache = encoder.output.len() >= 1024;
-    if cache {
+    if cache
+        && (CHECKED
+            || encoder.keys.len() < 16
+            || encoder.key_mask & key_identity_bit(key as usize) != 0)
+    {
         if let Some((_, encoded)) = encoder.keys.iter().find(|(entry, _)| entry.as_ptr() == key) {
             let encoded = encoded.clone();
             encoder.output.extend_from_within(encoded);
@@ -244,7 +248,11 @@ unsafe fn write_key<const CHECKED: bool>(
         // SAFETY: the exact string key is still owned by dict. This adds a
         // retained owner without conversion, allocation or a reference drop.
         let key = unsafe { Py::<PyString>::from_borrowed_ptr(owner.py(), key) };
+        let identity = key.as_ptr() as usize;
         encoder.keys.push((key, start..encoder.output.len()));
+        if !CHECKED {
+            encoder.key_mask |= key_identity_bit(identity);
+        }
     }
     Ok(())
 }

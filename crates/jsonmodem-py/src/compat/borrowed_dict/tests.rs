@@ -8,11 +8,11 @@ use std::{
 
 use pyo3::{
     prelude::*,
-    types::{PyDict, PyList, iter::BoundDictIterator},
+    types::{PyDict, PyList, PyString, iter::BoundDictIterator},
 };
 
 use super::{DictScalarCursor, DictStep};
-use crate::compat::{Encoder, INDENT};
+use crate::compat::{Encoder, INDENT, key_identity_bit};
 
 /// The old owning iterator is a behavioral control in this test executable.
 #[derive(Clone, Copy)]
@@ -60,6 +60,7 @@ fn encoder<const CHECKED: bool>() -> Encoder<CHECKED> {
         base_depth: 0,
         dataclass_root: false,
         keys: Vec::new(),
+        key_mask: 0,
         #[cfg(all(
             Py_3_12,
             not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
@@ -104,6 +105,101 @@ fn write_owned(
     drop(key);
     assert!(encoder.scalar(&value)?);
     Ok(())
+}
+
+fn write_cursor(
+    dict: Bound<'_, PyDict>,
+    mode: CursorMode,
+    encoder: &mut Encoder,
+    count: &mut usize,
+) -> PyResult<()> {
+    let mut cursor = TestCursor::new(dict, mode);
+    loop {
+        match cursor.step(encoder, count)? {
+            DictStep::Written => {}
+            DictStep::Owned(key, value) => write_owned(encoder, count, key, value)?,
+            DictStep::End => return Ok(()),
+        }
+    }
+}
+
+fn check_mixed_key_writers(first: CursorMode, second: CursorMode) -> PyResult<()> {
+    pyo3::prepare_freethreaded_python();
+    Python::with_gil(|py| {
+        let keys: Vec<_> = (0..24)
+            .map(|index| PyString::new(py, &format!("fresh_cache_field_{index:02}")))
+            .collect();
+        let first_dict = PyDict::new(py);
+        let second_dict = PyDict::new(py);
+        let all = PyDict::new(py);
+        for (index, key) in keys.iter().enumerate() {
+            all.set_item(key, index)?;
+            if index < 8 {
+                first_dict.set_item(key, index)?;
+            } else if index < 16 {
+                second_dict.set_item(key, index)?;
+            }
+        }
+        let mut encoder = encoder::<false>();
+        encoder.output.resize(1024, b' ');
+        let mut count = 0;
+        write_cursor(first_dict, first, &mut encoder, &mut count)?;
+        write_cursor(second_dict, second, &mut encoder, &mut count)?;
+        assert_eq!(count, 16);
+        let retained: Vec<_> = encoder.keys.iter().map(|(key, _)| key.as_ptr()).collect();
+        assert_eq!(
+            retained,
+            keys[..16].iter().map(Bound::as_ptr).collect::<Vec<_>>()
+        );
+        let expected_mask = retained
+            .iter()
+            .fold(0, |mask, key| mask | key_identity_bit(*key as usize));
+        assert_eq!(encoder.key_mask, expected_mask);
+        let ranges: Vec<_> = encoder
+            .keys
+            .iter()
+            .map(|(_, range)| range.clone())
+            .collect();
+
+        // Both writers must reuse admitted owners after the other writer filled
+        // the cache, while new keys leave its owners and encoded ranges intact.
+        let start = encoder.output.len();
+        write_cursor(all.clone(), first, &mut encoder, &mut count)?;
+        let first_output = encoder.output[start..].to_vec();
+        let start = encoder.output.len();
+        write_cursor(all, second, &mut encoder, &mut count)?;
+        assert_eq!(encoder.output[start..], first_output);
+        assert_eq!(count, 64);
+        assert_eq!(encoder.key_mask, expected_mask);
+        assert_eq!(
+            encoder
+                .keys
+                .iter()
+                .map(|(key, _)| key.as_ptr())
+                .collect::<Vec<_>>(),
+            retained,
+        );
+        assert_eq!(
+            encoder
+                .keys
+                .iter()
+                .map(|(_, range)| range.clone())
+                .collect::<Vec<_>>(),
+            ranges,
+        );
+        assert_eq!(encoder.into_checked().key_mask, expected_mask);
+        Ok(())
+    })
+}
+
+#[test]
+fn borrowed_keys_are_visible_to_the_owning_writer() -> PyResult<()> {
+    check_mixed_key_writers(CursorMode::Scalars, CursorMode::Owning)
+}
+
+#[test]
+fn owning_keys_are_visible_to_the_borrowed_writer() -> PyResult<()> {
+    check_mixed_key_writers(CursorMode::Owning, CursorMode::Scalars)
 }
 
 fn check_owned_fallback(mode: CursorMode) {
