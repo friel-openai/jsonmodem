@@ -1,7 +1,29 @@
 //! Python construction from the reader's immutable string classification.
 
+#[cfg(test)]
+mod tests;
+
 use jsonmodem::document::DecodedString;
 use pyo3::{exceptions::PyMemoryError, prelude::*, types::PyString};
+
+/// Delay error-document allocation until PyO3 converts the second call
+/// argument.
+pub(crate) struct ErrorDocument<'a>(pub(crate) &'a str);
+
+impl<'py> IntoPyObject<'py> for ErrorDocument<'_> {
+    type Target = PyString;
+    type Output = Bound<'py, Self::Target>;
+    type Error = PyErr;
+
+    fn into_pyobject(self, py: Python<'py>) -> PyResult<Self::Output> {
+        if self.0.len() >= 1024 && self.0.is_ascii() {
+            // SAFETY: The length guard excludes singletons, and is_ascii
+            // proves the existing constructor's byte-copy precondition.
+            return unsafe { new_ascii_string(py, self.0) };
+        }
+        Ok(PyString::new(py, self.0))
+    }
+}
 
 #[inline(always)]
 pub(super) fn new<'py>(

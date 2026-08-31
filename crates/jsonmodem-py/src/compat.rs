@@ -23,6 +23,12 @@ mod owned_list;
     not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
 ))]
 mod strings;
+#[cfg(all(
+    Py_3_12,
+    not(Py_3_14),
+    not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+))]
+pub(crate) use strings::ErrorDocument;
 mod validate;
 
 #[cfg(all(
