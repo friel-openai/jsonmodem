@@ -291,9 +291,11 @@ remaining tests.
 
 See the [Python performance report](benchmarks/PERFORMANCE.md) for streaming
 comparisons, complete-document comparisons with orjson, and CPU and allocation
-profiles. The [public-document and date/time report](benchmarks/PERFORMANCE_36H.md)
-records complete-call timings, allocations, RSS and regressions for its named
-builds. Benchmark results apply to the builds recorded in each report.
+profiles. The [large-document and worst-case report](benchmarks/PERFORMANCE_24H.md)
+records the latest measured optimizations, allocations, RSS and remaining
+regressions. The [public-document and date/time report](benchmarks/PERFORMANCE_36H.md)
+covers the preceding builds. Benchmark results apply to the builds recorded
+in each report.
 The [earlier report](benchmarks/PROFILE.md) covers performance after
 PR #74 and the SIMD build experiments from that revision.
 

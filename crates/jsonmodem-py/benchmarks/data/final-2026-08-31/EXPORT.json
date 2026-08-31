@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "inputs_sha256": "ca896293f703d7a3b3dcabced09988353841386d4bd4157376a7668a0c70b7c4",
+  "generator_sha256": {
+    "export.py": "5b5fd9fd8c5548e5b0915ea6c48d8bff6cf3b006cb80edf9312e4c29b1c17e10",
+    "catalog.py": "48c0842aed2286b57c0389e10a8d9a6ea7e2d08cd5ec2f0f4deec22041261767",
+    "observations.py": "bcd1ee1aad90ad541e162486b7bb705a017641df390f9139e57a0e95f95bf0cd"
+  },
+  "files": {
+    "PERFORMANCE_FINAL.md": "bf312744fa42ebddcdae1ebaf51e6801bed5b4c2ae6bc02fe45cf46d0a66d6ac",
+    "PUBLIC.md": "208f7f14f5806c8c48a01b639820465e3b6078d9345ccfcfb341e8b3ea5c4d7b",
+    "MAINTAINED_ORIGINAL.md": "64c6b9abfb73b1235b3adabd898d77b2516f86cf0492aa64f85b108b947cf9b9",
+    "DATES_ORIGINAL.md": "def388af44f49161301e655de81fd888d6668958e703da07233dc0f1869f3dc8",
+    "NUMPY_ORIGINAL.md": "28cdff824cabbcf250165e58388d576d75460e1e9f0f6ef0b2d7b42f19727d72",
+    "INCREMENTAL_ORIGINAL.md": "5c7f77c97ce27eb0b55e81497a50743f5a387b2b35cc54eec624e6f57a5ab2e8",
+    "MAINTAINED_REBUILT.md": "a8d62dec7f10fcab7528d4c2e96f752bc0385950e387041927c6a8d801fc06c2",
+    "DATES_REBUILT.md": "55c37ce194b4507242a392e3b0ca498c0e87dc5e3b9c1308d92b9d0953b28a6c",
+    "NUMPY_REBUILT.md": "e776f13041a7ba59a1ccccb681b4b552f7f778a58d2868c33768ddc5e6e53c63",
+    "INCREMENTAL_REBUILT.md": "0cd71a07aff6c9c5d7ff98b922013a5ac8fab14c60046a5d37db99a835e84fa9",
+    "MALFORMED.md": "247cc2f0c9848abf6ac8091c2084b3c2b5ef1fba6661bd78b2c848661ab0e912",
+    "MEMORY_PUBLIC.md": "9a82b265360cebcf5f864a42e1f634e2aa0ab05332e88481f3a15291e8618e91",
+    "MEMORY_SYNTHETIC.md": "f63d7a49862fac6e9b93c7e18bd910b647324f9736b41bcbeccbe59fbc1ec413",
+    "MEMORY_DATES.md": "716bc2e995e467fbe71ca89c1ca8ce497a0116164bf19ca82ea1a07ac0a8a15a",
+    "MEMORY_NUMPY.md": "ed32be7b61c99c16a2fa92f56822e820b2d65a05af180789081c22c7c95bd7c6",
+    "data.json": "a31ed3e30463ce46478e3916bcb174c43dc2939df71b63d9244821e5afd6023b"
+  },
+  "all_checks_passed": true,
+  "measurements_rerun": false
+}
