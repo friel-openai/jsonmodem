@@ -32,6 +32,49 @@ pub enum IntegerToken {
     Unsigned(u64),
 }
 
+/// One decoded string and its ASCII classification, borrowing its text.
+///
+/// The buffer borrow prevents escaped text from changing while its ASCII
+/// classification can be used. Unescaped text retains its input lifetime.
+#[derive(Debug)]
+pub struct DecodedString<'input, 'buffer> {
+    source: StringSource<'input, 'buffer>,
+    // True exactly when every byte of source text is below 128.
+    ascii: bool,
+}
+
+/// Distinguishes input text from text held in the caller's reusable buffer.
+#[derive(Debug)]
+enum StringSource<'input, 'buffer> {
+    Input(&'input str),
+    Buffer(&'buffer str),
+}
+
+impl<'input> DecodedString<'input, '_> {
+    /// The decoded string, regardless of which storage it borrows.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        match self.source {
+            StringSource::Input(text) | StringSource::Buffer(text) => text,
+        }
+    }
+
+    /// Input text for an unescaped string, or `None` for buffered text.
+    #[must_use]
+    pub fn borrowed(&self) -> Option<&'input str> {
+        match self.source {
+            StringSource::Input(text) => Some(text),
+            StringSource::Buffer(_) => None,
+        }
+    }
+
+    /// Whether every decoded code point is ASCII.
+    #[must_use]
+    pub fn is_ascii(&self) -> bool {
+        self.ascii
+    }
+}
+
 /// A cursor for a complete UTF-8 document. Consumers build containers directly.
 pub struct DocumentReader<'a> {
     input: &'a str,
@@ -124,10 +167,54 @@ impl<'a> DocumentReader<'a> {
         &mut self,
         decoded: &mut String,
     ) -> Result<Option<&'a str>, DocumentError> {
+        self.read_string::<false>(decoded)
+            .map(|(borrowed, _)| borrowed)
+    }
+
+    /// Read a string and classify its decoded text without a separate scan.
+    ///
+    /// As with [`Self::string_with_buffer`], escaped strings replace `decoded`
+    /// while retaining its capacity. The result borrows that buffer until it
+    /// is no longer used, so its text and classification cannot diverge.
+    ///
+    /// # Errors
+    /// Rejects the same malformed strings as [`Self::string_with_buffer`].
+    ///
+    /// ```compile_fail
+    /// use jsonmodem::document::DocumentReader;
+    /// let mut reader = DocumentReader::new("\"\\n\"");
+    /// let mut buffer = String::new();
+    /// let decoded = reader.string_with_metadata(&mut buffer).unwrap();
+    /// buffer.clear();
+    /// assert!(decoded.is_ascii());
+    /// ```
+    #[inline]
+    pub fn string_with_metadata<'buffer>(
+        &mut self,
+        decoded: &'buffer mut String,
+    ) -> Result<DecodedString<'a, 'buffer>, DocumentError> {
+        let (borrowed, ascii) = self.read_string::<true>(decoded)?;
+        Ok(DecodedString {
+            source: match borrowed {
+                Some(text) => StringSource::Input(text),
+                None => StringSource::Buffer(decoded),
+            },
+            ascii,
+        })
+    }
+
+    #[inline]
+    fn read_string<const CLASSIFY: bool>(
+        &mut self,
+        decoded: &mut String,
+    ) -> Result<(Option<&'a str>, bool), DocumentError> {
         self.expect(b'"')?;
         let start = self.offset;
         let remaining = &self.input.as_bytes()[start..];
-        self.offset += if remaining.len() < 8 {
+        let mut ascii = true;
+        self.offset += if CLASSIFY {
+            string_prefix_with_ascii(remaining, &mut ascii)
+        } else if remaining.len() < 8 {
             scalar_string_prefix::<false>(remaining)
         } else {
             plain_string_prefix(remaining)
@@ -136,22 +223,23 @@ impl<'a> DocumentReader<'a> {
             Some(b'"') => {
                 let text = &self.input[start..self.offset];
                 self.offset += 1;
-                Ok(Some(text))
+                Ok((Some(text), ascii))
             }
             None => Err(self.error("unterminated string")),
             Some(byte) if byte < 0x20 => Err(self.error("unescaped control character")),
             Some(_) => {
-                self.string_escaped(start, decoded)?;
-                Ok(None)
+                let ascii = self.string_escaped::<CLASSIFY>(start, decoded, ascii)?;
+                Ok((None, ascii))
             }
         }
     }
 
-    fn string_escaped(
+    fn string_escaped<const CLASSIFY: bool>(
         &mut self,
         mut start: usize,
         decoded: &mut String,
-    ) -> Result<(), DocumentError> {
+        mut ascii: bool,
+    ) -> Result<bool, DocumentError> {
         decoded.clear();
         // The first escape can add four UTF-8 bytes after the plain prefix.
         decoded.reserve(64.max(self.offset - start + 4));
@@ -204,6 +292,9 @@ impl<'a> DocumentReader<'a> {
                         message: "invalid high surrogate in string",
                         offset: escape_start,
                     })?);
+                    if CLASSIFY && code > 0x7f {
+                        ascii = false;
+                    }
                 }
                 _ => {
                     return Err(DocumentError {
@@ -218,7 +309,9 @@ impl<'a> DocumentReader<'a> {
                 continue;
             }
             let remaining = &self.input.as_bytes()[start..];
-            self.offset += if remaining.len() < 8 {
+            self.offset += if CLASSIFY {
+                string_prefix_with_ascii(remaining, &mut ascii)
+            } else if remaining.len() < 8 {
                 scalar_string_prefix::<false>(remaining)
             } else {
                 plain_string_prefix(remaining)
@@ -227,7 +320,7 @@ impl<'a> DocumentReader<'a> {
                 Some(b'"') => {
                     decoded.push_str(&self.input[start..self.offset]);
                     self.offset += 1;
-                    return Ok(());
+                    return Ok(ascii);
                 }
                 None => return Err(self.error("unterminated string")),
                 Some(byte) if byte < 0x20 => {
@@ -416,6 +509,19 @@ pub(crate) fn ascii_string_prefix(bytes: &[u8]) -> usize {
     string_prefix::<true>(bytes)
 }
 
+#[inline]
+fn string_prefix_with_ascii(bytes: &[u8], ascii: &mut bool) -> usize {
+    if *ascii {
+        let prefix = ascii_string_prefix(bytes);
+        if bytes.get(prefix).is_some_and(|byte| !byte.is_ascii()) {
+            *ascii = false;
+            return prefix + plain_string_prefix(&bytes[prefix..]);
+        }
+        return prefix;
+    }
+    plain_string_prefix(bytes)
+}
+
 fn string_prefix<const ASCII_ONLY: bool>(bytes: &[u8]) -> usize {
     let mut index = 0;
     // Most keys and values end before a full vector-sized chunk.
@@ -484,6 +590,185 @@ mod tests {
     use alloc::{format, string::ToString, vec};
 
     use super::*;
+
+    #[test]
+    fn classified_prefix_matches_the_scalar_oracle() {
+        let lengths = if cfg!(miri) { 12 } else { 160 };
+        for length in 0..lengths {
+            let mut bytes = vec![b'x'; length];
+            for position in 0..length {
+                for byte in 0..=u8::MAX {
+                    bytes[position] = byte;
+                    let expected = bytes
+                        .iter()
+                        .position(|&byte| byte < 0x20 || matches!(byte, b'"' | b'\\'))
+                        .unwrap_or(length);
+                    let mut ascii = true;
+                    assert_eq!(string_prefix_with_ascii(&bytes, &mut ascii), expected);
+                    assert_eq!(ascii, bytes[..expected].is_ascii());
+                    let mut already_non_ascii = false;
+                    assert_eq!(
+                        string_prefix_with_ascii(&bytes, &mut already_non_ascii),
+                        expected,
+                    );
+                    assert!(!already_non_ascii);
+                }
+                bytes[position] = b'x';
+            }
+        }
+    }
+
+    #[test]
+    fn metadata_preserves_text_cursor_and_buffer_contents() {
+        for length in [
+            0, 1, 7, 8, 9, 15, 16, 17, 31, 32, 33, 47, 48, 49, 63, 64, 65,
+        ] {
+            for alignment in [0, 1, 7, 15, 16, 31, 32] {
+                let plain = "x".repeat(length);
+                for (body, expected) in [
+                    (plain.clone(), plain.clone()),
+                    (format!("{plain}\\n\\t"), format!("{plain}\n\t")),
+                    (format!("\\u0000{plain}\\u007f"), format!("\0{plain}\u{7f}")),
+                    (format!("{plain}\u{80}\\n"), format!("{plain}\u{80}\n")),
+                    (format!("\\u00e9{plain}"), format!("\u{e9}{plain}")),
+                    (format!("\\u0800{plain}\\t"), format!("\u{800}{plain}\t")),
+                    (
+                        format!("{plain}\\uD83D\\uDE42"),
+                        format!("{plain}\u{1f642}"),
+                    ),
+                    (format!("\\u005c{plain}\\u006e"), format!("\\{plain}n")),
+                ] {
+                    let input = format!("{}\"{body}\"\u{e9}", " ".repeat(alignment));
+                    let end = input.len() - "\u{e9}".len();
+                    let mut legacy = DocumentReader::new(&input);
+                    let mut reader = DocumentReader::new(&input);
+                    let mut previous = String::with_capacity(1024);
+                    previous.push_str("previous\u{2603}");
+                    let mut buffer = previous.clone();
+                    buffer.reserve(1024);
+                    let storage = buffer.as_ptr();
+                    let borrowed = legacy.string_with_buffer(&mut previous).unwrap();
+                    let parsed = reader.string_with_metadata(&mut buffer).unwrap();
+                    assert_eq!(parsed.as_str(), expected);
+                    assert_eq!(parsed.as_str(), borrowed.unwrap_or(&previous));
+                    assert_eq!(parsed.borrowed().is_some(), borrowed.is_some());
+                    assert_eq!(parsed.is_ascii(), expected.is_ascii());
+                    if parsed.borrowed().is_none() {
+                        assert_eq!(parsed.as_str().as_ptr(), storage);
+                    }
+                    let input_text = parsed.borrowed();
+                    assert_eq!(buffer, previous);
+                    assert_eq!(reader.offset(), legacy.offset());
+                    assert_eq!(reader.offset(), end);
+                    assert_eq!(reader.peek(), legacy.peek());
+                    buffer.clear();
+                    if let Some(text) = input_text {
+                        assert_eq!(text, expected);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn metadata_errors_preserve_cursor_and_partial_buffer() {
+        for leading in ["a", "\u{e9}"] {
+            let head = format!("\"{leading}\\n\\t");
+            for (tail, message, error_offset, cursor, decoded_tail) in [
+                ("", "unterminated string", 0, 0, ""),
+                ("\\", "incomplete escape", 1, 1, ""),
+                ("\\q\"", "invalid escaped character in string", 1, 2, ""),
+                ("\\u\"", "invalid escaped sequence in string", 0, 2, ""),
+                ("\\u00x0\"", "invalid escaped sequence in string", 0, 4, ""),
+                ("\\uD800\"", "no low surrogate in string", 6, 6, ""),
+                ("\\uD800\\q\"", "no low surrogate in string", 6, 6, ""),
+                (
+                    "\\uD800\\uZZZZ\"",
+                    "invalid escaped sequence in string",
+                    6,
+                    8,
+                    "",
+                ),
+                (
+                    "\\uD800\\u0000\"",
+                    "invalid low surrogate in string",
+                    6,
+                    12,
+                    "",
+                ),
+                ("\\uDC00\"", "invalid high surrogate in string", 0, 6, ""),
+                ("\\uD83D\\uDE42\\", "incomplete escape", 13, 13, "\u{1f642}"),
+                ("\n\"", "unescaped control character", 0, 0, ""),
+                ("\\u0000", "unterminated string", 6, 6, "\0"),
+            ] {
+                let input = format!("{head}{tail}");
+                let mut reader = DocumentReader::new(&input);
+                let mut legacy = DocumentReader::new(&input);
+                let mut buffer = String::with_capacity(128);
+                buffer.push_str("old");
+                let storage = buffer.as_ptr();
+                let capacity = buffer.capacity();
+                let mut previous = String::from("old");
+                let expected = DocumentError {
+                    message,
+                    offset: head.len() + error_offset,
+                };
+                assert_eq!(
+                    reader.string_with_metadata(&mut buffer).unwrap_err(),
+                    expected
+                );
+                assert_eq!(
+                    legacy.string_with_buffer(&mut previous).unwrap_err(),
+                    expected
+                );
+                assert_eq!(reader.offset(), head.len() + cursor);
+                assert_eq!(reader.offset(), legacy.offset());
+                assert_eq!(buffer, previous);
+                assert_eq!(buffer, format!("{leading}\n\t{decoded_tail}"));
+                assert_eq!(buffer.as_ptr(), storage);
+                assert_eq!(buffer.capacity(), capacity);
+                let mut next = DocumentReader::new(r#""\u0000\u007f""#);
+                let parsed = next.string_with_metadata(&mut buffer).unwrap();
+                assert_eq!(parsed.as_str(), "\0\u{7f}");
+                assert!(parsed.is_ascii());
+                assert!(parsed.borrowed().is_none());
+            }
+        }
+    }
+
+    #[test]
+    fn metadata_is_reset_when_escape_storage_is_reused() {
+        let count = if cfg!(miri) { 128 } else { 32769 };
+        let input = format!("\"{}\"", "\\n\\t".repeat(count));
+        let mut buffer = String::new();
+        {
+            let mut reader = DocumentReader::new(&input);
+            let parsed = reader.string_with_metadata(&mut buffer).unwrap();
+            assert!(parsed.is_ascii());
+            assert!(parsed.borrowed().is_none());
+            assert_eq!(parsed.as_str(), "\n\t".repeat(count));
+        }
+        let storage = buffer.as_ptr();
+        let capacity = buffer.capacity();
+        for (input, expected, ascii, borrowed) in [
+            (r#""\u00e9""#, "\u{e9}", false, false),
+            (r#""\u0000\u007f""#, "\0\u{7f}", true, false),
+            ("\"\u{1f642}\"", "\u{1f642}", false, true),
+            ("\"plain\"", "plain", true, true),
+            (r#""\uD83D\uDE42\n""#, "\u{1f642}\n", false, false),
+            (r#""\u0061""#, "a", true, false),
+            ("\"\"", "", true, true),
+        ] {
+            let mut reader = DocumentReader::new(input);
+            let parsed = reader.string_with_metadata(&mut buffer).unwrap();
+            assert_eq!(parsed.as_str(), expected);
+            assert_eq!(parsed.is_ascii(), ascii);
+            assert_eq!(parsed.borrowed().is_some(), borrowed);
+            assert_eq!(reader.offset(), input.len());
+            assert_eq!(buffer.as_ptr(), storage);
+            assert_eq!(buffer.capacity(), capacity);
+        }
+    }
 
     #[test]
     fn checked_word_scan_matches_scalar_at_every_alignment() {

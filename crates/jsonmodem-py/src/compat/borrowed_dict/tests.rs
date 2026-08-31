@@ -1,5 +1,13 @@
 //! Live-Python checks of owning fallbacks and dictionary mutation detection.
 
+#[cfg(not(any(
+    py_sys_config = "Py_DEBUG",
+    py_sys_config = "Py_REF_DEBUG",
+    py_sys_config = "Py_TRACE_REFS",
+)))]
+mod key_validation;
+mod lookup;
+
 use std::{
     any::Any,
     ffi::CString,

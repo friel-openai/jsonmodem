@@ -16,6 +16,13 @@ mod escape_mask;
 )]
 mod integer;
 mod objects;
+mod owned_list;
+#[cfg(all(
+    Py_3_12,
+    not(Py_3_14),
+    not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+))]
+mod strings;
 mod validate;
 
 #[cfg(all(
@@ -169,16 +176,52 @@ impl<'py, 'src> Decoder<'py, 'src> {
     }
 
     fn key(&mut self) -> PyResult<Py<PyString>> {
+        #[cfg(all(
+            Py_3_12,
+            not(Py_3_14),
+            not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+        ))]
+        let parsed = match self.reader.string_with_metadata(&mut self.string_buffer) {
+            Ok(parsed) => parsed,
+            Err(error) => return Err(self.error(error)),
+        };
+        #[cfg(all(
+            Py_3_12,
+            not(Py_3_14),
+            not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+        ))]
+        let (borrowed, text) = (parsed.borrowed(), parsed.as_str());
+        #[cfg(not(all(
+            Py_3_12,
+            not(Py_3_14),
+            not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+        )))]
         let borrowed = self
             .reader
             .string_with_buffer(&mut self.string_buffer)
             .map_err(|error| self.error(error))?;
+        #[cfg(not(all(
+            Py_3_12,
+            not(Py_3_14),
+            not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+        )))]
         let text = borrowed.unwrap_or(&self.string_buffer);
         let key = if self.cache_keys && text.len() <= 64 {
             let keys = self.keys.get_or_insert_with(HashMap::new);
             match keys.get(text) {
                 Some(key) => key.clone_ref(self.py),
                 None => {
+                    #[cfg(all(
+                        Py_3_12,
+                        not(Py_3_14),
+                        not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+                    ))]
+                    let key = strings::new(self.py, &parsed)?.unbind();
+                    #[cfg(not(all(
+                        Py_3_12,
+                        not(Py_3_14),
+                        not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+                    )))]
                     let key = PyString::new(self.py, text).unbind();
                     if keys.len() < 512 {
                         let text = match borrowed {
@@ -191,7 +234,19 @@ impl<'py, 'src> Decoder<'py, 'src> {
                 }
             }
         } else {
-            PyString::new(self.py, text).unbind()
+            #[cfg(all(
+                Py_3_12,
+                not(Py_3_14),
+                not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+            ))]
+            let key = strings::new(self.py, &parsed)?.unbind();
+            #[cfg(not(all(
+                Py_3_12,
+                not(Py_3_14),
+                not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+            )))]
+            let key = PyString::new(self.py, text).unbind();
+            key
         };
         if borrowed.is_none() {
             self.release_large_string_buffer();
@@ -233,10 +288,41 @@ impl<'py, 'src> Decoder<'py, 'src> {
                     dict.into_any().unbind()
                 }
                 Some(b'"') => {
+                    #[cfg(all(
+                        Py_3_12,
+                        not(Py_3_14),
+                        not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+                    ))]
+                    let parsed = match self.reader.string_with_metadata(&mut self.string_buffer) {
+                        Ok(parsed) => parsed,
+                        Err(error) => return Err(self.error(error)),
+                    };
+                    #[cfg(all(
+                        Py_3_12,
+                        not(Py_3_14),
+                        not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+                    ))]
+                    let borrowed = parsed.borrowed();
+                    #[cfg(not(all(
+                        Py_3_12,
+                        not(Py_3_14),
+                        not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+                    )))]
                     let borrowed = self
                         .reader
                         .string_with_buffer(&mut self.string_buffer)
                         .map_err(|error| self.error(error))?;
+                    #[cfg(all(
+                        Py_3_12,
+                        not(Py_3_14),
+                        not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+                    ))]
+                    let value = strings::new(py, &parsed)?.into_any().unbind();
+                    #[cfg(not(all(
+                        Py_3_12,
+                        not(Py_3_14),
+                        not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+                    )))]
                     let value = PyString::new(py, borrowed.unwrap_or(&self.string_buffer))
                         .into_any()
                         .unbind();
@@ -288,7 +374,7 @@ impl<'py, 'src> Decoder<'py, 'src> {
                 match stack.last_mut() {
                     None => return Ok(value),
                     Some(DecodeContainer::Array(list)) => {
-                        list.append(value)?;
+                        owned_list::append(list, value)?;
                         match self.reader.peek() {
                             Some(b',') => {
                                 self.expect(b',')?;
@@ -734,6 +820,42 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
         Ok(true)
     }
 
+    fn validate_keys(&mut self, dict: &Bound<'_, PyDict>) -> PyResult<bool> {
+        #[cfg(all(
+            Py_3_12,
+            not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+            not(any(
+                py_sys_config = "Py_DEBUG",
+                py_sys_config = "Py_REF_DEBUG",
+                py_sys_config = "Py_TRACE_REFS",
+            )),
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64",
+            target_endian = "little",
+        ))]
+        if borrowed_dict::primitive_keys_valid::<CHECKED>(dict) {
+            return Ok(true);
+        }
+        // A refusal restarts validation at the first key, preserving conversion
+        // errors and their order before any value is serialized.
+        for (key, _) in dict.iter() {
+            if let Ok(key) = key.downcast_exact::<PyString>() {
+                key.to_str()
+                    .map_err(|cause| key_utf8_error(key.py(), cause))?;
+            } else if let Ok(key) = key.downcast_exact::<PyInt>() {
+                self.integer(key)
+                    .map_err(|error| integer_key_error(key, error))?;
+            } else if !(key.is_none()
+                || key.is_exact_instance_of::<PyBool>()
+                || key.is_exact_instance_of::<PyFloat>())
+            {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
     fn key(&mut self, key: &Bound<'_, PyString>) -> PyResult<()> {
         let cache = self.output.len() >= 1024;
         if cache
@@ -972,21 +1094,9 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                 // NON_STR_KEYS validates every key before values, even without sorting.
                 if self.option & (NON_STR_KEYS | SORT_KEYS) == NON_STR_KEYS
                     && (!self.dataclass_root || !stack.is_empty())
+                    && !self.validate_keys(dict)?
                 {
-                    for (key, _) in dict.iter() {
-                        if let Ok(key) = key.downcast_exact::<PyString>() {
-                            key.to_str()
-                                .map_err(|cause| key_utf8_error(key.py(), cause))?;
-                        } else if let Ok(key) = key.downcast_exact::<PyInt>() {
-                            self.integer(key)
-                                .map_err(|error| integer_key_error(key, error))?;
-                        } else if !(key.is_none()
-                            || key.is_exact_instance_of::<PyBool>()
-                            || key.is_exact_instance_of::<PyFloat>())
-                        {
-                            return Ok(false);
-                        }
-                    }
+                    return Ok(false);
                 }
                 if self.option & SORT_KEYS != 0 && (!self.dataclass_root || !stack.is_empty()) {
                     let mut items: Vec<_> = dict.iter().collect();

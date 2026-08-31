@@ -1,6 +1,9 @@
-//! Borrow dictionary entries only during non-reentrant scalar writes.
+//! Borrow dictionary entries only during non-reentrant validation and writes.
 
 mod compact_int;
+
+#[cfg(not(any(py_sys_config = "Py_DEBUG", py_sys_config = "Py_REF_DEBUG")))]
+mod dense_entry;
 
 #[cfg(test)]
 mod tests;
@@ -12,6 +15,37 @@ use pyo3::{
 };
 
 use super::{Encoder, INDENT, OutputAllocationError, key_identity_bit};
+
+/// Certify common keys without conversions, output, or temporary owners.
+/// False requires the full owning validation; it does not mean a key is
+/// invalid.
+#[cfg(not(any(
+    py_sys_config = "Py_DEBUG",
+    py_sys_config = "Py_REF_DEBUG",
+    py_sys_config = "Py_TRACE_REFS",
+)))]
+pub(super) fn primitive_keys_valid<const CHECKED: bool>(dict: &Bound<'_, PyDict>) -> bool {
+    if CHECKED {
+        return false;
+    }
+    let mut position = 0;
+    let mut key = std::ptr::null_mut();
+    loop {
+        // SAFETY: dict owns the dictionary under the GIL. PyDict_Next accepts
+        // a null value-output pointer, and both other outputs remain live.
+        if unsafe { ffi::PyDict_Next(dict.as_ptr(), &mut position, &mut key, std::ptr::null_mut()) }
+            == 0
+        {
+            return true;
+        }
+        // SAFETY: dict retains each key. Neither this loop nor entry_scalar
+        // allocates, converts, decrements a reference, or reenters Python.
+        // No borrowed text survives this test, and no pointer escapes.
+        if unsafe { entry_scalar(key, dict) }.is_none() {
+            return false;
+        }
+    }
+}
 
 /// An entry has either been written or promoted to two owning references.
 pub(super) enum DictStep<'py> {
@@ -41,6 +75,51 @@ impl<'py> DictScalarCursor<'py> {
         }
     }
 
+    /// Reacquire table storage on each call, before any Python reentry.
+    #[inline(always)]
+    fn lookup_entry(
+        &mut self,
+        current_size: ffi::Py_ssize_t,
+    ) -> Option<(*mut ffi::PyObject, *mut ffi::PyObject)> {
+        #[cfg(not(any(py_sys_config = "Py_DEBUG", py_sys_config = "Py_REF_DEBUG")))]
+        if current_size > 0 && self.dict.is_exact_instance_of::<PyDict>() {
+            let dict = self.dict.as_ptr().cast::<ffi::PyDictObject>();
+            // SAFETY: the exact dictionary is retained under the GIL. This
+            // field read neither reenters Python nor forms a table reference.
+            if unsafe { std::ptr::addr_of!((*dict).ma_values).read() }.is_null() {
+                // SAFETY: the same owner retains the current key table. Do not
+                // save this pointer across an owned result or error handling.
+                let keys = unsafe { std::ptr::addr_of!((*dict).ma_keys).read() }.cast::<u8>();
+                // SAFETY: this module selects the reviewed full-API GIL layout,
+                // with debug layouts excluded above. Valid CPython storage
+                // supplies the initialized fields and entries read by the
+                // helper; no callback, allocation, decref or GIL release can
+                // mutate it during these checks and copied-pointer reads.
+                match unsafe { dense_entry::read_entry(keys, current_size, self.position) } {
+                    dense_entry::EntryLookup::Entry { key, value } => {
+                        // The admitted position is below a positive isize count.
+                        self.position += 1;
+                        return Some((key.cast(), value.cast()));
+                    }
+                    dense_entry::EntryLookup::End => return None,
+                    dense_entry::EntryLookup::Fallback => {}
+                }
+            }
+        }
+        let _ = current_size;
+        let mut key = std::ptr::null_mut();
+        let mut value = std::ptr::null_mut();
+        // SAFETY: dict owns the dictionary under the GIL. Every declined
+        // lookup leaves position untouched and these outputs initialized.
+        if unsafe { ffi::PyDict_Next(self.dict.as_ptr(), &mut self.position, &mut key, &mut value) }
+            == 0
+        {
+            None
+        } else {
+            Some((key, value))
+        }
+    }
+
     pub(super) fn next<const CHECKED: bool>(
         &mut self,
         encoder: &mut Encoder<CHECKED>,
@@ -50,7 +129,8 @@ impl<'py> DictScalarCursor<'py> {
         // Encoder::value selects this cursor only for ordinary Vec output.
         // Fail before borrowing an entry if a checked caller is added later.
         assert!(!CHECKED);
-        if self.original_size != self.dict.len() as ffi::Py_ssize_t {
+        let current_size = self.dict.len() as ffi::Py_ssize_t;
+        if self.original_size != current_size {
             self.original_size = -1;
             panic!("dictionary changed size during iteration");
         }
@@ -58,18 +138,12 @@ impl<'py> DictScalarCursor<'py> {
             self.original_size = -1;
             panic!("dictionary keys changed during iteration");
         }
-        let mut key = std::ptr::null_mut();
-        let mut value = std::ptr::null_mut();
-        // SAFETY: dict owns the dictionary under the GIL. The position and
-        // pointer outputs remain initialized and live during this call.
-        if unsafe { ffi::PyDict_Next(self.dict.as_ptr(), &mut self.position, &mut key, &mut value) }
-            == 0
-        {
+        let Some((key, value)) = self.lookup_entry(current_size) else {
             return Ok(DictStep::End);
-        }
+        };
         self.remaining -= 1;
 
-        // SAFETY: a successful PyDict_Next returns non-null entries owned by
+        // SAFETY: a successful lookup returns non-null entries owned by
         // dict. No Python allocation, conversion, error, callback, decref or
         // GIL release occurs until this helper finishes all borrowed reads.
         // Its writers allocate only Rust Vec storage. Do not substitute a
