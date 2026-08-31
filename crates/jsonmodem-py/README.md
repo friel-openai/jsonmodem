@@ -246,6 +246,11 @@ Wheels are interpreter-specific rather than `abi3-py39`. This lets PyO3 use
 CPython's public UTF-8 string access without an encoded copy on Python 3.9.
 Build a wheel separately for each supported CPython version.
 
+The native extension requires a GIL-enabled Python build. Free-threaded builds
+are rejected at compile time, even if their GIL could be enabled at runtime.
+Raw buffer copies and tuple initialization rely on excluding concurrent Python
+access; a PyO3 thread-attachment token alone does not establish that exclusion.
+
 Both complete-document operations use unsafe Rust and call CPython. During
 `loads()`, `strings::new_ascii_string` fills a fresh Python string before
 publishing it. `owned_list::append` can transfer an owned value into a list's
@@ -262,7 +267,7 @@ serialization continues. Callback serialization keeps its owning snapshots.
 These optimizations have interpreter and build restrictions. Raw object-layout
 readers and the list writer require CPython 3.12 or 3.13 with the GIL on 64-bit,
 little-endian Linux x86_64. Debug and reference-tracing restrictions differ by
-helper. ASCII construction has separate conditions. Unsupported builds keep
+helper. ASCII construction has separate conditions. Other GIL-enabled builds keep
 the existing PyO3 or C API operations. The
 [memory-safety document](../../docs/memory-safety-testing.md) names the
 conditions, ownership rules and tests.

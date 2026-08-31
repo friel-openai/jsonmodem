@@ -1,3 +1,9 @@
+#[cfg(Py_GIL_DISABLED)]
+compile_error!(
+    "jsonmodem requires a GIL-enabled Python build; free-threaded builds are not supported"
+);
+
+mod buffer;
 mod compat;
 mod numpy;
 
@@ -5,7 +11,6 @@ use std::{
     borrow::Cow,
     cell::RefCell,
     collections::BTreeMap,
-    os::raw::{c_int, c_void},
     rc::Rc,
     sync::{Arc, Mutex},
 };
@@ -3714,67 +3719,7 @@ fn is_single_byte_view_input(data: &Bound<'_, PyAny>) -> bool {
 }
 
 fn supports_buffer_protocol(data: &Bound<'_, PyAny>) -> bool {
-    const PYBUF_SIMPLE: c_int = 0;
-
-    let mut view = PyBufferView::new();
-    let status = unsafe { PyObject_GetBuffer(data.as_ptr(), &mut view, PYBUF_SIMPLE) };
-    if status != 0 {
-        unsafe { ffi::PyErr_Clear() };
-        return false;
-    }
-    let guard = PyBufferGuard { view };
-    drop(guard);
-    true
-}
-
-struct PyBufferGuard {
-    view: PyBufferView,
-}
-
-impl Drop for PyBufferGuard {
-    fn drop(&mut self) {
-        if !self.view.obj.is_null() {
-            unsafe { PyBuffer_Release(&mut self.view) };
-        }
-    }
-}
-
-#[repr(C)]
-struct PyBufferView {
-    buf: *mut c_void,
-    obj: *mut ffi::PyObject,
-    len: isize,
-    itemsize: isize,
-    readonly: c_int,
-    ndim: c_int,
-    format: *mut std::os::raw::c_char,
-    shape: *mut isize,
-    strides: *mut isize,
-    suboffsets: *mut isize,
-    internal: *mut c_void,
-}
-
-impl PyBufferView {
-    const fn new() -> Self {
-        Self {
-            buf: std::ptr::null_mut(),
-            obj: std::ptr::null_mut(),
-            len: 0,
-            itemsize: 0,
-            readonly: 0,
-            ndim: 0,
-            format: std::ptr::null_mut(),
-            shape: std::ptr::null_mut(),
-            strides: std::ptr::null_mut(),
-            suboffsets: std::ptr::null_mut(),
-            internal: std::ptr::null_mut(),
-        }
-    }
-}
-
-unsafe extern "C" {
-    fn PyObject_GetBuffer(obj: *mut ffi::PyObject, view: *mut PyBufferView, flags: c_int) -> c_int;
-    fn PyBuffer_Release(view: *mut PyBufferView);
+    buffer::with_export(data, |_| Ok(())).is_ok_and(|export| export.is_some())
 }
 
 fn with_buffer_text<T>(
@@ -3783,47 +3728,32 @@ fn with_buffer_text<T>(
     caller: &str,
     f: impl FnOnce(&str) -> PyResult<T>,
 ) -> PyResult<Option<PyResult<T>>> {
-    const PYBUF_SIMPLE: c_int = 0;
-
-    let mut view = PyBufferView::new();
-    let status = unsafe { PyObject_GetBuffer(data.as_ptr(), &mut view, PYBUF_SIMPLE) };
-    if status != 0 {
-        unsafe { ffi::PyErr_Clear() };
-        return Ok(None);
-    }
-
-    let guard = PyBufferGuard { view };
-    if guard.view.len < 0 {
-        return Ok(Some(Err(PyTypeError::new_err(format!(
-            "{caller} received a negative buffer length"
-        )))));
-    }
-
-    let immutable = if let Ok(memoryview) = data.downcast::<PyMemoryView>() {
-        memoryview
-            .getattr(pyo3::intern!(py, "obj"))?
-            .is_exact_instance_of::<PyBytes>()
-    } else {
-        false
-    };
-    let bytes = if guard.view.len == 0 {
-        &[]
-    } else {
-        // SAFETY: the exporter supplies readable storage and the guard holds
-        // its export. No Python callback occurs before the copy below.
-        unsafe { std::slice::from_raw_parts(guard.view.buf.cast::<u8>(), guard.view.len as usize) }
-    };
-    // f can allocate Python objects and run GC callbacks on older interpreters.
-    // A read-only export alone does not make its backing storage immutable.
-    let bytes = if immutable {
-        Cow::Borrowed(bytes)
-    } else {
-        Cow::Owned(bytes.to_vec())
-    };
-    let text = core::str::from_utf8(&bytes).map_err(|err| {
-        PyTypeError::new_err(format!("{caller} input bytes are not valid UTF-8: {err}"))
-    });
-    Ok(Some(text.and_then(f)))
+    buffer::with_export(data, |export| {
+        if export.len() < 0 {
+            return Ok(Err(PyTypeError::new_err(format!(
+                "{caller} received a negative buffer length"
+            ))));
+        }
+        let owner = if let Ok(memoryview) = data.downcast::<PyMemoryView>() {
+            Some(memoryview.getattr(pyo3::intern!(py, "obj"))?)
+        } else {
+            None
+        };
+        // A read-only export alone does not make its storage immutable.
+        // Parser callbacks may allocate Python objects and invoke GC callbacks.
+        let bytes = if let Some(owner) = owner
+            .as_ref()
+            .filter(|owner| owner.is_exact_instance_of::<PyBytes>())
+        {
+            Cow::Borrowed(export.owner_bytes(owner.downcast::<PyBytes>()?, caller)?)
+        } else {
+            Cow::Owned(export.snapshot(caller)?)
+        };
+        let text = core::str::from_utf8(&bytes).map_err(|err| {
+            PyTypeError::new_err(format!("{caller} input bytes are not valid UTF-8: {err}"))
+        });
+        Ok(text.and_then(f))
+    })
 }
 
 fn with_readonly_byte_text<T>(
@@ -3842,8 +3772,6 @@ fn with_readonly_byte_text<T>(
             "byte views require exact bytes or a read-only buffer",
         ));
     }
-    const PYBUF_SIMPLE: c_int = 0;
-
     // Acquire the retained export before validating or borrowing any text.
     // Asking data for another export afterward could call Python and return
     // different storage, or mutate the bytes we have already validated.
@@ -3861,64 +3789,54 @@ fn with_readonly_byte_text<T>(
             "byte views require one-dimensional input",
         ));
     }
-    let mut view = PyBufferView::new();
-    // SAFETY: source is a built-in memoryview retaining the acquired export.
-    let status = unsafe { PyObject_GetBuffer(source.as_ptr(), &mut view, PYBUF_SIMPLE) };
-    if status != 0 {
-        unsafe { ffi::PyErr_Clear() };
-        return Err(PyTypeError::new_err(format!(
-            "{caller} expected bytes or a read-only contiguous memoryview, got {}",
-            data.get_type().name()?
-        )));
-    }
+    let result = buffer::with_export(source.as_any(), |export| {
+        if !export.readonly() {
+            return Err(PyTypeError::new_err(format!(
+                "{caller} requires read-only bytes-like input for no-copy payload views"
+            )));
+        }
+        if export.len() < 0 {
+            return Err(PyTypeError::new_err(format!(
+                "{caller} received a negative buffer length"
+            )));
+        }
+        if export.itemsize() != 1 {
+            return Err(PyTypeError::new_err(format!(
+                "{caller} requires a bytes-like input with itemsize 1 for no-copy payload views"
+            )));
+        }
+        let owner = source.getattr(pyo3::intern!(py, "obj"))?;
+        if data.is_instance_of::<PyMemoryView>() && owner.downcast::<PyBytes>().is_err() {
+            return Err(PyTypeError::new_err(format!(
+                "{caller} requires memoryview input backed by bytes for stable no-copy payload views"
+            )));
+        }
 
-    let guard = PyBufferGuard { view };
-    if guard.view.readonly == 0 {
-        return Err(PyTypeError::new_err(format!(
-            "{caller} requires read-only bytes-like input for no-copy payload views"
-        )));
-    }
-    if guard.view.len < 0 {
-        return Err(PyTypeError::new_err(format!(
-            "{caller} received a negative buffer length"
-        )));
-    }
-    if guard.view.itemsize != 1 {
-        return Err(PyTypeError::new_err(format!(
-            "{caller} requires a bytes-like input with itemsize 1 for no-copy payload views"
-        )));
-    }
-    let owner = source.getattr(pyo3::intern!(py, "obj"))?;
-    if data.is_instance_of::<PyMemoryView>() && owner.downcast::<PyBytes>().is_err() {
-        return Err(PyTypeError::new_err(format!(
-            "{caller} requires memoryview input backed by bytes for stable no-copy payload views"
-        )));
-    }
+        if !owner.is_exact_instance_of::<PyBytes>() {
+            // Copy the retained export, never request a second export from data.
+            let snapshot = source
+                .call_method0(pyo3::intern!(py, "tobytes"))?
+                .downcast_into::<PyBytes>()?;
+            let source = PyMemoryView::from(snapshot.as_any())?;
+            let text = core::str::from_utf8(snapshot.as_bytes()).map_err(|err| {
+                PyTypeError::new_err(format!("{caller} input bytes are not valid UTF-8: {err}"))
+            })?;
+            return f(text, &source);
+        }
 
-    if !owner.is_exact_instance_of::<PyBytes>() {
-        // Copy through the built-in memoryview before creating a Rust borrow.
-        // Unknown exporters may expose mutable storage as read-only.
-        let snapshot = source
-            .call_method0(pyo3::intern!(py, "tobytes"))?
-            .downcast_into::<PyBytes>()?;
-        let source = PyMemoryView::from(snapshot.as_any())?;
-        let text = core::str::from_utf8(snapshot.as_bytes()).map_err(|err| {
+        let bytes = export.owner_bytes(owner.downcast::<PyBytes>()?, caller)?;
+        let text = core::str::from_utf8(bytes).map_err(|err| {
             PyTypeError::new_err(format!("{caller} input bytes are not valid UTF-8: {err}"))
         })?;
-        return f(text, &source);
-    }
-
-    let bytes = if guard.view.len == 0 {
-        &[]
-    } else {
-        // SAFETY: this exact export is backed by immutable bytes. The guard
-        // and source keep it alive, including while f allocates Python objects.
-        unsafe { std::slice::from_raw_parts(guard.view.buf.cast::<u8>(), guard.view.len as usize) }
-    };
-    let text = core::str::from_utf8(bytes).map_err(|err| {
-        PyTypeError::new_err(format!("{caller} input bytes are not valid UTF-8: {err}"))
+        f(text, &source)
     })?;
-    f(text, &source)
+    match result {
+        Some(result) => Ok(result),
+        None => Err(PyTypeError::new_err(format!(
+            "{caller} expected bytes or a read-only contiguous memoryview, got {}",
+            data.get_type().name()?
+        ))),
+    }
 }
 
 fn memoryview_range(

@@ -166,9 +166,18 @@ events after the fix. The tests also retain nested events and exercise slicing
 with large positive and negative steps.
 
 The buffer operations are exercised through `with_buffer_text`, `with_readonly_byte_text`,
-`supports_buffer_protocol`, and `PyBufferGuard::drop`. The exporter must supply a
-valid allocation for the requested length, and the guard must keep the export
-alive until the Rust borrow or copy ends. Unknown read-only exporters are copied
+`supports_buffer_protocol`, and `BufferExport::drop`. `buffer::with_export`
+pins the descriptor on the stack before acquisition. The callback borrows the
+guard, so it cannot move the descriptor or release it early. The guard uses
+PyO3's interpreter-specific FFI definitions rather than a handwritten layout.
+Failed acquisition is not released; a successful export is released once.
+
+Bytes-backed views are checked against their owner's allocation and borrowed
+through that owner's safe byte slice. Mutable or unknown ordinary exports are
+copied to a Rust vector before parser callbacks, without first constructing a
+Rust shared slice over external storage. The exporter must still provide a valid
+allocation for the requested length and prevent unsynchronized native writes.
+Unknown read-only exporters are copied
 to immutable bytes before parsing, so their payloads retain the copy. Known
 immutable bytes-backed payloads retain their own export after the temporary
 guard releases its export.
@@ -303,6 +312,11 @@ exclude free and unmap records; peak tracked memory is not process RSS. Timings
 on a shared host are evidence for that run, not a performance guarantee.
 
 ## Limits
+
+The extension rejects `Py_GIL_DISABLED` builds. On those builds a PyO3 Python
+token proves thread attachment, not that concurrent Python writes are excluded.
+Setting `gil_used=true` is insufficient because callers can force the GIL off.
+The current raw copies and tuple initialization require a GIL-enabled build.
 
 CPython itself and the prebuilt Rust standard library are not instrumented by
 the native script. `PYTHONMALLOC=malloc` makes Python allocations visible to the
