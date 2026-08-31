@@ -34,11 +34,8 @@ mod dense_entry;
 mod dense_entry_tests;
 
 #[cfg(all(test, target_pointer_width = "64"))]
-#[path = "../../jsonmodem-py/src/compat/owned_list/spare.rs"]
-mod list_spare;
-
-#[cfg(all(test, target_pointer_width = "64"))]
-mod list_spare_tests;
+#[path = "../../jsonmodem-py/src/compat/owned_list/live.rs"]
+mod list_live;
 
 #[cfg(test)]
 #[path = "../../jsonmodem-py/src/compat/escape_mask.rs"]
