@@ -1109,7 +1109,9 @@ fn dump_long_string(py: Python<'_>, text: &str, flags: i32) -> PyResult<PyObject
         key_mask: 0,
     };
     encoder.output.push(b'"');
-    encoder.output.extend_from_slice(&bytes[..prefix]);
+    for chunk in bytes[..prefix].chunks(1024) {
+        encoder.output.extend_from_slice(chunk);
+    }
     encoder.string_contents(&bytes[prefix..])?;
     encoder.output.push(b'"');
     if flags & APPEND_NEWLINE != 0 {
