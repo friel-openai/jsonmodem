@@ -33,6 +33,32 @@ cargo add jsonmodem
 
 *(Python, Node‑API, and WASM bindings are on the roadmap.)*
 
+### Rust features
+
+`cached-zipper` is enabled by default. It lets value-building adapters cache
+pointers along the current branch instead of walking from the root for each
+access. Its unsafe implementation has safe interfaces tied to the tree's owner;
+enabling it does not permit unchecked JSON or overlapping mutable references.
+
+To use safe tree traversal instead:
+
+```toml
+[dependencies]
+jsonmodem = { version = "0.1.2", default-features = false }
+```
+
+Without `cached-zipper`, the core crate uses `forbid(unsafe_code)`. The public
+parsing and value APIs stay the same, but value building can be slower,
+especially for deeply nested documents. This guarantee covers the core crate's
+source, not its dependencies or the Python extension.
+
+Cargo combines dependency features. If any other dependency enables
+`cached-zipper`, including through jsonmodem's defaults, your application also
+uses the cache. `default-features = false` is not a veto. Check the resolved
+features with `cargo tree -e features -i jsonmodem` in your application.
+
+The independent `serde` feature can be enabled with or without `cached-zipper`.
+
 ---
 
 ## 🧪 Quick start – reacting to moderation while streaming code

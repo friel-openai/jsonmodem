@@ -1,17 +1,32 @@
 #![allow(dead_code)]
-use alloc::{boxed::Box, collections::BTreeMap, sync::Arc, vec::Vec};
-use core::{cmp::Ordering, ptr::NonNull};
+#[cfg(feature = "cached-zipper")]
+use alloc::boxed::Box;
+use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
+use core::cmp::Ordering;
 
 use super::{StdPath, value::Value};
 use crate::path::{Path, PathItem};
 
+#[cfg(feature = "cached-zipper")]
+#[allow(unsafe_code)]
+mod cached;
+
 #[derive(Debug)]
-/// Caches pointers along the parser's current branch of an owned value tree.
-/// Descendant pointers must be discarded before replacing or growing an
-/// ancestor.
+/// Owns a partial value tree and the current event's path.
+/// The `cached-zipper` feature caches branch pointers instead of walking from
+/// the root for each access. Both implementations expose the same borrows.
 pub struct ValueZipper {
+    // Boxing keeps the root address stable when cached pointers exist.
+    #[cfg(feature = "cached-zipper")]
     root: Box<Value>,
-    path_nodes: Vec<NonNull<Value>>,
+    #[cfg(not(feature = "cached-zipper"))]
+    root: Value,
+    // Discard descendant pointers before replacing or growing an ancestor.
+    #[cfg(feature = "cached-zipper")]
+    path_nodes: Vec<core::ptr::NonNull<Value>>,
+    // Keep Send/Sync unchanged when another dependency enables the cache.
+    #[cfg(not(feature = "cached-zipper"))]
+    thread_bound: core::marker::PhantomData<*mut Value>,
     path_components: Vec<PathItem>,
 }
 
@@ -25,8 +40,14 @@ impl ValueZipper {
     #[inline]
     pub fn new() -> Self {
         Self {
+            #[cfg(feature = "cached-zipper")]
             root: Box::new(Value::Null),
+            #[cfg(not(feature = "cached-zipper"))]
+            root: Value::Null,
+            #[cfg(feature = "cached-zipper")]
             path_nodes: Vec::with_capacity(8),
+            #[cfg(not(feature = "cached-zipper"))]
+            thread_bound: core::marker::PhantomData,
             path_components: Vec::with_capacity(8),
         }
     }
@@ -39,9 +60,14 @@ impl ValueZipper {
 
     #[inline]
     pub fn take_root(&mut self) -> Value {
+        #[cfg(feature = "cached-zipper")]
         self.path_nodes.clear();
         self.path_components.clear();
-        core::mem::replace(self.root.as_mut(), Value::Null)
+        #[cfg(feature = "cached-zipper")]
+        let root = self.root.as_mut();
+        #[cfg(not(feature = "cached-zipper"))]
+        let root = &mut self.root;
+        core::mem::replace(root, Value::Null)
     }
 
     #[inline]
@@ -69,73 +95,22 @@ impl ValueZipper {
         (path, slot)
     }
 
+    #[cfg(not(feature = "cached-zipper"))]
     #[inline]
     fn align_path(&mut self, path: &Path) -> (&StdPath, &mut Value) {
-        let current_depth = self.path_components.len();
-        let target_depth = path.len();
-
-        match target_depth.cmp(&current_depth) {
-            Ordering::Greater => {
-                #[cfg(any(fuzzing, debug_assertions))]
-                assert_eq!(
-                    target_depth,
-                    current_depth + 1,
-                    "parser path depth increased by more than one"
-                );
-                let mut parent_ptr = self.current_ptr();
-                let component = path
-                    .last()
-                    .expect("path depth greater than current depth implies non-empty path");
-                // SAFETY: the current node is live and exclusively borrowed.
-                // No descendant pointers exist while its container may grow.
-                let child = descend_one(unsafe { parent_ptr.as_mut() }, component);
-                let child_ptr = NonNull::from(child);
-                self.path_nodes.push(child_ptr);
-                self.path_components.push(component.clone());
-            }
-            Ordering::Less => {
-                #[cfg(any(fuzzing, debug_assertions))]
-                assert_eq!(
-                    current_depth,
-                    target_depth + 1,
-                    "parser path depth decreased by more than one"
-                );
-                self.path_nodes.truncate(target_depth);
-                self.path_components.truncate(target_depth);
-            }
-            Ordering::Equal => {
-                if target_depth == 0 {
-                    // Root path – nothing to do.
-                } else if let Some(last) = path.last() {
-                    let matches_existing = self.path_components.last() == Some(last);
-                    if !matches_existing {
-                        self.path_nodes.pop();
-                        self.path_components.pop();
-                        let mut parent_ptr = self.current_ptr();
-                        // SAFETY: the old child pointer was removed before
-                        // descend_one can grow the parent's container.
-                        let child = descend_one(unsafe { parent_ptr.as_mut() }, last);
-                        let child_ptr = NonNull::from(child);
-                        self.path_nodes.push(child_ptr);
-                        self.path_components.push(last.clone());
-                    }
-                }
-            }
+        let shared = self
+            .path_components
+            .iter()
+            .zip(path)
+            .take_while(|(left, right)| left == right)
+            .count();
+        self.path_components.truncate(shared);
+        self.path_components.extend_from_slice(&path[shared..]);
+        let mut current = &mut self.root;
+        for component in &self.path_components {
+            current = descend_one(current, component);
         }
-
-        // SAFETY: the branches above retain only pointers to live ancestors
-        // and the current leaf. The leaf belongs to the boxed tree, disjoint
-        // from path_components. Both references remain tied to this zipper.
-        let leaf = unsafe { self.current_ptr().as_mut() };
-        (&self.path_components, leaf)
-    }
-
-    #[inline]
-    fn current_ptr(&mut self) -> NonNull<Value> {
-        match self.path_nodes.last().copied() {
-            Some(ptr) => ptr,
-            None => NonNull::from(self.root.as_mut()),
-        }
+        (&self.path_components, current)
     }
 }
 
@@ -187,6 +162,26 @@ mod tests {
     use super::*;
 
     #[test]
+    fn feature_preserves_send_and_sync_contract() {
+        // If ValueZipper gains Send or Sync, the corresponding inferred
+        // trait parameter becomes ambiguous and this test fails to compile.
+        trait NotSend<A> {
+            fn check() {}
+        }
+        impl<T: ?Sized> NotSend<()> for T {}
+        impl<T: ?Sized + Send> NotSend<u8> for T {}
+
+        trait NotSync<A> {
+            fn check() {}
+        }
+        impl<T: ?Sized> NotSync<()> for T {}
+        impl<T: ?Sized + Sync> NotSync<u8> for T {}
+
+        let _ = <ValueZipper as NotSend<_>>::check;
+        let _ = <ValueZipper as NotSync<_>>::check;
+    }
+
+    #[test]
     fn memory_safety_array_growth_and_root_reuse() {
         let mut zipper = ValueZipper::new();
         for round in 0..3 {
@@ -211,7 +206,7 @@ mod tests {
             assert_eq!(zipper.read_root(), &expected);
             assert_eq!(zipper.take_root(), expected);
             assert_eq!(zipper.read_root(), &Value::Null);
-            assert!(zipper.path_nodes.is_empty());
+            assert!(zipper.path_components.is_empty());
         }
     }
 

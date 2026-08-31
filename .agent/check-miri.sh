@@ -30,6 +30,9 @@ for model in stacked tree; do
         cargo "+$TOOLCHAIN" miri test -p jsonmodem --lib memory_safety -- --nocapture
         cargo "+$TOOLCHAIN" miri test -p jsonmodem --test memory_safety -- --nocapture
     done
+    echo "Miri model=$model execution_seed=2 without cached-zipper"
+    cargo "+$TOOLCHAIN" miri test -p jsonmodem --no-default-features \
+        --lib backend::std::value_zipper::tests -- --nocapture
 done
 
 if [[ "$(uname -m)" == x86_64 ]]; then

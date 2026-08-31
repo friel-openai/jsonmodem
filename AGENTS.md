@@ -14,6 +14,11 @@ Required checks:
 .agent/check.sh
 ```
 
+The check script also runs `.agent/check-features.sh` for every combination of
+the core crate's `cached-zipper` and `serde` features. Run this script directly
+for a focused feature check. It selects the core package alone because testing
+the whole workspace can re-enable dependency features.
+
 Run this script early and often—ideally after every meaningful change—so
 failures surface while the context is still fresh. Keeping the local workspace
 green makes it easier to hand off high-quality changes and prevents last-minute

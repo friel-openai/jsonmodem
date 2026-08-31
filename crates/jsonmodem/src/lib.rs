@@ -10,8 +10,15 @@
 //!
 //! Most users only need these three types plus `ParseEvent`, `Path`, and
 //! `Value`.
+//!
+//! The default `cached-zipper` feature enables an internally unsafe pointer
+//! cache for value building. Without it, value building uses safe tree
+//! traversal, and this crate forbids unsafe code. Other dependencies can
+//! enable the feature through Cargo feature unification; see the README.
 
 #![no_std]
+#![deny(unsafe_code)]
+#![cfg_attr(not(feature = "cached-zipper"), forbid(unsafe_code))]
 extern crate alloc;
 
 #[cfg(any(test, fuzzing))]
