@@ -1,10 +1,50 @@
 //! Complete-document operations: no streaming events and no Python
 //! preprocessing.
 
+mod escape_mask;
+#[cfg_attr(
+    not(all(
+        Py_3_12,
+        not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+        not(any(py_sys_config = "Py_TRACE_REFS", py_sys_config = "Py_REF_DEBUG")),
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64",
+        target_endian = "little",
+    )),
+    allow(dead_code)
+)]
+mod integer;
 mod objects;
+mod owned_list;
+#[cfg(all(
+    Py_3_12,
+    not(Py_3_14),
+    not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+))]
+mod strings;
+#[cfg(all(
+    Py_3_12,
+    not(Py_3_14),
+    not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+))]
+pub(crate) use strings::ErrorDocument;
+mod validate;
+
+#[cfg(all(
+    Py_3_12,
+    not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+    not(py_sys_config = "Py_TRACE_REFS"),
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64",
+    target_endian = "little",
+))]
+mod borrowed_dict;
 
 use std::{borrow::Cow, collections::HashMap, ops::Range};
 
+use integer::Integer;
 use jsonmodem::document::{DocumentError, DocumentReader, IntegerToken, plain_string_prefix};
 use lexical_parse_float::FromLexical;
 pub use objects::_dumps_objects;
@@ -35,6 +75,40 @@ const MAX_RETAINED_STRING_CAPACITY: usize = 64 * 1024;
 fn parse_double(text: &str) -> Result<f64, lexical_parse_float::Error> {
     // DocumentReader already checked JSON syntax; only decimal conversion remains.
     f64::from_lexical(text.as_bytes())
+}
+
+/// Borrow text from an owned string, using inline ASCII storage on supported
+/// builds.
+#[inline]
+fn string_text<'value>(value: &'value Bound<'_, PyString>) -> PyResult<&'value str> {
+    #[cfg(all(
+        Py_3_12,
+        not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+        not(py_sys_config = "Py_TRACE_REFS"),
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64",
+        target_endian = "little",
+    ))]
+    if value.is_exact_instance_of::<PyString>() {
+        // SAFETY: value owns an exact CPython str while the GIL is held. In the
+        // selected ABI, compact ASCII has initialized, immutable ASCII data of
+        // GET_LENGTH bytes. PyO3 computes its address for that ABI, including
+        // empty strings. The returned view cannot outlive the owning reference.
+        unsafe {
+            let pointer = value.as_ptr();
+            if pyo3::ffi::PyUnicode_IS_COMPACT_ASCII(pointer) != 0 {
+                if let Ok(length) = usize::try_from(pyo3::ffi::PyUnicode_GET_LENGTH(pointer)) {
+                    let bytes = std::slice::from_raw_parts(
+                        pyo3::ffi::PyUnicode_1BYTE_DATA(pointer),
+                        length,
+                    );
+                    return Ok(std::str::from_utf8_unchecked(bytes));
+                }
+            }
+        }
+    }
+    value.to_str()
 }
 
 /// Explicit raw output, retaining its owner without parsing or placeholder
@@ -108,16 +182,52 @@ impl<'py, 'src> Decoder<'py, 'src> {
     }
 
     fn key(&mut self) -> PyResult<Py<PyString>> {
+        #[cfg(all(
+            Py_3_12,
+            not(Py_3_14),
+            not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+        ))]
+        let parsed = match self.reader.string_with_metadata(&mut self.string_buffer) {
+            Ok(parsed) => parsed,
+            Err(error) => return Err(self.error(error)),
+        };
+        #[cfg(all(
+            Py_3_12,
+            not(Py_3_14),
+            not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+        ))]
+        let (borrowed, text) = (parsed.borrowed(), parsed.as_str());
+        #[cfg(not(all(
+            Py_3_12,
+            not(Py_3_14),
+            not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+        )))]
         let borrowed = self
             .reader
             .string_with_buffer(&mut self.string_buffer)
             .map_err(|error| self.error(error))?;
+        #[cfg(not(all(
+            Py_3_12,
+            not(Py_3_14),
+            not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+        )))]
         let text = borrowed.unwrap_or(&self.string_buffer);
         let key = if self.cache_keys && text.len() <= 64 {
             let keys = self.keys.get_or_insert_with(HashMap::new);
             match keys.get(text) {
                 Some(key) => key.clone_ref(self.py),
                 None => {
+                    #[cfg(all(
+                        Py_3_12,
+                        not(Py_3_14),
+                        not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+                    ))]
+                    let key = strings::new(self.py, &parsed)?.unbind();
+                    #[cfg(not(all(
+                        Py_3_12,
+                        not(Py_3_14),
+                        not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+                    )))]
                     let key = PyString::new(self.py, text).unbind();
                     if keys.len() < 512 {
                         let text = match borrowed {
@@ -130,7 +240,19 @@ impl<'py, 'src> Decoder<'py, 'src> {
                 }
             }
         } else {
-            PyString::new(self.py, text).unbind()
+            #[cfg(all(
+                Py_3_12,
+                not(Py_3_14),
+                not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+            ))]
+            let key = strings::new(self.py, &parsed)?.unbind();
+            #[cfg(not(all(
+                Py_3_12,
+                not(Py_3_14),
+                not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+            )))]
+            let key = PyString::new(self.py, text).unbind();
+            key
         };
         if borrowed.is_none() {
             self.release_large_string_buffer();
@@ -172,10 +294,41 @@ impl<'py, 'src> Decoder<'py, 'src> {
                     dict.into_any().unbind()
                 }
                 Some(b'"') => {
+                    #[cfg(all(
+                        Py_3_12,
+                        not(Py_3_14),
+                        not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+                    ))]
+                    let parsed = match self.reader.string_with_metadata(&mut self.string_buffer) {
+                        Ok(parsed) => parsed,
+                        Err(error) => return Err(self.error(error)),
+                    };
+                    #[cfg(all(
+                        Py_3_12,
+                        not(Py_3_14),
+                        not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+                    ))]
+                    let borrowed = parsed.borrowed();
+                    #[cfg(not(all(
+                        Py_3_12,
+                        not(Py_3_14),
+                        not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+                    )))]
                     let borrowed = self
                         .reader
                         .string_with_buffer(&mut self.string_buffer)
                         .map_err(|error| self.error(error))?;
+                    #[cfg(all(
+                        Py_3_12,
+                        not(Py_3_14),
+                        not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+                    ))]
+                    let value = strings::new(py, &parsed)?.into_any().unbind();
+                    #[cfg(not(all(
+                        Py_3_12,
+                        not(Py_3_14),
+                        not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+                    )))]
                     let value = PyString::new(py, borrowed.unwrap_or(&self.string_buffer))
                         .into_any()
                         .unbind();
@@ -227,7 +380,7 @@ impl<'py, 'src> Decoder<'py, 'src> {
                 match stack.last_mut() {
                     None => return Ok(value),
                     Some(DecodeContainer::Array(list)) => {
-                        list.append(value)?;
+                        owned_list::append(list, value)?;
                         match self.reader.peek() {
                             Some(b',') => {
                                 self.expect(b',')?;
@@ -276,6 +429,10 @@ fn decode(py: Python<'_>, input: &str) -> PyResult<PyObject> {
         keys: None,
         cache_keys: input.len() >= 1024,
     };
+    if validate::has_invalid_container_ending(input) {
+        decoder.validate_without_values()?;
+        decoder.reader = DocumentReader::new(input);
+    }
     let value = decoder.value()?;
     if decoder.reader.peek().is_some() {
         return Err(decoder.fail("unexpected content after document"));
@@ -347,6 +504,78 @@ fn decode_bytes(py: Python<'_>, bytes: &[u8]) -> PyResult<PyObject> {
     decode(py, input)
 }
 
+/// Cached storage check. Only copy_integer may record a checked result.
+#[cfg(all(
+    Py_3_12,
+    not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+    not(any(py_sys_config = "Py_TRACE_REFS", py_sys_config = "Py_REF_DEBUG")),
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64",
+    target_endian = "little",
+))]
+#[repr(u8)]
+enum IntegerLayout {
+    Unchecked,
+    Supported,
+    Fallback,
+}
+
+/// Copy an owned exact integer only on the reviewed CPython layout.
+#[cfg(all(
+    Py_3_12,
+    not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+    not(any(py_sys_config = "Py_TRACE_REFS", py_sys_config = "Py_REF_DEBUG")),
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64",
+    target_endian = "little",
+))]
+#[inline(always)]
+fn copy_integer(value: &Bound<'_, PyInt>, layout: &mut IntegerLayout) -> Option<Integer> {
+    /// Excluding digits avoids a padded struct read beyond a small allocation.
+    #[repr(C)]
+    struct IntegerPrefix {
+        _header: pyo3::ffi::PyObject,
+        tag: usize,
+    }
+
+    if !value.is_exact_instance_of::<PyInt>() {
+        return None;
+    }
+    let layout_matches = match layout {
+        IntegerLayout::Unchecked => {
+            let expected_offset = isize::try_from(std::mem::size_of::<IntegerPrefix>()).ok()?;
+            let integer_type = std::ptr::addr_of!(pyo3::ffi::PyLong_Type);
+            // SAFETY: Bound keeps Python attached to the GIL. These built-in
+            // fields are the first digit's offset and sizeof(digit). The type
+            // is immutable; no ordinary callback can change this cached result.
+            let matches = unsafe {
+                (*integer_type).tp_basicsize == expected_offset && (*integer_type).tp_itemsize == 4
+            };
+            *layout = if matches {
+                IntegerLayout::Supported
+            } else {
+                IntegerLayout::Fallback
+            };
+            matches
+        }
+        IntegerLayout::Supported => true,
+        IntegerLayout::Fallback => false,
+    };
+    let tag = value
+        .as_ptr()
+        .cast::<u8>()
+        .wrapping_add(std::mem::offset_of!(IntegerPrefix, tag))
+        .cast::<usize>();
+    // SAFETY: Bound retains an exact immutable int under the GIL. The selected
+    // ABI provides the initialized tag, and the cached metadata check proves
+    // the following digits' offset and width. Each counted digit is initialized
+    // and below 2^30. The helper reads no digit for zero or an unsupported count,
+    // makes no Python call, and retains no pointer. A false layout reads nothing.
+    unsafe { integer::read_integer(tag, layout_matches) }
+}
+
 /// Return a signed integer, or select unsigned conversion without an exception.
 #[inline(always)]
 fn signed_integer(value: &Bound<'_, PyInt>) -> PyResult<Option<i64>> {
@@ -399,16 +628,58 @@ struct Encoder<const CHECKED: bool = false> {
     base_depth: usize,
     // Dataclasses retain field order and check depth before counting their object.
     dataclass_root: bool,
+    #[cfg(all(
+        Py_3_12,
+        not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+        not(any(py_sys_config = "Py_TRACE_REFS", py_sys_config = "Py_REF_DEBUG")),
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64",
+        target_endian = "little",
+    ))]
+    integer_layout: IntegerLayout,
     // Retained owners make identity-based reuse safe for the whole call.
     keys: Vec<(Py<PyString>, Range<usize>)>,
+    // In callback-free encoding, an unset identity bit rules out a cache hit.
+    key_mask: u64,
 }
 
 /// Owning iterators keep each container alive without native recursion.
 enum EncodeIterator<'py> {
     Dict(BoundDictIterator<'py>),
+    #[cfg(all(
+        Py_3_12,
+        not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+        not(py_sys_config = "Py_TRACE_REFS"),
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64",
+        target_endian = "little",
+    ))]
+    ScalarDict(borrowed_dict::DictScalarCursor<'py>),
     Sorted(std::vec::IntoIter<(Bound<'py, PyAny>, Bound<'py, PyAny>)>),
     List(BoundListIterator<'py>),
     Tuple(BoundTupleIterator<'py>),
+}
+
+impl<'py> EncodeIterator<'py> {
+    /// The caller has already selected the sorted-dictionary branch, if needed.
+    fn dict<const CHECKED: bool>(dict: &Bound<'py, PyDict>, dataclass_root: bool) -> Self {
+        #[cfg(all(
+            Py_3_12,
+            not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+            not(py_sys_config = "Py_TRACE_REFS"),
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64",
+            target_endian = "little",
+        ))]
+        if !CHECKED && !dataclass_root {
+            return Self::ScalarDict(borrowed_dict::DictScalarCursor::new(dict.clone()));
+        }
+        let _ = dataclass_root;
+        Self::Dict(dict.iter())
+    }
 }
 
 /// An unfinished container, including identity for active-ancestor cycle
@@ -423,6 +694,27 @@ struct EncodeContainer<'py> {
 #[cold]
 fn allocation_error() -> PyErr {
     PyMemoryError::new_err("JSON serialization allocation failed")
+}
+
+/// Retain Python's conversion error as the cause of an invalid JSON key.
+#[cold]
+fn key_utf8_error(py: Python<'_>, cause: PyErr) -> PyErr {
+    let error = PyTypeError::new_err("str is not valid UTF-8: surrogates not allowed");
+    error.set_cause(py, Some(cause));
+    error
+}
+
+/// Key overflow retains the unsigned C conversion error as its cause.
+#[cold]
+fn integer_key_error(value: &Bound<'_, PyInt>, original: PyErr) -> PyErr {
+    match value.extract::<u64>() {
+        Ok(_) => original,
+        Err(cause) => {
+            let error = PyTypeError::new_err("Dict integer key must be within 64-bit range");
+            error.set_cause(value.py(), Some(cause));
+            error
+        }
+    }
 }
 
 /// Output writes fail only on allocation; callers construct the Python
@@ -442,7 +734,18 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
             option: self.option,
             base_depth: self.base_depth,
             dataclass_root: self.dataclass_root,
+            #[cfg(all(
+                Py_3_12,
+                not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+                not(any(py_sys_config = "Py_TRACE_REFS", py_sys_config = "Py_REF_DEBUG")),
+                target_os = "linux",
+                target_arch = "x86_64",
+                target_pointer_width = "64",
+                target_endian = "little",
+            ))]
+            integer_layout: self.integer_layout,
             keys: self.keys,
+            key_mask: self.key_mask,
         }
     }
 
@@ -523,9 +826,49 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
         Ok(true)
     }
 
+    fn validate_keys(&mut self, dict: &Bound<'_, PyDict>) -> PyResult<bool> {
+        #[cfg(all(
+            Py_3_12,
+            not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+            not(any(
+                py_sys_config = "Py_DEBUG",
+                py_sys_config = "Py_REF_DEBUG",
+                py_sys_config = "Py_TRACE_REFS",
+            )),
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64",
+            target_endian = "little",
+        ))]
+        if borrowed_dict::primitive_keys_valid::<CHECKED>(dict) {
+            return Ok(true);
+        }
+        // A refusal restarts validation at the first key, preserving conversion
+        // errors and their order before any value is serialized.
+        for (key, _) in dict.iter() {
+            if let Ok(key) = key.downcast_exact::<PyString>() {
+                key.to_str()
+                    .map_err(|cause| key_utf8_error(key.py(), cause))?;
+            } else if let Ok(key) = key.downcast_exact::<PyInt>() {
+                self.integer(key)
+                    .map_err(|error| integer_key_error(key, error))?;
+            } else if !(key.is_none()
+                || key.is_exact_instance_of::<PyBool>()
+                || key.is_exact_instance_of::<PyFloat>())
+            {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
     fn key(&mut self, key: &Bound<'_, PyString>) -> PyResult<()> {
         let cache = self.output.len() >= 1024;
-        if cache {
+        if cache
+            && (CHECKED
+                || self.keys.len() < 16
+                || self.key_mask & key_identity_bit(key.as_ptr() as usize) != 0)
+        {
             if let Some((_, encoded)) = self
                 .keys
                 .iter()
@@ -539,9 +882,7 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                 return Ok(());
             }
         }
-        let text = key
-            .to_str()
-            .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
+        let text = string_text(key).map_err(|cause| key_utf8_error(key.py(), cause))?;
         let start = self.output.len();
         self.string(text)?;
         if cache && self.keys.len() < 16 && text.len() <= 64 {
@@ -550,6 +891,9 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
             }
             self.keys
                 .push((key.clone().unbind(), start..self.output.len()));
+            if !CHECKED {
+                self.key_mask |= key_identity_bit(key.as_ptr() as usize);
+            }
         }
         Ok(())
     }
@@ -570,30 +914,56 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
             self.extend(&remaining[..prefix])?;
             remaining = &remaining[prefix..];
             if let Some((&byte, tail)) = remaining.split_first() {
-                match byte {
-                    b'"' => self.extend(b"\\\"")?,
-                    b'\\' => self.extend(b"\\\\")?,
-                    b'\n' => self.extend(b"\\n")?,
-                    b'\r' => self.extend(b"\\r")?,
-                    b'\t' => self.extend(b"\\t")?,
-                    8 => self.extend(b"\\b")?,
-                    12 => self.extend(b"\\f")?,
-                    _ => {
-                        const HEX: &[u8] = b"0123456789abcdef";
-                        self.extend(&[
-                            b'\\',
-                            b'u',
-                            b'0',
-                            b'0',
-                            HEX[usize::from(byte >> 4)],
-                            HEX[usize::from(byte & 15)],
-                        ])?;
+                if let Some(block) = remaining.first_chunk::<16>() {
+                    let mut escapes = escape_mask::mask(block);
+                    if escapes & escapes.wrapping_sub(1) != 0 {
+                        let mut start = 0;
+                        while escapes != 0 {
+                            let index = escapes.trailing_zeros() as usize;
+                            if start < index {
+                                self.extend(&block[start..index])?;
+                            }
+                            self.escape_byte(block[index])?;
+                            start = index + 1;
+                            escapes &= escapes - 1;
+                        }
+                        if start < block.len() {
+                            self.extend(&block[start..])?;
+                        }
+                        remaining = &remaining[block.len()..];
+                        continue;
                     }
                 }
+                self.escape_byte(byte)?;
                 remaining = tail;
             }
         }
         Ok(())
+    }
+
+    /// Write a byte already identified as a JSON escape by either scanner.
+    #[inline(always)]
+    fn escape_byte(&mut self, byte: u8) -> Result<(), OutputAllocationError> {
+        match byte {
+            b'"' => self.extend(b"\\\""),
+            b'\\' => self.extend(b"\\\\"),
+            b'\n' => self.extend(b"\\n"),
+            b'\r' => self.extend(b"\\r"),
+            b'\t' => self.extend(b"\\t"),
+            8 => self.extend(b"\\b"),
+            12 => self.extend(b"\\f"),
+            _ => {
+                const HEX: &[u8] = b"0123456789abcdef";
+                self.extend(&[
+                    b'\\',
+                    b'u',
+                    b'0',
+                    b'0',
+                    HEX[usize::from(byte >> 4)],
+                    HEX[usize::from(byte & 15)],
+                ])
+            }
+        }
     }
 
     fn newline(&mut self, depth: usize) -> Result<(), OutputAllocationError> {
@@ -609,33 +979,55 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
     }
 
     #[inline(always)]
+    fn integer(&mut self, value: &Bound<'_, PyInt>) -> PyResult<Integer> {
+        #[cfg(all(
+            Py_3_12,
+            not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+            not(any(py_sys_config = "Py_TRACE_REFS", py_sys_config = "Py_REF_DEBUG")),
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64",
+            target_endian = "little",
+        ))]
+        if let Some(integer) = copy_integer(value, &mut self.integer_layout) {
+            return Ok(integer);
+        }
+        if let Some(integer) = signed_integer(value)? {
+            Ok(Integer::Signed(integer))
+        } else {
+            let integer = unsigned_integer(value)
+                .map_err(|_| PyTypeError::new_err("Integer exceeds 64-bit range"))?;
+            Ok(Integer::Unsigned(integer))
+        }
+    }
+
+    #[inline(always)]
     fn scalar(&mut self, value: &Bound<'_, PyAny>) -> PyResult<bool> {
         if value.is_none() {
             self.extend(b"null")?;
         } else if let Ok(string) = value.downcast_exact::<PyString>() {
             self.string(
-                string
-                    .to_str()
-                    .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?,
+                string_text(string).map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?,
             )?;
         } else if let Ok(boolean) = value.downcast_exact::<PyBool>() {
             self.extend(if boolean.is_true() { b"true" } else { b"false" })?;
         } else if let Ok(value) = value.downcast_exact::<PyInt>() {
             let mut buffer = itoa::Buffer::new();
-            if let Some(integer) = signed_integer(value)? {
-                if self.option & STRICT_INTEGER != 0
-                    && !(-9_007_199_254_740_991..=9_007_199_254_740_991).contains(&integer)
-                {
-                    return Err(PyTypeError::new_err("Integer exceeds 53-bit range"));
+            match self.integer(value)? {
+                Integer::Signed(integer) => {
+                    if self.option & STRICT_INTEGER != 0
+                        && !(-9_007_199_254_740_991..=9_007_199_254_740_991).contains(&integer)
+                    {
+                        return Err(PyTypeError::new_err("Integer exceeds 53-bit range"));
+                    }
+                    self.extend(buffer.format(integer).as_bytes())?;
                 }
-                self.extend(buffer.format(integer).as_bytes())?;
-            } else {
-                let integer = unsigned_integer(value)
-                    .map_err(|_| PyTypeError::new_err("Integer exceeds 64-bit range"))?;
-                if self.option & STRICT_INTEGER != 0 && integer > 9_007_199_254_740_991 {
-                    return Err(PyTypeError::new_err("Integer exceeds 53-bit range"));
+                Integer::Unsigned(integer) => {
+                    if self.option & STRICT_INTEGER != 0 && integer > 9_007_199_254_740_991 {
+                        return Err(PyTypeError::new_err("Integer exceeds 53-bit range"));
+                    }
+                    self.extend(buffer.format(integer).as_bytes())?;
                 }
-                self.extend(buffer.format(integer).as_bytes())?;
             }
         } else if let Ok(float) = value.downcast_exact::<PyFloat>() {
             let number = float.value();
@@ -705,6 +1097,13 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                 return Err(PyTypeError::new_err("circular reference"));
             }
             let (iter, opening, closing) = if let Ok(dict) = current.downcast_exact::<PyDict>() {
+                // NON_STR_KEYS validates every key before values, even without sorting.
+                if self.option & (NON_STR_KEYS | SORT_KEYS) == NON_STR_KEYS
+                    && (!self.dataclass_root || !stack.is_empty())
+                    && !self.validate_keys(dict)?
+                {
+                    return Ok(false);
+                }
                 if self.option & SORT_KEYS != 0 && (!self.dataclass_root || !stack.is_empty()) {
                     let mut items: Vec<_> = dict.iter().collect();
                     for (key, _) in &items {
@@ -712,7 +1111,7 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                             return Ok(false);
                         };
                         key.to_str()
-                            .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
+                            .map_err(|cause| key_utf8_error(key.py(), cause))?;
                     }
                     items.sort_unstable_by(|(left, _), (right, _)| {
                         left.downcast::<PyString>()
@@ -723,7 +1122,11 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                     });
                     (EncodeIterator::Sorted(items.into_iter()), b'{', b'}')
                 } else {
-                    (EncodeIterator::Dict(dict.iter()), b'{', b'}')
+                    (
+                        EncodeIterator::dict::<CHECKED>(dict, self.dataclass_root),
+                        b'{',
+                        b'}',
+                    )
                 }
             } else if let Ok(list) = current.downcast_exact::<PyList>() {
                 (EncodeIterator::List(list.iter()), b'[', b']')
@@ -765,6 +1168,22 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                 }
                 let item = match &mut frame.iter {
                     EncodeIterator::Dict(iter) => iter.next().map(|(key, item)| (Some(key), item)),
+                    #[cfg(all(
+                        Py_3_12,
+                        not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+                        not(py_sys_config = "Py_TRACE_REFS"),
+                        target_os = "linux",
+                        target_arch = "x86_64",
+                        target_pointer_width = "64",
+                        target_endian = "little",
+                    ))]
+                    EncodeIterator::ScalarDict(iter) => {
+                        match iter.next(self, &mut frame.count, depth)? {
+                            borrowed_dict::DictStep::Written => continue,
+                            borrowed_dict::DictStep::Owned(key, item) => Some((Some(key), item)),
+                            borrowed_dict::DictStep::End => None,
+                        }
+                    }
                     EncodeIterator::Sorted(iter) => {
                         iter.next().map(|(key, item)| (Some(key), item))
                     }
@@ -802,6 +1221,11 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
     }
 }
 
+#[inline]
+fn key_identity_bit(identity: usize) -> u64 {
+    1 << (((identity >> 4) ^ (identity >> 10)) & 63)
+}
+
 fn supplied_default<'py>(value: &Bound<'py, PyAny>) -> PyResult<Option<Bound<'py, PyAny>>> {
     // Explicit None is an invalid callback; an omitted argument has no callback
     // cause.
@@ -832,10 +1256,23 @@ fn dump_long_string(py: Python<'_>, text: &str, flags: i32) -> PyResult<PyObject
         option: flags,
         base_depth: 0,
         dataclass_root: false,
+        #[cfg(all(
+            Py_3_12,
+            not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+            not(any(py_sys_config = "Py_TRACE_REFS", py_sys_config = "Py_REF_DEBUG")),
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64",
+            target_endian = "little",
+        ))]
+        integer_layout: IntegerLayout::Unchecked,
         keys: Vec::new(),
+        key_mask: 0,
     };
     encoder.output.push(b'"');
-    encoder.output.extend_from_slice(&bytes[..prefix]);
+    for chunk in bytes[..prefix].chunks(1024) {
+        encoder.output.extend_from_slice(chunk);
+    }
     encoder.string_contents(&bytes[prefix..])?;
     encoder.output.push(b'"');
     if flags & APPEND_NEWLINE != 0 {
@@ -865,9 +1302,8 @@ pub fn dumps(
         return Err(PyTypeError::new_err("unsupported option bits"));
     }
     let root_string = if let Ok(string) = obj.downcast_exact::<PyString>() {
-        let text = string
-            .to_str()
-            .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
+        let text =
+            string_text(string).map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
         if text.len() >= INITIAL_OUTPUT_CAPACITY {
             return dump_long_string(py, text, flags);
         }
@@ -880,7 +1316,18 @@ pub fn dumps(
         option: flags,
         base_depth: 0,
         dataclass_root: false,
+        #[cfg(all(
+            Py_3_12,
+            not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+            not(any(py_sys_config = "Py_TRACE_REFS", py_sys_config = "Py_REF_DEBUG")),
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64",
+            target_endian = "little",
+        ))]
+        integer_layout: IntegerLayout::Unchecked,
         keys: Vec::new(),
+        key_mask: 0,
     };
     let encoded = if let Some(text) = root_string {
         encoder.string(text)?;
@@ -913,7 +1360,18 @@ pub fn _dumps_fields(
         option,
         base_depth: depth,
         dataclass_root: true,
+        #[cfg(all(
+            Py_3_12,
+            not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+            not(any(py_sys_config = "Py_TRACE_REFS", py_sys_config = "Py_REF_DEBUG")),
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64",
+            target_endian = "little",
+        ))]
+        integer_layout: IntegerLayout::Unchecked,
         keys: Vec::new(),
+        key_mask: 0,
     };
     if encoder.value(fields.as_any())? {
         Ok(Some(PyBytes::new(py, &encoder.output).unbind()))

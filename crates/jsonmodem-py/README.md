@@ -201,8 +201,9 @@ not prove identical behavior for every Python object or malformed input. Test th
 options and types used by your application.
 
 `loads` uses jsonmodem's complete-document reader and constructs Python values
-directly. It does not call `feed()`, allocate events, clone paths, or run a second
-grammar parser. It validates grammar while constructing containers and rejects
+directly. It does not call `feed()`, allocate events, or clone paths. It normally
+validates grammar while constructing containers. For selected malformed container
+endings, it finds the first error without building Python values. It rejects
 trailing commas, non-finite numbers, invalid UTF-8, and unpaired UTF-16
 surrogates. `dumps` rejects cycles, unsupported types, and integers outside
 orjson's signed/unsigned 64-bit range. A non-callable default fails only if needed.
@@ -225,7 +226,8 @@ Rust handles sorted dictionaries, Fragments, and primitive non-string keys.
 Dataclasses, subclasses, sorted converted keys, and callback results share one
 Rust output buffer instead of producing one byte string per dataclass. The
 serializer retains parent entries before calling field getters or callbacks.
-Python helpers still format datetimes and UUIDs and prepare NumPy arrays.
+Rust formats exact UUIDs and supported exact date/time objects directly.
+Python helpers handle the remaining date/time cases and prepare NumPy arrays.
 Dataclass fields retain their order under `OPT_SORT_KEYS`; ordinary dictionaries
 inside them are sorted.
 
@@ -244,21 +246,33 @@ Wheels are interpreter-specific rather than `abi3-py39`. This lets PyO3 use
 CPython's public UTF-8 string access without an encoded copy on Python 3.9.
 Build a wheel separately for each supported CPython version.
 
-Tests exercise the compiled Python extension with generated documents, malformed
-bytes, numeric chunk splits, callback mutation, restricted buffers, resource
-limits, and small thread stacks. Miri checks the Rust core for certain kinds of
-invalid memory access. It does not check the Python binding or its calls into
-CPython. The complete-document writer uses two explicit `unsafe` calls to public
-CPython integer-conversion functions: `PyLong_AsLongLongAndOverflow` and, on
-64-bit targets, `PyLong_AsSize_t`. Both receive retained, exact Python integers
-while Python is attached and check the error sentinel. They do not read Python
-object layouts or retain raw pointers. Callback serialization uses another
-explicit `unsafe` block to copy its owned output with CPython's public bytes
-constructor and check allocation failure. Streaming number conversion uses
-three public CPython constructors, also checking allocation failure. The
-complete-document reader has no explicit `unsafe` blocks. Other parts of the
-package and native dependencies also use unsafe code. Passing tests is not a
-proof of memory safety.
+Both complete-document operations use unsafe Rust and call CPython. During
+`loads()`, `strings::new_ascii_string` fills a fresh Python string before
+publishing it. `owned_list::append` can transfer an owned value into a list's
+spare storage. It initializes the entry before increasing the list length;
+CPython still handles allocation and growth.
+
+During `dumps()`, `copy_integer` reads selected exact Python integers directly,
+and `string_text` borrows immutable ASCII text from an owned Python string.
+`borrowed_dict::DictScalarCursor` handles primitive entries without temporary
+Python owners. It permits no Python call or reference release while entry
+storage is borrowed. Other entries gain owning references before general
+serialization continues. Callback serialization keeps its owning snapshots.
+
+These optimizations have interpreter and build restrictions. Raw object-layout
+readers and the list writer require CPython 3.12 or 3.13 with the GIL on 64-bit,
+little-endian Linux x86_64. Debug and reference-tracing restrictions differ by
+helper. ASCII construction has separate conditions. Unsupported builds keep
+the existing PyO3 or C API operations. The
+[memory-safety document](../../docs/memory-safety-testing.md) names the
+conditions, ownership rules and tests.
+
+Python tests cover values, exact output, malformed input, callbacks, buffer
+lifetimes and resource limits. Native tests exercise CPython ownership and
+selected allocation failures. Miri checks the Rust parser and selected pointer
+helpers without executing CPython. AddressSanitizer checks the compiled
+extension; CPython itself is not instrumented. Neither tool proves memory
+safety or protects against a native extension that supplies invalid storage.
 
 The separate AddressSanitizer runner instruments the Python extension and
 launches subprocess tests with the same runtime. Virtual-address limits apply
@@ -277,8 +291,11 @@ remaining tests.
 
 See the [Python performance report](benchmarks/PERFORMANCE.md) for streaming
 comparisons, complete-document comparisons with orjson, and CPU and allocation
-profiles. The [public-document and date/time report](benchmarks/PERFORMANCE_36H.md)
-has the latest complete-call timings, allocations, RSS and recorded regressions.
+profiles. The [large-document and worst-case report](benchmarks/PERFORMANCE_24H.md)
+records the latest measured optimizations, allocations, RSS and remaining
+regressions. The [public-document and date/time report](benchmarks/PERFORMANCE_36H.md)
+covers the preceding builds. Benchmark results apply to the builds recorded
+in each report.
 The [earlier report](benchmarks/PROFILE.md) covers performance after
 PR #74 and the SIMD build experiments from that revision.
 

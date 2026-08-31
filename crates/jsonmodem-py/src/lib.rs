@@ -54,8 +54,15 @@ fn json_decode_error(py: Python<'_>, message: &str, doc: &str, pos: usize) -> Py
     match py
         .import("json")
         .and_then(|module| module.getattr("JSONDecodeError"))
-        .and_then(|class| class.call1((message, doc, pos)))
-    {
+        .and_then(|class| {
+            #[cfg(all(
+                Py_3_12,
+                not(Py_3_14),
+                not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
+            ))]
+            let doc = compat::ErrorDocument(doc);
+            class.call1((message, doc, pos))
+        }) {
         Ok(error) => PyErr::from_value(error),
         Err(error) => error,
     }

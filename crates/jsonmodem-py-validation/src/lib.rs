@@ -1,5 +1,46 @@
 //! Tests Rust dependencies used by the Python bindings without linking Python.
 
+#[cfg(all(test, target_pointer_width = "64"))]
+#[path = "../../jsonmodem-py/src/compat/integer.rs"]
+mod integer;
+
+#[cfg(all(test, target_pointer_width = "64"))]
+mod integer_tests;
+
+#[cfg(all(test, target_pointer_width = "64"))]
+#[path = "../../jsonmodem-py/src/compat/borrowed_dict/compact_int.rs"]
+mod compact_int;
+
+#[cfg(all(test, target_pointer_width = "64"))]
+mod compact_int_tests;
+
+#[cfg(all(
+    test,
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64",
+    target_endian = "little",
+))]
+#[path = "../../jsonmodem-py/src/compat/borrowed_dict/dense_entry.rs"]
+mod dense_entry;
+
+#[cfg(all(
+    test,
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64",
+    target_endian = "little",
+))]
+mod dense_entry_tests;
+
+#[cfg(all(test, target_pointer_width = "64"))]
+#[path = "../../jsonmodem-py/src/compat/owned_list/live.rs"]
+mod list_live;
+
+#[cfg(test)]
+#[path = "../../jsonmodem-py/src/compat/escape_mask.rs"]
+mod escape_mask;
+
 #[cfg(test)]
 mod tests {
     fn report_features() {

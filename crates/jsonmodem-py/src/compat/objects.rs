@@ -4,7 +4,7 @@ mod datetime;
 
 use pyo3::{
     Borrowed,
-    exceptions::PyTypeError,
+    exceptions::{PyOverflowError, PyTypeError, PyUnicodeEncodeError, PyValueError},
     intern,
     prelude::*,
     types::{PyBytes, PyDict, PyInt, PyList, PyString, PyTuple, PyType},
@@ -12,7 +12,8 @@ use pyo3::{
 use smallvec::SmallVec;
 
 use super::{
-    APPEND_NEWLINE, Encoder, INITIAL_OUTPUT_CAPACITY, MAX_ENCODE_DEPTH, SORT_KEYS, allocation_error,
+    APPEND_NEWLINE, Encoder, INITIAL_OUTPUT_CAPACITY, MAX_ENCODE_DEPTH, NON_STR_KEYS, SORT_KEYS,
+    allocation_error, key_utf8_error,
 };
 
 const PASSTHROUGH_SUBCLASS: i32 = 256;
@@ -155,17 +156,20 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
         for (key, value) in dict.iter() {
             push_field(&mut items, key, value)?;
         }
-        for (key, _) in &mut items {
-            if !key.is_exact_instance_of::<PyString>() {
-                *key = self.key_text.call1((&*key, self.encoder.option))?;
+        let option = self.encoder.option;
+        // Without key options, earlier value callbacks precede a later invalid key.
+        if option & (SORT_KEYS | NON_STR_KEYS) != 0 {
+            for (key, _) in &mut items {
+                if option & NON_STR_KEYS != 0 && !key.is_exact_instance_of::<PyString>() {
+                    *key = self.key_text.call1((&*key, option))?;
+                }
+                key.downcast_exact::<PyString>()
+                    .map_err(|_| PyTypeError::new_err("Dict key must be str"))?
+                    .to_str()
+                    .map_err(|cause| key_utf8_error(key.py(), cause))?;
             }
         }
-        if self.encoder.option & SORT_KEYS != 0 {
-            for (key, _) in &items {
-                key.downcast::<PyString>()?
-                    .to_str()
-                    .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
-            }
+        if option & SORT_KEYS != 0 {
             // Original positions preserve equal converted keys without the
             // infallible scratch allocation used by slice::sort_by.
             let mut order: SmallVec<[usize; 16]> = SmallVec::new();
@@ -217,13 +221,18 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                 let attributes = attributes.downcast::<PyDict>()?;
                 let mut items = ObjectItems::new();
                 for (key, item) in attributes.iter() {
-                    let text = key
-                        .downcast::<PyString>()?
-                        .to_str()
-                        .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
-                    if !text.starts_with('_') {
-                        push_field(&mut items, key, item)?;
+                    if let Ok(text) = key.downcast_exact::<PyString>() {
+                        match text.to_str() {
+                            Ok(text) if text.starts_with('_') => continue,
+                            Ok(_) => (),
+                            // Invalid names fail at key emission, after earlier callbacks.
+                            Err(error) if error.is_instance_of::<PyUnicodeEncodeError>(py) => {
+                                drop(error);
+                            }
+                            Err(error) => return Err(key_utf8_error(py, error)),
+                        }
                     }
+                    push_field(&mut items, key, item)?;
                 }
                 items
             } else {
@@ -267,6 +276,42 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                 Err(error)
             }
         }
+    }
+
+    fn uuid(&mut self, value: &Bound<'py, PyAny>) -> PyResult<()> {
+        // An exact UUID can have a replaced int descriptor. Keep its result
+        // owned and leave getter exceptions unchanged.
+        let integer = value.getattr(intern!(value.py(), "int"))?;
+        if !integer.is_instance_of::<PyInt>() {
+            return Err(PyTypeError::new_err("UUID.int must be an integer"));
+        }
+        let integer = if integer.is_exact_instance_of::<PyInt>() {
+            integer
+        } else {
+            self.int_base.call1((&integer,))?
+        };
+        let number = integer
+            .downcast_exact::<PyInt>()?
+            .extract::<u128>()
+            .map_err(|error| {
+                // Python 3.13 reports negative unsigned conversion as ValueError.
+                if error.is_instance_of::<PyOverflowError>(value.py())
+                    || error.is_instance_of::<PyValueError>(value.py())
+                {
+                    PyTypeError::new_err("UUID.int is outside 128-bit range")
+                } else {
+                    error
+                }
+            })?;
+        let mut bytes = *b"\"00000000-0000-0000-0000-000000000000\"";
+        let digits = b"0123456789abcdef";
+        let offsets = [1, 3, 5, 7, 10, 12, 15, 17, 20, 22, 25, 27, 29, 31, 33, 35];
+        for (offset, byte) in offsets.into_iter().zip(number.to_be_bytes()) {
+            bytes[offset] = digits[(byte >> 4) as usize];
+            bytes[offset + 1] = digits[(byte & 15) as usize];
+        }
+        self.encoder.extend(&bytes)?;
+        Ok(())
     }
 
     fn value(&mut self, value: Bound<'py, PyAny>) -> PyResult<()> {
@@ -313,10 +358,12 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
             } else {
                 let value_type = value.get_type();
                 let is_datetime = self.datetime_types.iter().any(|kind| value_type.is(kind));
-                if !(is_datetime && datetime::write(&mut self.encoder, &value)?) {
-                    let datetime_or_uuid = is_datetime || value_type.is(self.uuid_type);
+                // Aliased helper types must keep the datetime fallback behavior.
+                if !is_datetime && value_type.is(self.uuid_type) {
+                    self.uuid(&value)?;
+                } else if !(is_datetime && datetime::write(&mut self.encoder, &value)?) {
                     let attributes = self.class_attributes(&value_type)?;
-                    if !datetime_or_uuid
+                    if !is_datetime
                         && attributes.contains(intern!(py, "__dataclass_fields__"))?
                         && !value.is_instance_of::<PyType>()
                         && option & PASSTHROUGH_DATACLASS == 0
@@ -324,7 +371,7 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                         container = Some(self.dataclass_items(&value, &attributes)?);
                         limit += 1;
                     } else {
-                        let prepared = if datetime_or_uuid || option & SERIALIZE_NUMPY != 0 {
+                        let prepared = if is_datetime || option & SERIALIZE_NUMPY != 0 {
                             self.special
                                 .call1((&value, option, self.default_provided, depth))?
                         } else {
@@ -393,7 +440,10 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                     frame.count += 1;
                     self.encoder.newline(depth)?;
                     if let Some(key) = key {
-                        self.encoder.key(key.downcast::<PyString>()?)?;
+                        let key = key
+                            .downcast_exact::<PyString>()
+                            .map_err(|_| PyTypeError::new_err("Dict key must be str"))?;
+                        self.encoder.key(key)?;
                         self.encoder.push(b':')?;
                         if option & super::INDENT != 0 {
                             self.encoder.push(b' ')?;
@@ -421,6 +471,7 @@ pub(super) fn dumps(
 ) -> PyResult<PyObject> {
     encoder.output.clear();
     encoder.keys.clear();
+    encoder.key_mask = 0;
     let helpers = py
         .import(intern!(py, "jsonmodem._compat"))?
         .getattr(intern!(py, "_ENCODER_HELPERS"))?;
@@ -452,7 +503,18 @@ pub fn _dumps_objects(
         option,
         base_depth: 0,
         dataclass_root: false,
+        #[cfg(all(
+            Py_3_12,
+            not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+            not(any(py_sys_config = "Py_TRACE_REFS", py_sys_config = "Py_REF_DEBUG")),
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64",
+            target_endian = "little",
+        ))]
+        integer_layout: super::IntegerLayout::Unchecked,
         keys: Vec::new(),
+        key_mask: 0,
     };
     encoder.reserve(INITIAL_OUTPUT_CAPACITY)?;
     ObjectEncoder::new(encoder, default, default_provided, &helpers)?.finish(py, obj)
