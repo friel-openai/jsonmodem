@@ -1,4 +1,4 @@
-//! Python construction from the reader's immutable string classification.
+//! Python strings from classified scanner text and ASCII error documents.
 
 #[cfg(test)]
 mod tests;

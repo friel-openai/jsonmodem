@@ -11,6 +11,11 @@ The first command executes Rust tests under Miri. The second loads an
 AddressSanitizer-instrumented Python extension into CPython. They check different
 operations; neither proves that every possible use is safe.
 
+These two commands do not run the Rust tests in `jsonmodem-py`; those tests
+need separately linked native executables. The default AddressSanitizer setup
+installs maturin and pytest, but not orjson or NumPy. Tests requiring either
+optional dependency skip when it is absent; inspect the reported skips.
+
 ## Rust tests
 
 Miri needs a Rust nightly toolchain with `miri` and `rust-src`, plus
@@ -18,13 +23,17 @@ Miri needs a Rust nightly toolchain with `miri` and `rust-src`, plus
 compiler version so a failure can be reproduced with the same nightly. Set
 `JSONMODEM_MEMORY_TOOLCHAIN` to a dated nightly to reproduce a recorded run.
 
-The full suite excludes the Python binding and fuzz executables. It includes
-ordinary Rust tests and saved fuzz regression inputs. It does not run a live
-fuzzer. Tests that render `insta` snapshots remain excluded under Miri;
+The full suite excludes `jsonmodem-py` and `jsonmodem-fuzz`. It includes the
+Rust parser, saved fuzz regression inputs, and `jsonmodem-py-validation`.
+The validation crate includes selected production helper files without linking
+Python, so Miri checks those pointer operations but not their CPython callers.
+It does not run a live fuzzer. Tests that render `insta` snapshots remain
+excluded under Miri;
 `tests/memory_safety.rs` uses plain assertions for the streaming behavior it
 checks, so it does not need snapshot filesystem access.
 
-The targeted tests run with execution seeds 0, 1, and 2 under Stacked Borrows and
+The targeted `jsonmodem` tests run with execution seeds 0, 1, and 2 under
+Stacked Borrows and
 Tree Borrows. These are two models Miri uses to detect invalid overlapping Rust
 references. The execution seed changes choices such as allocation addresses.
 It does not specify the generated JSON inputs. The generated-input test uses
@@ -81,6 +90,30 @@ zipper after `take_root`. The tests assert values and paths, not just that the
 process survives. Integration tests also exercise generated containers, multiple
 roots, partial values, iterator drop, and cleanup after parse errors.
 
+### Complete-document pointer helpers
+
+`jsonmodem-py-validation` exercises production helpers using small allocations
+with only the required fields initialized. The tests check allocation bounds
+and which fields are read. Real CPython layouts require separate native checks.
+
+`integer_tests.rs` and `compact_int_tests.rs` test the integer readers with
+storage ending immediately after the required digits. Zero must not read an
+unused digit. Unsupported tags and out-of-range values select fallback.
+`dense_entry_tests.rs` tests dictionary table layouts, deleted entries,
+end positions, arithmetic, alignment and replacement allocations. Arithmetic
+checks do not prove allocation bounds; callers must supply valid storage.
+
+`owned_list/live_tests.rs` tests `append_live` with empty, full and sorting
+lists, first and last spare slots, stale bytes, repeated references and
+replacement storage. One case makes the value point to the object containing
+the list length. Valid current metadata is a precondition, not something
+these helpers can establish from an arbitrary pointer.
+
+`list_live_overwrite.rs` deliberately claims two writable slots for a
+one-pointer allocation. Running this example under Miri should report the
+eight-byte store beyond that allocation. An unrelated error does not count
+as detection of this fault. The example is not part of the production library.
+
 ## Python extension
 
 The native check currently requires Linux x86_64, `uv`, a C linker, `nm` from
@@ -129,15 +162,96 @@ to immutable bytes before parsing, so their payloads retain the copy. Known
 immutable bytes-backed payloads retain their own export after the temporary
 guard releases its export.
 
-The complete-document writer's integer helpers call the public
-`PyLong_AsLongLongAndOverflow` and `PyLong_AsSize_t` APIs. The second call is
-compiled only on 64-bit targets; other targets keep PyO3's `u64` conversion.
-Both helpers retain exact Python integer owners while Python is attached.
-They distinguish valid `-1` and maximum unsigned values from error sentinels.
-`test_number_conversion.py` checks signed and unsigned bounds, strict-integer
-options, subclass overrides, default callbacks, and successful calls after
-errors. AddressSanitizer runs these tests without requiring orjson. CPython's
-conversion code itself is not instrumented by this script.
+### Complete-document decoding
+
+`strings::new_ascii_string` receives ASCII text longer than one byte. Decoded
+strings carry a classification tied to immutable scanner output. It checks the length and
+`PyUnicode_New` result, then copies into fresh one-byte string storage.
+No further Python call or allocation occurs before initialization finishes.
+Empty, single-character and non-ASCII strings keep the ordinary constructor.
+`test_decode_classified_strings.py` checks scan boundaries, escapes, singleton
+identity, scratch-buffer reuse, input release and UTF-8 errors.
+That module requires orjson and skips without it.
+
+`ErrorDocument` also uses this constructor for ASCII error documents of at
+least 1,024 bytes. It checks ASCII before copying. Conversion still occurs
+after looking up the exception class and converting the message, preserving
+argument order. Allocation failure returns `MemoryError` instead of panicking
+in PyO3's infallible string conversion. Smaller and non-ASCII documents use
+the original constructor. `test_error_document.py` checks exception fields,
+boundaries, Unicode and exception-factory behavior. Separately linked native
+tests inject failure into `PyUnicode_New` and check recovery; they do not
+simulate failure at every allocation.
+
+`owned_list::append` retains the exact decoded list and incoming value. It
+reads current storage after constructing the value, because construction
+can permit callbacks. A spare-slot write precedes the length update and
+immediate reference transfer. No allocation, Python call, reference release
+or possible unwind may intervene. Full lists and the temporary sorting state
+use the original append operation.
+
+`test_decode_owned_append.py` checks growth, nesting, input release and error
+cleanup. Separately linked Rust tests additionally check reference counts, finalizers,
+self-references, clear/shrink/grow/replace operations, sorting and an injected
+growth failure followed by recovery. A separate native test explicitly runs
+GC callbacks that mutate a retained list between value construction and append.
+It checks current storage without relying on automatic GC inside the decoder.
+
+### Reading Python storage while encoding
+
+`copy_integer` checks the built-in integer type's digit offset and width before
+reading an exact integer's tag and required digits. It retains no pointer.
+Unsupported layouts or values use the original conversion.
+`signed_integer` calls `PyLong_AsLongLongAndOverflow`; `unsigned_integer` uses
+`PyLong_AsSize_t` on 64-bit targets and PyO3 elsewhere. Error sentinels are
+checked separately from valid boundary values. `test_number_conversion.py`
+and `test_encode_integer64.py` cover bounds, strict-integer options, converted
+keys, subclasses, callbacks and recovery.
+
+`string_text` borrows compact ASCII from an exact owned string. The owner
+outlives the borrow; other strings use PyO3's UTF-8 conversion.
+`test_encode_string_text.py` checks ASCII bytes, lengths around buffer and
+cache boundaries, Unicode fallback, subclasses and callback mutation.
+
+`borrowed_dict::primitive_keys_valid` checks supported primitive keys without
+conversion, Python allocation or output. Refusal starts owning validation.
+`DictScalarCursor::lookup_entry` can read a dense, combined dictionary table
+with exact string keys. Deleted entries, split storage and other key layouts
+use `PyDict_Next`. Each call reacquires the current table.
+
+`DictScalarCursor::next` consumes borrowed primitive values only while their
+dictionary retains them. No Python call or reference release can intervene;
+output growth uses Rust storage. Fallback and Python error construction first
+obtain owning references. Borrowed text must not escape this operation.
+The original iteration-position and mutation checks remain.
+
+`test_encode_borrowed_dict.py` and `test_borrowed_key_validation.py` cover mixed
+values, deleted entries, converted-key duplicates, error priority, callbacks
+and output growth. Separately linked Rust tests in `borrowed_dict/tests.rs`, `tests/lookup.rs`
+and `tests/key_validation.rs` check ownership, dense and split tables, mutation,
+instance insertion order and refusal before output changes.
+
+### Interpreter and build conditions
+
+These shortcuts require CPython 3.12 or 3.13 with the GIL and full CPython API.
+They exclude PyPy, GraalPy, limited-API builds and free-threaded Python.
+All except `strings::new_ascii_string` also require Linux x86_64, 64-bit
+pointers, little-endian storage and no `Py_TRACE_REFS`. The remaining
+conditions differ by helper:
+
+- `strings::new_ascii_string` uses PyO3's Unicode accessors without an additional
+  platform or debug-build restriction.
+- `string_text` and generic borrowed dictionary operations have no further
+  debug-build exclusion.
+- `copy_integer` excludes `Py_REF_DEBUG`.
+- Dense dictionary reads, primitive-key checks and direct list append exclude
+  `Py_DEBUG` and `Py_REF_DEBUG`.
+
+`Py_TRACE_REFS` and `Py_REF_DEBUG` enable reference tracking; `Py_DEBUG` selects
+a debug interpreter. These conditions still require valid CPython objects and
+allocator-provided storage. Other builds keep existing PyO3 or C API operations.
+
+### Other Python calls
 
 Streaming `load_number` uses `PyFloat_FromDouble`, `PyLong_FromLongLong`, and
 `PyLong_FromUnsignedLongLong` after checking the number's range. Each call runs
@@ -150,7 +264,7 @@ each constructor; those branches also require source review.
 
 `compat/objects.rs` retains container entries before invoking field getters
 or callbacks. Its snapshots, frame storage, class cache, and output buffer use
-fallible growth. The final bytes copy calls `PyBytes_FromStringAndSize` with a
+fallible growth. `Encoder::bytes` in `compat.rs` calls `PyBytes_FromStringAndSize` with a
 borrow of the initialized Rust output. The borrow remains valid until the
 synchronous copy returns. PyO3 takes ownership of the new Python object or
 propagates the allocation error. No raw pointer escapes the call.
