@@ -602,9 +602,22 @@ fn allocation_error() -> PyErr {
 /// Retain Python's conversion error as the cause of an invalid JSON key.
 #[cold]
 fn key_utf8_error(py: Python<'_>, cause: PyErr) -> PyErr {
-    let error = PyTypeError::new_err("str is not valid UTF-8");
+    let error = PyTypeError::new_err("str is not valid UTF-8: surrogates not allowed");
     error.set_cause(py, Some(cause));
     error
+}
+
+/// Key overflow retains the unsigned C conversion error as its cause.
+#[cold]
+fn integer_key_error(value: &Bound<'_, PyInt>, original: PyErr) -> PyErr {
+    match value.extract::<u64>() {
+        Ok(_) => original,
+        Err(cause) => {
+            let error = PyTypeError::new_err("Dict integer key must be within 64-bit range");
+            error.set_cause(value.py(), Some(cause));
+            error
+        }
+    }
 }
 
 /// Output writes fail only on allocation; callers construct the Python
@@ -956,11 +969,18 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                     && (!self.dataclass_root || !stack.is_empty())
                 {
                     for (key, _) in dict.iter() {
-                        let Ok(key) = key.downcast_exact::<PyString>() else {
+                        if let Ok(key) = key.downcast_exact::<PyString>() {
+                            key.to_str()
+                                .map_err(|cause| key_utf8_error(key.py(), cause))?;
+                        } else if let Ok(key) = key.downcast_exact::<PyInt>() {
+                            self.integer(key)
+                                .map_err(|error| integer_key_error(key, error))?;
+                        } else if !(key.is_none()
+                            || key.is_exact_instance_of::<PyBool>()
+                            || key.is_exact_instance_of::<PyFloat>())
+                        {
                             return Ok(false);
-                        };
-                        key.to_str()
-                            .map_err(|cause| key_utf8_error(key.py(), cause))?;
+                        }
                     }
                 }
                 if self.option & SORT_KEYS != 0 && (!self.dataclass_root || !stack.is_empty()) {

@@ -49,11 +49,17 @@ def key_text(value, option):
     if value is None:
         return "null"
     if type(value) in (bool, int, float):
+        if type(value) is int and not -(2**63) <= value <= 2**64 - 1:
+            # CPython supplies the same unsigned-conversion cause for key errors.
+            try:
+                value.to_bytes(8, "little")
+            except OverflowError as cause:
+                raise TypeError("Dict integer key must be within 64-bit range") from cause
         return native.dumps(value).decode("ascii")
     if isinstance(value, enum.Enum):
         return key_text(value.value, option)
     if isinstance(value, int):
-        return native.dumps(int.__int__(value)).decode("ascii")
+        return key_text(int.__int__(value), option)
     if type(value) in (datetime.datetime, datetime.date, datetime.time):
         return datetime_text(value, option)
     if type(value) is uuid.UUID:

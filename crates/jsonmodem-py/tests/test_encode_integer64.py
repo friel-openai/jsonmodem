@@ -117,7 +117,7 @@ def test_integer_storage_overflow_precedes_strict(value, strict):
     for container in (integer, [0, integer], {"value": integer}):
         with pytest.raises(TypeError, match="Integer exceeds 64-bit range"):
             jsonmodem.dumps(container, option=option)
-    with pytest.raises(TypeError, match="Integer exceeds 64-bit range"):
+    with pytest.raises(TypeError, match="Dict integer key must be within 64-bit range"):
         jsonmodem.dumps({integer: 0}, option=option | jsonmodem.OPT_NON_STR_KEYS)
     assert jsonmodem.dumps([0, -1, 2**64 - 1]) == b"[0,-1,18446744073709551615]"
 
