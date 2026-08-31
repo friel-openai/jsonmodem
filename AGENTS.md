@@ -1,8 +1,9 @@
 # Agent Instructions
 
 To verify changes locally before submitting a PR, run the same checks as CI
-(excluding the benchmark, fuzz, and Miri jobs). The fuzz crate itself is
-included in the normal build, test, and clippy steps, so ensure it compiles.
+(excluding the benchmark, fuzz, and Miri jobs). The normal build, test, and
+clippy steps exclude the fuzz crate. Also check that it compiles with
+`cargo check -p jsonmodem-fuzz --all-targets --locked`.
 Local runs set `JSONMODEM_BENCH_FAST=1` and `JSONMODEM_TEST_FAST=1` for quick
 feedback; these are environment variables, not Cargo features. CI executes
 the full suites without these settings.

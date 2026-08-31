@@ -6,8 +6,14 @@ import json
 import struct
 
 import jsonmodem
-import orjson
 import pytest
+
+try:
+    import orjson
+except ModuleNotFoundError as error:
+    if error.name != "orjson":
+        raise
+    orjson = None
 
 
 LENGTHS = (0, 1, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17, 24, 25, 32, 33, 40, 41,
@@ -64,12 +70,23 @@ def assert_same(actual, expected):
         assert actual == expected
 
 
+def parse_integer(token):
+    value = int(token)
+    if -(2**63) <= value <= 2**64 - 1:
+        return value
+    # The fixtures contain one value above the unsigned 64-bit maximum.
+    assert value == 2**64
+    return float(value)
+
+
 @pytest.mark.parametrize("length", LENGTHS)
 @pytest.mark.parametrize("pattern", PATTERNS)
 @pytest.mark.parametrize("kind", INPUTS)
 def test_array_values_across_growth_boundaries(length, pattern, kind):
     raw = json.dumps(values(pattern, length), ensure_ascii=False, separators=(",", ":")).encode()
-    expected = orjson.loads(as_input(raw, kind))
+    expected = json.loads(raw, parse_int=parse_integer)
+    if orjson is not None:
+        assert_same(orjson.loads(as_input(raw, kind)), expected)
     actual = jsonmodem.loads(as_input(raw, kind))
     assert_same(actual, expected)
     gc.collect()
@@ -81,7 +98,8 @@ def test_array_values_across_growth_boundaries(length, pattern, kind):
 def test_decoded_children_do_not_share_mutable_storage(length, nested):
     item = {"items": []} if nested else []
     raw = json.dumps([item] * length, separators=(",", ":")).encode()
-    for codec in (orjson, jsonmodem):
+    codecs = (jsonmodem,) if orjson is None else (orjson, jsonmodem)
+    for codec in codecs:
         actual = codec.loads(raw)
         assert len({id(child) for child in actual}) == length
         if nested:
@@ -96,7 +114,9 @@ def test_decoded_children_do_not_share_mutable_storage(length, nested):
 @pytest.mark.parametrize("kind", ("bytearray", "memoryview", "array_view"))
 def test_array_values_survive_mutating_and_releasing_input(kind):
     raw = b'[[10000,"owned text"],{"items":[20000,"other text"]}]'
-    expected = orjson.loads(raw)
+    expected = json.loads(raw, parse_int=parse_integer)
+    if orjson is not None:
+        assert_same(orjson.loads(raw), expected)
     source = as_input(raw, kind)
     actual = jsonmodem.loads(source)
     source[:] = b" " * len(source)

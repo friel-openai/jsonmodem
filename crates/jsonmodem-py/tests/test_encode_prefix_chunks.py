@@ -1,8 +1,16 @@
 """Keep long string prefixes exact across fixed-size copy boundaries."""
 
+import json
+
 import jsonmodem
-import orjson
 import pytest
+
+try:
+    import orjson
+except ModuleNotFoundError as error:
+    if error.name != "orjson":
+        raise
+    orjson = None
 
 
 @pytest.mark.parametrize(
@@ -15,9 +23,14 @@ import pytest
 def test_escaped_suffix_after_plain_prefix(length, character, suffix, append_newline):
     value = character * length + suffix
     ours_option = jsonmodem.OPT_APPEND_NEWLINE if append_newline else 0
-    reference_option = orjson.OPT_APPEND_NEWLINE if append_newline else 0
 
     encoded = jsonmodem.dumps(value, option=ours_option)
 
     assert type(encoded) is bytes
-    assert encoded == orjson.dumps(value, option=reference_option)
+    expected = json.dumps(value, ensure_ascii=False).encode("utf-8")
+    if append_newline:
+        expected += b"\n"
+    assert encoded == expected
+    if orjson is not None:
+        reference_option = orjson.OPT_APPEND_NEWLINE if append_newline else 0
+        assert encoded == orjson.dumps(value, option=reference_option)
