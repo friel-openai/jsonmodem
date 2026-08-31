@@ -332,16 +332,10 @@ impl<'src> Scanner<'src> {
                     if let Some(start) = anchor.start_byte_in_batch {
                         let end = cmp::min(self.byte_idx, self.batch.len());
                         if end > start {
-                            let slice = &self.batch.as_bytes()[start..end];
+                            let slice = &self.batch[start..end];
                             match &mut self.scratch {
-                                CaptureBuf::Text(s) => {
-                                    #[cfg(any(test, miri))]
-                                    assert!(core::str::from_utf8(slice).is_ok());
-                                    // SAFETY: the anchor and cursor are character boundaries in
-                                    // batch.
-                                    s.push_str(unsafe { core::str::from_utf8_unchecked(slice) });
-                                }
-                                CaptureBuf::Raw(b) => b.extend_from_slice(slice),
+                                CaptureBuf::Text(s) => s.push_str(slice),
+                                CaptureBuf::Raw(b) => b.extend_from_slice(slice.as_bytes()),
                             }
                         }
                     }
@@ -601,15 +595,10 @@ impl<'src> Scanner<'src> {
             let start = anchor.start_byte_in_batch.unwrap_or(self.byte_idx);
             let end = self.byte_idx;
             if end > start {
-                let slice = &self.batch.as_bytes()[start..end];
+                let slice = &self.batch[start..end];
                 match &mut self.scratch {
-                    CaptureBuf::Text(s) => {
-                        #[cfg(any(test, miri))]
-                        assert!(core::str::from_utf8(slice).is_ok());
-                        // SAFETY: the anchor and cursor are character boundaries in batch.
-                        s.push_str(unsafe { core::str::from_utf8_unchecked(slice) });
-                    }
-                    CaptureBuf::Raw(b) => b.extend_from_slice(slice),
+                    CaptureBuf::Text(s) => s.push_str(slice),
+                    CaptureBuf::Raw(b) => b.extend_from_slice(slice.as_bytes()),
                 }
             }
             anchor.owned = true;
@@ -630,15 +619,10 @@ impl<'src> Scanner<'src> {
     }
 
     #[inline]
-    fn push_ascii_to_scratch(&mut self, slice: &[u8]) {
+    fn push_text_to_scratch(&mut self, slice: &str) {
         match &mut self.scratch {
-            CaptureBuf::Text(s) => {
-                #[cfg(any(test, miri))]
-                assert!(core::str::from_utf8(slice).is_ok());
-                // SAFETY: caller guarantees ASCII, hence valid UTF-8.
-                s.push_str(unsafe { core::str::from_utf8_unchecked(slice) });
-            }
-            CaptureBuf::Raw(b) => b.extend_from_slice(slice),
+            CaptureBuf::Text(s) => s.push_str(slice),
+            CaptureBuf::Raw(b) => b.extend_from_slice(slice.as_bytes()),
         }
     }
 
@@ -656,15 +640,10 @@ impl<'src> Scanner<'src> {
         if start >= self.byte_idx {
             return;
         }
-        let slice = &self.batch.as_bytes()[start..self.byte_idx];
+        let slice = &self.batch[start..self.byte_idx];
         match &mut self.scratch {
-            CaptureBuf::Text(s) => {
-                #[cfg(any(test, miri))]
-                assert!(core::str::from_utf8(slice).is_ok());
-                // SAFETY: the anchor and cursor are character boundaries in batch.
-                s.push_str(unsafe { core::str::from_utf8_unchecked(slice) });
-            }
-            CaptureBuf::Raw(b) => b.extend_from_slice(slice),
+            CaptureBuf::Text(s) => s.push_str(slice),
+            CaptureBuf::Raw(b) => b.extend_from_slice(slice.as_bytes()),
         }
     }
 
@@ -710,13 +689,12 @@ impl<'src> Scanner<'src> {
             return 0;
         }
 
-        let slice = &search[..consumed];
         self.byte_idx += consumed;
         self.char_idx += consumed;
         self.col += consumed;
 
         if anchor_owned {
-            self.push_ascii_to_scratch(slice);
+            self.push_text_to_scratch(&self.batch[start..self.byte_idx]);
         }
 
         consumed
@@ -758,14 +736,13 @@ impl<'src> Scanner<'src> {
             return 0;
         }
 
-        let slice = &search[..ascii_limit];
         self.byte_idx += ascii_limit;
         self.char_idx += ascii_limit;
         self.col += ascii_limit;
 
         // Match consume(): partial numeric captures must include fast digits
         // when a subsequent feed or finish() switches to owned text.
-        self.push_ascii_to_scratch(slice);
+        self.push_text_to_scratch(&self.batch[start..self.byte_idx]);
 
         ascii_limit
     }

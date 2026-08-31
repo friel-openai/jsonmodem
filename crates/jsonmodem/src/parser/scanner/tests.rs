@@ -674,13 +674,23 @@ fn memory_safety_owned_ascii_and_raw_captures() {
 
     let mut scanner = Scanner::from_state(carry(""), "abc");
     scanner.ensure_raw();
-    scanner.push_ascii_to_scratch(b"raw");
+    scanner.push_text_to_scratch("raw");
     assert!(matches!(scanner.emit(), Capture::Raw(bytes) if bytes == b"raw"));
 }
 
 #[test]
-#[should_panic(expected = "assertion failed: core::str::from_utf8(slice).is_ok()")]
-fn memory_safety_invalid_utf8_fails_before_unchecked_conversion() {
+#[should_panic(expected = "not a char boundary")]
+fn memory_safety_invalid_capture_boundary_panics() {
+    let mut scanner = Scanner::from_state(carry(""), "\u{e9}");
+    scanner.ensure_anchor_started();
+    // Simulate a scanner bug; checked slicing must reject it in release too.
+    scanner.byte_idx = 1;
+    scanner.copy_prefix_to_scratch();
+}
+
+#[test]
+fn memory_safety_text_capture_accepts_unicode() {
     let mut scanner = Scanner::from_state(carry(""), "");
-    scanner.push_ascii_to_scratch(&[0xff]);
+    scanner.push_text_to_scratch("\u{e9}\u{1f600}");
+    assert!(matches!(scanner.emit(), Capture::Owned(text) if text == "\u{e9}\u{1f600}"));
 }

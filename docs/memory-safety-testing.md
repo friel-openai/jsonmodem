@@ -52,9 +52,9 @@ cargo test -p jsonmodem --test memory_safety
 
 ### Scanner
 
-`parser/scanner/mod.rs` has four unchecked UTF-8 conversions. Test and Miri builds
-check the selected bytes before each conversion. These assertions are absent
-from normal release builds.
+`parser/scanner/mod.rs` copies text through safe string slices. Rust checks the
+slice bounds and character boundaries in release builds as well as tests.
+The scanner no longer converts arbitrary bytes with unchecked UTF-8 casts.
 
 `memory_safety_prefix_copy_operations` exercises `finish`,
 `switch_to_owned_prefix_if_needed`, and `copy_prefix_to_scratch` with empty,
@@ -62,11 +62,11 @@ ASCII, and multibyte prefixes. Each assumes the anchor and cursor select valid
 character boundaries in the input string. The test deliberately clears captured
 text to exercise the branch that copies from the input batch.
 
-`memory_safety_owned_ascii_and_raw_captures` exercises `push_ascii_to_scratch`,
-whose text branch requires ASCII input. The invalid-UTF-8 test deliberately
-violates that private helper's requirement and expects the test-only assertion
-to panic before unchecked conversion. This confirms the assertion is active
-without creating an invalid Rust string.
+`memory_safety_owned_ascii_and_raw_captures` and
+`memory_safety_text_capture_accepts_unicode` exercise `push_text_to_scratch`,
+which accepts a `str` rather than arbitrary bytes. The invalid-boundary test
+deliberately places a cursor inside a multibyte character and expects string
+slicing to panic. It cannot create an invalid Rust string.
 
 The integration test `every_character_boundary_preserves_values_and_strings`
 tries every valid split position in short inputs, then feeds each character

@@ -25,7 +25,6 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::mem::{ManuallyDrop, MaybeUninit};
 
 pub use error::{ErrorSource, ParserError, SyntaxError};
 use escape_buffer::UnicodeEscapeBuffer;
@@ -174,7 +173,7 @@ pub struct JsonModem<Ctx: EventCtx> {
     expected_literal: ExpectedLiteralBuffer,
     partial_lex: bool,
 
-    path: MaybeUninit<Ctx::PathState>,
+    path: Ctx::PathState,
     /// Indicates if a we've started parsing a string value and have not yet
     /// emitted a parse event. Determines the value of `is_initial` on
     /// [`ParseEvent::String`].
@@ -203,19 +202,10 @@ pub struct JsonModem<Ctx: EventCtx> {
     allow_uppercase_u: bool,
 }
 
-impl<Ctx: EventCtx> Drop for JsonModem<Ctx> {
-    fn drop(&mut self) {
-        // SAFETY: We are in control of the lifetime of `self.path`, and we ensure it is
-        // fully initialized in `new`. The only place where it is uninitialized
-        // is when an iterator holds the thawed path, and it must drop before
-        // `JsonModem` is dropped.
-        unsafe { MaybeUninit::assume_init_drop(&mut self.path) };
-    }
-}
-
 pub struct JsonModemIterator<'p, 'src, Ctx: EventCtx> {
     parser: &'p mut JsonModem<Ctx>,
-    path: ManuallyDrop<Ctx::Path>,
+    // Present until Drop returns ownership to the parser.
+    path: Option<Ctx::Path>,
     pub(crate) factory: Ctx,
     scanner: Scanner<'src>,
 }
@@ -243,10 +233,9 @@ impl<'src, Ctx: EventCtx> JsonModemIterator<'_, 'src, Ctx> {
 impl<Ctx: EventCtx> Drop for JsonModemIterator<'_, '_, Ctx> {
     #[inline]
     fn drop(&mut self) {
-        // SAFETY: ManuallyDrop::take moves out without running Drop,
-        // so the later field-drop won’t double-drop it.
-        let thawed = unsafe { ManuallyDrop::take(&mut self.path) };
-        self.parser.path = MaybeUninit::new(self.factory.freeze(thawed));
+        if let Some(path) = self.path.take() {
+            self.parser.path = self.factory.freeze(path);
+        }
 
         // Persist scanner carryover (unread tail + token scratch + positions)
         self.parser.scanner_state = core::mem::take(&mut self.scanner).finish();
@@ -260,8 +249,13 @@ impl<'src, Ctx: EventCtx> LendingIterator for JsonModemIterator<'_, 'src, Ctx> {
         Self: 'a;
 
     fn next(&mut self) -> Option<Self::Item<'_>> {
-        self.parser
-            .next_event_with(&mut self.factory, &mut self.path, &mut self.scanner)
+        self.parser.next_event_with(
+            &mut self.factory,
+            self.path
+                .as_mut()
+                .expect("iterator owns its path until drop"),
+            &mut self.scanner,
+        )
     }
 }
 
@@ -272,17 +266,17 @@ impl<'src, Ctx: EventCtx> LendingIterator for JsonModemIterator<'_, 'src, Ctx> {
 /// `ParseEvent` results.
 pub struct JsonModemClosed<'src, Ctx: EventCtx> {
     parser: JsonModem<Ctx>,
-    path: ManuallyDrop<Ctx::Path>,
+    // Present until Drop returns ownership to the parser.
+    path: Option<Ctx::Path>,
     pub(crate) factory: Ctx,
     scanner: Scanner<'src>,
 }
 
 impl<Ctx: EventCtx> Drop for JsonModemClosed<'_, Ctx> {
     fn drop(&mut self) {
-        // SAFETY: ManuallyDrop::take moves out without running Drop,
-        // so the later field-drop won’t double-drop it.
-        let thawed = unsafe { ManuallyDrop::take(&mut self.path) };
-        self.parser.path = MaybeUninit::new(self.factory.freeze(thawed));
+        if let Some(path) = self.path.take() {
+            self.parser.path = self.factory.freeze(path);
+        }
 
         // Persist scanner carryover (unread tail + token scratch + positions)
         let carry = core::mem::take(&mut self.scanner).finish();
@@ -317,8 +311,13 @@ impl<'src, Ctx: EventCtx> LendingIterator for JsonModemClosed<'src, Ctx> {
         Self: 'a;
 
     fn next(&mut self) -> Option<Self::Item<'_>> {
-        self.parser
-            .next_event_with(&mut self.factory, &mut self.path, &mut self.scanner)
+        self.parser.next_event_with(
+            &mut self.factory,
+            self.path
+                .as_mut()
+                .expect("iterator owns its path until drop"),
+            &mut self.scanner,
+        )
     }
 }
 
@@ -342,7 +341,7 @@ impl<Ctx: EventCtx> JsonModem<Ctx> {
             unicode_escape_buffer: UnicodeEscapeBuffer::new(),
             expected_literal: ExpectedLiteralBuffer::none(),
 
-            path: MaybeUninit::new(f.frozen_new()),
+            path: f.frozen_new(),
             initialized_string: false,
 
             multiple_values: options.allow_multiple_json_values,
@@ -360,8 +359,7 @@ impl<Ctx: EventCtx> JsonModem<Ctx> {
         mut factory: Ctx,
         text: &'src str,
     ) -> JsonModemIterator<'p, 'src, Ctx> {
-        let path = unsafe { factory.thaw(core::mem::take(self.path.assume_init_mut())) };
-        let path = ManuallyDrop::new(path);
+        let path = Some(factory.thaw(core::mem::take(&mut self.path)));
         let scanner = Scanner::from_state(core::mem::take(&mut self.scanner_state), text);
         JsonModemIterator {
             parser: self,
@@ -384,8 +382,7 @@ impl<Ctx: EventCtx> JsonModem<Ctx> {
     /// and then ends.
     pub fn finish_with<'src>(mut self, mut context: Ctx) -> JsonModemClosed<'src, Ctx> {
         self.close();
-        let path = unsafe { context.thaw(core::mem::take(self.path.assume_init_mut())) };
-        let path = ManuallyDrop::new(path);
+        let path = Some(context.thaw(core::mem::take(&mut self.path)));
         let scanner = Scanner::from_state(core::mem::take(&mut self.scanner_state), "");
         JsonModemClosed {
             parser: self,
@@ -457,7 +454,7 @@ impl<Ctx: EventCtx> JsonModem<Ctx> {
                 // No internal builder; adapters build values externally.
                 self.lex_state = LexState::Default;
                 self.parse_state = ParseState::Start;
-                self.path = MaybeUninit::new(f.frozen_new());
+                self.path = f.frozen_new();
             }
 
             let token = match self.lex(scanner) {
