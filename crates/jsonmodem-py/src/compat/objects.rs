@@ -4,7 +4,7 @@ mod datetime;
 
 use pyo3::{
     Borrowed,
-    exceptions::{PyTypeError, PyUnicodeEncodeError},
+    exceptions::{PyOverflowError, PyTypeError, PyUnicodeEncodeError},
     intern,
     prelude::*,
     types::{PyBytes, PyDict, PyInt, PyList, PyString, PyTuple, PyType},
@@ -278,6 +278,39 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
         }
     }
 
+    fn uuid(&mut self, value: &Bound<'py, PyAny>) -> PyResult<()> {
+        // An exact UUID can have a replaced int descriptor. Keep its result
+        // owned and leave getter exceptions unchanged.
+        let integer = value.getattr(intern!(value.py(), "int"))?;
+        if !integer.is_instance_of::<PyInt>() {
+            return Err(PyTypeError::new_err("UUID.int must be an integer"));
+        }
+        let integer = if integer.is_exact_instance_of::<PyInt>() {
+            integer
+        } else {
+            self.int_base.call1((&integer,))?
+        };
+        let number = integer
+            .downcast_exact::<PyInt>()?
+            .extract::<u128>()
+            .map_err(|error| {
+                if error.is_instance_of::<PyOverflowError>(value.py()) {
+                    PyTypeError::new_err("UUID.int is outside 128-bit range")
+                } else {
+                    error
+                }
+            })?;
+        let mut bytes = *b"\"00000000-0000-0000-0000-000000000000\"";
+        let digits = b"0123456789abcdef";
+        let offsets = [1, 3, 5, 7, 10, 12, 15, 17, 20, 22, 25, 27, 29, 31, 33, 35];
+        for (offset, byte) in offsets.into_iter().zip(number.to_be_bytes()) {
+            bytes[offset] = digits[(byte >> 4) as usize];
+            bytes[offset + 1] = digits[(byte & 15) as usize];
+        }
+        self.encoder.extend(&bytes)?;
+        Ok(())
+    }
+
     fn value(&mut self, value: Bound<'py, PyAny>) -> PyResult<()> {
         let py = value.py();
         let option = self.encoder.option;
@@ -322,10 +355,12 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
             } else {
                 let value_type = value.get_type();
                 let is_datetime = self.datetime_types.iter().any(|kind| value_type.is(kind));
-                if !(is_datetime && datetime::write(&mut self.encoder, &value)?) {
-                    let datetime_or_uuid = is_datetime || value_type.is(self.uuid_type);
+                // Aliased helper types must keep the datetime fallback behavior.
+                if !is_datetime && value_type.is(self.uuid_type) {
+                    self.uuid(&value)?;
+                } else if !(is_datetime && datetime::write(&mut self.encoder, &value)?) {
                     let attributes = self.class_attributes(&value_type)?;
-                    if !datetime_or_uuid
+                    if !is_datetime
                         && attributes.contains(intern!(py, "__dataclass_fields__"))?
                         && !value.is_instance_of::<PyType>()
                         && option & PASSTHROUGH_DATACLASS == 0
@@ -333,7 +368,7 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                         container = Some(self.dataclass_items(&value, &attributes)?);
                         limit += 1;
                     } else {
-                        let prepared = if datetime_or_uuid || option & SERIALIZE_NUMPY != 0 {
+                        let prepared = if is_datetime || option & SERIALIZE_NUMPY != 0 {
                             self.special
                                 .call1((&value, option, self.default_provided, depth))?
                         } else {
