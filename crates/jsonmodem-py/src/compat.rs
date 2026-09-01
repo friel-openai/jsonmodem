@@ -42,7 +42,7 @@ mod validate;
 ))]
 mod borrowed_dict;
 
-use std::{borrow::Cow, collections::HashMap, ops::Range};
+use std::ops::Range;
 
 use integer::Integer;
 use jsonmodem::document::{DocumentError, DocumentReader, IntegerToken, plain_string_prefix};
@@ -52,6 +52,7 @@ use pyo3::{
     PyTraverseError, PyVisit,
     exceptions::{PyMemoryError, PyTypeError, PyValueError},
     prelude::*,
+    pybacked::PyBackedStr,
     types::{
         PyBool, PyByteArray, PyBytes, PyDict, PyFloat, PyInt, PyList, PyMemoryView, PyString,
         PyTuple,
@@ -138,8 +139,31 @@ struct Decoder<'py, 'src> {
     reader: DocumentReader<'src>,
     // Python strings and cached escaped keys own their text before this is reused.
     string_buffer: String,
-    keys: Option<HashMap<Cow<'src, str>, Py<PyString>>>,
+    keys: Option<DecodeKeyCache>,
     cache_keys: bool,
+}
+
+/// A collision replaces one entry; lookup never scans a collision chain.
+struct DecodeKeyCache {
+    // Text retains the Python string's immutable storage instead of copying it.
+    entries: Vec<Option<PyBackedStr>>,
+}
+
+impl DecodeKeyCache {
+    fn new() -> Self {
+        Self {
+            entries: std::iter::repeat_with(|| None).take(512).collect(),
+        }
+    }
+
+    #[inline]
+    fn index(text: &str) -> usize {
+        let mut hash = 0xcbf29ce484222325_u64;
+        for byte in text.bytes() {
+            hash = (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3);
+        }
+        (hash ^ (hash >> 32)) as usize & 511
+    }
 }
 
 /// Unfinished containers use bounded inline storage, spilling to the heap
@@ -213,10 +237,14 @@ impl<'py, 'src> Decoder<'py, 'src> {
         )))]
         let text = borrowed.unwrap_or(&self.string_buffer);
         let key = if self.cache_keys && text.len() <= 64 {
-            let keys = self.keys.get_or_insert_with(HashMap::new);
-            match keys.get(text) {
-                Some(key) => key.clone_ref(self.py),
-                None => {
+            let keys = self.keys.get_or_insert_with(DecodeKeyCache::new);
+            let entry = &mut keys.entries[DecodeKeyCache::index(text)];
+            match entry {
+                Some(cached) if &**cached == text => (&*cached)
+                    .into_pyobject(self.py)?
+                    .downcast_into::<PyString>()?
+                    .unbind(),
+                _ => {
                     #[cfg(all(
                         Py_3_12,
                         not(Py_3_14),
@@ -229,13 +257,8 @@ impl<'py, 'src> Decoder<'py, 'src> {
                         not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
                     )))]
                     let key = PyString::new(self.py, text).unbind();
-                    if keys.len() < 512 {
-                        let text = match borrowed {
-                            Some(text) => Cow::Borrowed(text),
-                            None => Cow::Owned(text.to_owned()),
-                        };
-                        keys.insert(text, key.clone_ref(self.py));
-                    }
+                    let text = PyBackedStr::try_from(key.bind(self.py).clone())?;
+                    *entry = Some(text);
                     key
                 }
             }
