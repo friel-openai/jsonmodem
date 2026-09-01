@@ -43,12 +43,11 @@ def encode(value, option, default_provided, depth=0):
     scalar = value_type in SCALAR_TYPES
     if value_type is not np.ndarray and not scalar:
         return None
-    if scalar and type(value_type) is type:
-        metadata = _NUMERIC_SCALAR_METADATA.get(value_type)
-        if metadata is not None:
-            kind, itemsize = metadata
-            return native._numpy_dumps(memoryview(value).tobytes(), (),
-                                       kind, itemsize, "", option, depth)
+    if (scalar and type(value_type) is type
+            and value_type in _NUMERIC_SCALAR_METADATA):
+        metadata = _NUMERIC_SCALAR_METADATA[value_type]
+        return native._numpy_dumps(memoryview(value).tobytes(), (),
+                                   metadata[0], metadata[1], "", option, depth)
     if not scalar and not value.flags.c_contiguous:
         if default_provided:
             return None
