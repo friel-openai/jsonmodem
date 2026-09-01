@@ -42,7 +42,7 @@ def test_replaced_helper_tuple_does_not_change_current_call(value, monkeypatch):
     assert calls == [marker]
 
 
-@pytest.mark.parametrize("index,value", enumerate(VALUES, start=4))
+@pytest.mark.parametrize("index,value", tuple(enumerate(VALUES, start=4)))
 def test_removed_datetime_helper_still_selects_default(index, value):
     from jsonmodem import _compat
 
