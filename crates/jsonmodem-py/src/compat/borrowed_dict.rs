@@ -14,7 +14,7 @@ use pyo3::{
     types::{PyDict, PyString},
 };
 
-use super::{Encoder, INDENT, OutputAllocationError, key_identity_bit};
+use super::{Encoder, INDENT, OutputAllocationError, key_identity_bit, output::OutputBuffer};
 
 /// Certify common keys without conversions, output, or temporary owners.
 /// False requires the full owning validation; it does not mean a key is
@@ -120,15 +120,16 @@ impl<'py> DictScalarCursor<'py> {
         }
     }
 
-    pub(super) fn next<const CHECKED: bool>(
+    pub(super) fn next<const CHECKED: bool, B: OutputBuffer>(
         &mut self,
-        encoder: &mut Encoder<CHECKED>,
+        encoder: &mut Encoder<CHECKED, B>,
         count: &mut usize,
         depth: usize,
     ) -> PyResult<DictStep<'py>> {
         // Encoder::value selects this cursor only for ordinary Vec output.
         // Fail before borrowing an entry if a checked caller is added later.
         assert!(!CHECKED);
+        assert!(!B::PYTHON_ALLOCATION);
         let current_size = self.dict.len() as ffi::Py_ssize_t;
         if self.original_size != current_size {
             self.original_size = -1;
@@ -298,9 +299,9 @@ unsafe fn entry_scalar<'a>(
 ///
 /// owner must retain the exact string key and text must view that string.
 /// The caller holds the GIL and excludes reentry/decrefs through the write.
-unsafe fn write_key<const CHECKED: bool>(
+unsafe fn write_key<const CHECKED: bool, B: OutputBuffer>(
     owner: &Bound<'_, PyDict>,
-    encoder: &mut Encoder<CHECKED>,
+    encoder: &mut Encoder<CHECKED, B>,
     key: *mut ffi::PyObject,
     text: &str,
 ) -> Result<(), OutputAllocationError> {
@@ -312,7 +313,7 @@ unsafe fn write_key<const CHECKED: bool>(
     {
         if let Some((_, encoded)) = encoder.keys.iter().find(|(entry, _)| entry.as_ptr() == key) {
             let encoded = encoded.clone();
-            encoder.output.extend_from_within(encoded);
+            encoder.output.duplicate::<CHECKED>(encoded)?;
             return Ok(());
         }
     }
@@ -339,9 +340,9 @@ unsafe fn write_key<const CHECKED: bool>(
 /// the encoder must use the Rust Vec writer, not Python allocation. No reentry
 /// or decref is allowed until this function returns; only cached-key increfs
 /// may change Python reference counts. No borrowed view escapes this function.
-unsafe fn try_write_entry<const CHECKED: bool>(
+unsafe fn try_write_entry<const CHECKED: bool, B: OutputBuffer>(
     owner: &Bound<'_, PyDict>,
-    encoder: &mut Encoder<CHECKED>,
+    encoder: &mut Encoder<CHECKED, B>,
     count: &mut usize,
     depth: usize,
     key: *mut ffi::PyObject,

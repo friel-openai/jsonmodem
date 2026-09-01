@@ -13,7 +13,7 @@ use smallvec::SmallVec;
 
 use super::{
     APPEND_NEWLINE, Encoder, INITIAL_OUTPUT_CAPACITY, MAX_ENCODE_DEPTH, NON_STR_KEYS, SORT_KEYS,
-    allocation_error, key_utf8_error,
+    allocation_error, key_utf8_error, output, output::OutputBuffer,
 };
 
 const PASSTHROUGH_SUBCLASS: i32 = 256;
@@ -64,7 +64,7 @@ fn array_items<'py>(values: impl Iterator<Item = Bound<'py, PyAny>>) -> PyResult
 
 /// Uncommon Python operations share the native output buffer and depth counter.
 struct ObjectEncoder<'helpers, 'py> {
-    encoder: Encoder<true>,
+    encoder: Encoder<true, output::Output<'py>>,
     default: Bound<'py, PyAny>,
     default_provided: bool,
     // The caller retains the immutable helper tuple until encoding finishes.
@@ -91,7 +91,7 @@ struct ClassAttributes<'py> {
 
 impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
     fn new(
-        encoder: Encoder<true>,
+        encoder: Encoder<true, output::Output<'py>>,
         default: Bound<'py, PyAny>,
         default_provided: bool,
         helpers: &'helpers Bound<'py, PyTuple>,
@@ -463,11 +463,11 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
 }
 
 /// The first traversal cannot invoke callbacks, so its storage can be reused.
-pub(super) fn dumps(
-    py: Python<'_>,
-    mut encoder: Encoder,
-    obj: Bound<'_, PyAny>,
-    default: Option<Bound<'_, PyAny>>,
+pub(super) fn dumps<'py>(
+    py: Python<'py>,
+    mut encoder: Encoder<false, output::Output<'py>>,
+    obj: Bound<'py, PyAny>,
+    default: Option<Bound<'py, PyAny>>,
 ) -> PyResult<PyObject> {
     encoder.output.clear();
     encoder.keys.clear();
@@ -498,8 +498,8 @@ pub fn _dumps_objects(
     default_provided: bool,
     helpers: Bound<'_, PyTuple>,
 ) -> PyResult<Py<PyBytes>> {
-    let mut encoder = Encoder {
-        output: Vec::new(),
+    let encoder = Encoder {
+        output: output::new(py, INITIAL_OUTPUT_CAPACITY)?,
         option,
         base_depth: 0,
         dataclass_root: false,
@@ -516,6 +516,5 @@ pub fn _dumps_objects(
         keys: Vec::new(),
         key_mask: 0,
     };
-    encoder.reserve(INITIAL_OUTPUT_CAPACITY)?;
     ObjectEncoder::new(encoder, default, default_provided, &helpers)?.finish(py, obj)
 }

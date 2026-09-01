@@ -7,10 +7,13 @@ use pyo3::types::{
     PyTzInfoAccess,
 };
 
-use super::Encoder;
+use super::{Encoder, output};
 
 #[cfg(not(any(Py_LIMITED_API, Py_GIL_DISABLED, PyPy, GraalPy)))]
-pub(super) fn write(encoder: &mut Encoder<true>, value: &Bound<'_, PyAny>) -> PyResult<bool> {
+pub(super) fn write(
+    encoder: &mut Encoder<true, output::Output<'_>>,
+    value: &Bound<'_, PyAny>,
+) -> PyResult<bool> {
     const NAIVE_UTC: i32 = 2;
     const OMIT_MICROSECONDS: i32 = 8;
     const UTC_Z: i32 = 128;
@@ -83,7 +86,10 @@ pub(super) fn write(encoder: &mut Encoder<true>, value: &Bound<'_, PyAny>) -> Py
 }
 
 #[cfg(any(Py_LIMITED_API, Py_GIL_DISABLED, PyPy, GraalPy))]
-pub(super) fn write(_: &mut Encoder<true>, _: &Bound<'_, PyAny>) -> PyResult<bool> {
+pub(super) fn write(
+    _: &mut Encoder<true, output::Output<'_>>,
+    _: &Bound<'_, PyAny>,
+) -> PyResult<bool> {
     Ok(false)
 }
 

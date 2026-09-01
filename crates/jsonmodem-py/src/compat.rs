@@ -16,6 +16,7 @@ mod escape_mask;
 )]
 mod integer;
 mod objects;
+mod output;
 mod owned_list;
 #[cfg(all(
     Py_3_12,
@@ -48,6 +49,7 @@ use integer::Integer;
 use jsonmodem::document::{DocumentError, DocumentReader, IntegerToken, plain_string_prefix};
 use lexical_parse_float::FromLexical;
 pub use objects::_dumps_objects;
+use output::OutputBuffer;
 use pyo3::{
     PyTraverseError, PyVisit,
     exceptions::{PyMemoryError, PyTypeError, PyValueError},
@@ -642,10 +644,10 @@ fn unsigned_integer(value: &Bound<'_, PyInt>) -> PyResult<u64> {
 }
 
 /// Single output buffer and bounded cache of encoded dictionary keys.
-/// Callback serialization checks output growth; the callback-free encoder
-/// retains its existing write operations.
-struct Encoder<const CHECKED: bool = false> {
-    output: Vec<u8>,
+/// Output ownership is independent of container traversal and callback
+/// handling.
+struct Encoder<const CHECKED: bool = false, B = Vec<u8>> {
+    output: B,
     option: i32,
     // The Python serializer may already have unfinished parent containers.
     base_depth: usize,
@@ -687,7 +689,10 @@ enum EncodeIterator<'py> {
 
 impl<'py> EncodeIterator<'py> {
     /// The caller has already selected the sorted-dictionary branch, if needed.
-    fn dict<const CHECKED: bool>(dict: &Bound<'py, PyDict>, dataclass_root: bool) -> Self {
+    fn dict<const CHECKED: bool, B: OutputBuffer>(
+        dict: &Bound<'py, PyDict>,
+        dataclass_root: bool,
+    ) -> Self {
         #[cfg(all(
             Py_3_12,
             not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
@@ -697,7 +702,7 @@ impl<'py> EncodeIterator<'py> {
             target_pointer_width = "64",
             target_endian = "little",
         ))]
-        if !CHECKED && !dataclass_root {
+        if !CHECKED && !dataclass_root && !B::PYTHON_ALLOCATION {
             return Self::ScalarDict(borrowed_dict::DictScalarCursor::new(dict.clone()));
         }
         let _ = dataclass_root;
@@ -750,8 +755,8 @@ impl From<OutputAllocationError> for PyErr {
     }
 }
 
-impl<const CHECKED: bool> Encoder<CHECKED> {
-    fn into_checked(self) -> Encoder<true> {
+impl<const CHECKED: bool, B: OutputBuffer> Encoder<CHECKED, B> {
+    fn into_checked(self) -> Encoder<true, B> {
         Encoder {
             output: self.output,
             option: self.option,
@@ -774,55 +779,22 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
 
     #[inline]
     fn reserve(&mut self, additional: usize) -> Result<(), OutputAllocationError> {
-        if CHECKED {
-            if additional > self.output.capacity() - self.output.len() {
-                self.grow(additional)?;
-            }
-        } else {
-            self.output.reserve(additional);
-        }
-        Ok(())
-    }
-
-    #[cold]
-    fn grow(&mut self, additional: usize) -> Result<(), OutputAllocationError> {
-        self.output
-            .try_reserve(additional)
-            .map_err(|_| OutputAllocationError)
+        self.output.reserve::<CHECKED>(additional)
     }
 
     #[inline]
     fn push(&mut self, byte: u8) -> Result<(), OutputAllocationError> {
-        if CHECKED {
-            self.reserve(1)?;
-        }
-        self.output.push(byte);
-        Ok(())
+        self.output.push::<CHECKED>(byte)
     }
 
     #[inline]
     fn extend(&mut self, bytes: &[u8]) -> Result<(), OutputAllocationError> {
-        if CHECKED {
-            self.reserve(bytes.len())?;
-        }
-        self.output.extend_from_slice(bytes);
-        Ok(())
+        self.output.extend::<CHECKED>(bytes)
     }
 
     #[inline]
-    fn bytes(&self, py: Python<'_>) -> PyResult<Py<PyBytes>> {
-        let output = self.output.as_slice();
-        let len = pyo3::ffi::Py_ssize_t::try_from(output.len()).map_err(|_| allocation_error())?;
-        // SAFETY: output retains len initialized bytes for the synchronous copy.
-        // Python is attached, and the API returns a new reference or a null
-        // pointer with an exception. PyO3 takes ownership or returns that error.
-        let bytes = unsafe {
-            Bound::from_owned_ptr_or_err(
-                py,
-                pyo3::ffi::PyBytes_FromStringAndSize(output.as_ptr().cast(), len),
-            )
-        }?;
-        Ok(bytes.downcast_into::<PyBytes>()?.unbind())
+    fn bytes(self, py: Python<'_>) -> PyResult<Py<PyBytes>> {
+        self.output.finish(py)
     }
 
     #[inline(always)]
@@ -898,10 +870,7 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                 .find(|(owner, _)| owner.as_ptr() == key.as_ptr())
             {
                 let encoded = encoded.clone();
-                if CHECKED {
-                    self.reserve(encoded.len())?;
-                }
-                self.output.extend_from_within(encoded);
+                self.output.duplicate::<CHECKED>(encoded)?;
                 return Ok(());
             }
         }
@@ -994,9 +963,9 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
             if CHECKED {
                 self.reserve(1 + (depth + self.base_depth) * 2)?;
             }
-            self.output.push(b'\n');
+            self.push(b'\n')?;
             self.output
-                .resize(self.output.len() + (depth + self.base_depth) * 2, b' ');
+                .repeat::<CHECKED>((depth + self.base_depth) * 2, b' ')?;
         }
         Ok(())
     }
@@ -1146,7 +1115,7 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                     (EncodeIterator::Sorted(items.into_iter()), b'{', b'}')
                 } else {
                     (
-                        EncodeIterator::dict::<CHECKED>(dict, self.dataclass_root),
+                        EncodeIterator::dict::<CHECKED, B>(dict, self.dataclass_root),
                         b'{',
                         b'}',
                     )
@@ -1334,8 +1303,8 @@ pub fn dumps(
     } else {
         None
     };
-    let mut encoder = Encoder::<false> {
-        output: Vec::with_capacity(INITIAL_OUTPUT_CAPACITY),
+    let mut encoder = Encoder::<false, _> {
+        output: output::new(py, INITIAL_OUTPUT_CAPACITY)?,
         option: flags,
         base_depth: 0,
         dataclass_root: false,
@@ -1362,7 +1331,7 @@ pub fn dumps(
         if flags & APPEND_NEWLINE != 0 {
             encoder.push(b'\n')?;
         }
-        return Ok(PyBytes::new(py, &encoder.output).into_any().unbind());
+        return Ok(encoder.bytes(py)?.into_any());
     }
     objects::dumps(py, encoder, obj, default)
 }
@@ -1378,8 +1347,8 @@ pub fn _dumps_fields(
     if depth > MAX_ENCODE_DEPTH {
         return Err(PyTypeError::new_err("Recursion limit reached"));
     }
-    let mut encoder = Encoder::<false> {
-        output: Vec::with_capacity(INITIAL_OUTPUT_CAPACITY),
+    let mut encoder = Encoder::<false, _> {
+        output: output::new(py, INITIAL_OUTPUT_CAPACITY)?,
         option,
         base_depth: depth,
         dataclass_root: true,
@@ -1397,7 +1366,7 @@ pub fn _dumps_fields(
         key_mask: 0,
     };
     if encoder.value(fields.as_any())? {
-        Ok(Some(PyBytes::new(py, &encoder.output).unbind()))
+        Ok(Some(encoder.bytes(py)?))
     } else {
         Ok(None)
     }
