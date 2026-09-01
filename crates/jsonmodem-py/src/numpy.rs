@@ -253,5 +253,5 @@ pub fn _numpy_dumps(
             _ => return Err(PyTypeError::new_err("unsupported datatype in numpy array")),
         }
     };
-    Ok(PyBytes::new(py, &output).into_any().unbind())
+    Ok(crate::compat::bytes_from_vec(py, output)?.into_any())
 }

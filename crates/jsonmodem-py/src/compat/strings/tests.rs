@@ -1,5 +1,5 @@
-//! Exercise the error-document constructor with one real object-allocation
-//! failure.
+//! Exercise error-document and NumPy output constructors with one real
+//! object-allocation failure.
 
 #![cfg(all(
     not(any(
@@ -26,7 +26,7 @@ use pyo3::{
     exceptions::{PyMemoryError, PyRuntimeError},
     ffi,
     prelude::*,
-    types::{PyCFunction, PyModule},
+    types::{PyBytes, PyBytesMethods, PyCFunction, PyModule},
 };
 
 type Malloc = extern "C" fn(*mut c_void, usize) -> *mut c_void;
@@ -34,7 +34,7 @@ type Calloc = extern "C" fn(*mut c_void, usize, usize) -> *mut c_void;
 type Realloc = extern "C" fn(*mut c_void, *mut c_void, usize) -> *mut c_void;
 type Free = extern "C" fn(*mut c_void, *mut c_void);
 
-/// Delegate to the saved allocator except for one exact Unicode allocation.
+/// Delegate to the saved allocator except for one exact object allocation.
 struct HookState {
     previous: ffi::PyMemAllocatorEx,
     malloc: Malloc,
@@ -108,7 +108,7 @@ fn allocator_identity(value: ffi::PyMemAllocatorEx) -> [usize; 5] {
 }
 
 /// Restore the allocator before releasing its context, including on unwind.
-struct FailUnicode<'py> {
+struct FailObjectAllocation<'py> {
     state: Box<HookState>,
     _py: Python<'py>,
 }
@@ -122,13 +122,25 @@ struct FailureReceipt {
     saved_allocator: [usize; 5],
 }
 
-impl<'py> FailUnicode<'py> {
-    fn install(py: Python<'py>, document: &str) -> Self {
+impl<'py> FailObjectAllocation<'py> {
+    fn unicode(py: Python<'py>, document: &str) -> Self {
         assert!(document.len() >= 1024 && document.is_ascii());
         let requested_bytes = size_of::<ffi::PyASCIIObject>()
             .checked_add(document.len())
             .and_then(|size| size.checked_add(1))
             .expect("ASCII object allocation fits usize");
+        Self::install(py, requested_bytes)
+    }
+
+    fn bytes(py: Python<'py>, length: usize) -> Self {
+        let requested_bytes = std::mem::offset_of!(ffi::PyBytesObject, ob_sval)
+            .checked_add(length)
+            .and_then(|size| size.checked_add(1))
+            .expect("bytes object allocation fits usize");
+        Self::install(py, requested_bytes)
+    }
+
+    fn install(py: Python<'py>, requested_bytes: usize) -> Self {
         let previous = allocator();
         let mut guard = Self {
             state: Box::new(HookState {
@@ -178,7 +190,7 @@ impl<'py> FailUnicode<'py> {
     }
 }
 
-impl Drop for FailUnicode<'_> {
+impl Drop for FailObjectAllocation<'_> {
     fn drop(&mut self) {
         let mut previous = self.state.previous;
         // SAFETY: Restore callbacks while the GIL is held, before Box releases
@@ -254,7 +266,7 @@ fn error_document_allocation_failure_recovers() -> PyResult<()> {
         assert_eq!(warmup.to_str()?, document);
         drop(warmup);
         assert!(!PyErr::occurred(py));
-        let guard = FailUnicode::install(py, &document);
+        let guard = FailObjectAllocation::unicode(py, &document);
         let result = super::ErrorDocument(&document).into_pyobject(py);
         let receipt = guard.finish();
         let error = result.expect_err("the exact Unicode allocation must fail");
@@ -290,7 +302,7 @@ fn json_decode_error_allocation_failure_skips_factory_and_recovers() -> PyResult
         calls.store(0, Ordering::Relaxed);
         drop(warmup);
         assert!(!PyErr::occurred(py));
-        let guard = FailUnicode::install(py, &document);
+        let guard = FailObjectAllocation::unicode(py, &document);
         let error = crate::json_decode_error(py, message, &document, 0);
         let receipt = guard.finish();
         check_failure(py, &receipt, &error);
@@ -361,4 +373,30 @@ fn error_constructor_preserves_length_and_ascii_conditions() {
             accepted
         );
     }
+}
+
+#[test]
+fn numpy_output_allocation_failure_recovers() -> PyResult<()> {
+    pyo3::prepare_freethreaded_python();
+    Python::with_gil(|py| {
+        let data = PyBytes::new(py, &[42; 1000]);
+        let encode = || crate::numpy::_numpy_dumps(py, data.clone(), vec![1000], "u", 1, "", 16, 0);
+        let expected = encode()?;
+        let expected_bytes = expected.bind(py).downcast::<PyBytes>()?.as_bytes();
+        assert_eq!(expected_bytes.len(), 3001);
+        assert!(!PyErr::occurred(py));
+        let guard = FailObjectAllocation::bytes(py, expected_bytes.len());
+        let result = encode();
+        let receipt = guard.finish();
+        let error = result.expect_err("the exact NumPy output allocation must fail");
+        check_failure(py, &receipt, &error);
+        drop(error);
+        let recovered = encode()?;
+        assert_eq!(
+            recovered.bind(py).downcast::<PyBytes>()?.as_bytes(),
+            expected_bytes
+        );
+        assert!(!PyErr::occurred(py));
+        Ok(())
+    })
 }

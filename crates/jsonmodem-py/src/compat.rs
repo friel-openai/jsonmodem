@@ -1230,6 +1230,11 @@ fn key_identity_bit(identity: usize) -> u64 {
     1 << (((identity >> 4) ^ (identity >> 10)) & 63)
 }
 
+/// Publish initialized output while returning Python allocation failures.
+pub(crate) fn bytes_from_vec(py: Python<'_>, output: Vec<u8>) -> PyResult<Py<PyBytes>> {
+    output.finish(py)
+}
+
 fn supplied_default<'py>(value: &Bound<'py, PyAny>) -> PyResult<Option<Bound<'py, PyAny>>> {
     // Explicit None is an invalid callback; an omitted argument has no callback
     // cause.
