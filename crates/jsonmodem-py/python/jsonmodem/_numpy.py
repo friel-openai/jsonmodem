@@ -26,7 +26,17 @@ def _numeric_scalar_metadata():
         # retain the per-value lookup. Custom metaclasses retain it as well.
         if type(scalar_type) is not type or not scalar_type.__flags__ & (1 << 8):
             continue
-        dtype = np.dtype(scalar_type)
+        if scalar_type.__module__ != "numpy" or scalar_type.__name__ not in (
+                "bool", "bool_", "int8", "int16", "int32", "int64",
+                "uint8", "uint16", "uint32", "uint64", "longlong", "ulonglong",
+                "float16", "float32", "float64"):
+            continue
+        # np.dtype can be replaced independently of existing valid scalars.
+        # Read storage metadata from an instance of the immutable type instead.
+        value = scalar_type(0)
+        if type(value) is not scalar_type:
+            continue
+        dtype = value.dtype
         if (dtype.type is scalar_type and dtype.isnative
                 and dtype.kind in "biuf" and dtype.itemsize in (1, 2, 4, 8)):
             metadata[scalar_type] = (dtype.kind, dtype.itemsize)
