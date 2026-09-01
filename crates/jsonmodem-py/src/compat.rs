@@ -179,6 +179,16 @@ impl<'py, 'src> Decoder<'py, 'src> {
     #[cold]
     #[inline(never)]
     fn error(&self, error: DocumentError) -> PyErr {
+        let message = match error.message {
+            "expected comma or closing bracket" | "expected comma or closing brace" => {
+                if error.offset == self.input.len() {
+                    "unexpected end of data"
+                } else {
+                    "unexpected character"
+                }
+            }
+            message => message,
+        };
         let position = match self.input.get(..error.offset) {
             Some(prefix) => prefix.chars().count(),
             // Preserve the count for offsets that split a character or exceed the input.
@@ -188,7 +198,7 @@ impl<'py, 'src> Decoder<'py, 'src> {
                 .take_while(|(i, _)| *i < error.offset)
                 .count(),
         };
-        super::json_decode_error(self.py, error.message, self.input, position)
+        super::json_decode_error(self.py, message, self.input, position)
     }
 
     fn fail(&self, message: &'static str) -> PyErr {
