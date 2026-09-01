@@ -45,6 +45,10 @@ struct HookState {
     matched_calls: AtomicUsize,
     failed_calls: AtomicUsize,
     observed_bytes: AtomicUsize,
+    // Observe one parent allocation until collection frees its storage.
+    parent_bytes: usize,
+    parent_address: AtomicUsize,
+    parent_freed: AtomicBool,
 }
 
 extern "C" fn hooked_malloc(context: *mut c_void, size: usize) -> *mut c_void {
@@ -58,7 +62,16 @@ extern "C" fn hooked_malloc(context: *mut c_void, size: usize) -> *mut c_void {
             return std::ptr::null_mut();
         }
     }
-    (hook.malloc)(hook.previous.ctx, size)
+    let pointer = (hook.malloc)(hook.previous.ctx, size);
+    if hook.parent_bytes != 0 && size == hook.parent_bytes && !pointer.is_null() {
+        let _ = hook.parent_address.compare_exchange(
+            0,
+            pointer.addr(),
+            Ordering::Relaxed,
+            Ordering::Relaxed,
+        );
+    }
+    pointer
 }
 
 extern "C" fn hooked_calloc(context: *mut c_void, count: usize, size: usize) -> *mut c_void {
@@ -80,6 +93,9 @@ extern "C" fn hooked_realloc(
 extern "C" fn hooked_free(context: *mut c_void, pointer: *mut c_void) {
     // SAFETY: The guard keeps this immutable context live until restoration.
     let hook = unsafe { &*context.cast::<HookState>() };
+    if !pointer.is_null() && pointer.addr() == hook.parent_address.load(Ordering::Relaxed) {
+        hook.parent_freed.store(true, Ordering::Relaxed);
+    }
     (hook.free)(hook.previous.ctx, pointer);
 }
 
@@ -119,6 +135,8 @@ struct FailureReceipt {
     failed_calls: usize,
     observed_bytes: usize,
     saved_allocator: [usize; 5],
+    parent_address: usize,
+    parent_freed: bool,
 }
 
 impl<'py> FailObjectAllocation<'py> {
@@ -140,6 +158,10 @@ impl<'py> FailObjectAllocation<'py> {
     }
 
     fn install(py: Python<'py>, requested_bytes: usize) -> Self {
+        Self::install_with_parent(py, requested_bytes, 0)
+    }
+
+    fn install_with_parent(py: Python<'py>, requested_bytes: usize, parent_bytes: usize) -> Self {
         let previous = allocator();
         let mut guard = Self {
             state: Box::new(HookState {
@@ -153,6 +175,9 @@ impl<'py> FailObjectAllocation<'py> {
                 matched_calls: AtomicUsize::new(0),
                 failed_calls: AtomicUsize::new(0),
                 observed_bytes: AtomicUsize::new(0),
+                parent_bytes,
+                parent_address: AtomicUsize::new(0),
+                parent_freed: AtomicBool::new(false),
             }),
             _py: py,
         };
@@ -176,14 +201,20 @@ impl<'py> FailObjectAllocation<'py> {
         guard
     }
 
-    fn finish(self) -> FailureReceipt {
-        let receipt = FailureReceipt {
+    fn snapshot(&self) -> FailureReceipt {
+        FailureReceipt {
             requested_bytes: self.state.requested_bytes,
             matched_calls: self.state.matched_calls.load(Ordering::Relaxed),
             failed_calls: self.state.failed_calls.load(Ordering::Relaxed),
             observed_bytes: self.state.observed_bytes.load(Ordering::Relaxed),
             saved_allocator: allocator_identity(self.state.previous),
-        };
+            parent_address: self.state.parent_address.load(Ordering::Relaxed),
+            parent_freed: self.state.parent_freed.load(Ordering::Relaxed),
+        }
+    }
+
+    fn finish(self) -> FailureReceipt {
+        let receipt = self.snapshot();
         drop(self);
         receipt
     }
@@ -478,6 +509,71 @@ fn event_tuple_allocation_failure(at_finish: bool) -> PyResult<()> {
     })
 }
 
+fn decode_container_allocation_failure(
+    document: &str,
+    target_document: &str,
+    parent_document: Option<&str>,
+) -> PyResult<()> {
+    pyo3::prepare_freethreaded_python();
+    Python::with_gil(|py| {
+        let expected = super::super::decode(py, document)?;
+        let getsizeof = py.import("sys")?.getattr("getsizeof")?;
+        let target = super::super::decode(py, target_document)?;
+        let requested = getsizeof.call1((target.bind(py),))?.extract::<usize>()?;
+        let parent_bytes = if let Some(document) = parent_document {
+            let parent = super::super::decode(py, document)?;
+            getsizeof.call1((parent.bind(py),))?.extract::<usize>()?
+        } else {
+            0
+        };
+        let collect = py.import("gc")?.getattr("collect")?;
+        collect.call0()?;
+        let guard = FailObjectAllocation::install_with_parent(py, requested, parent_bytes);
+        let result = super::super::decode(py, document);
+        let before_collection = guard.snapshot();
+        // Released containers can remain on CPython's freelists until collection.
+        let collected = collect.call0();
+        let receipt = guard.finish();
+        collected?;
+        let error = result.expect_err("the initial container allocation must fail");
+        eprintln!(
+            "DECODE_CONTAINER_COUNTS requested={} before_collection={} after_collection={} failed_before={} failed_after={}",
+            requested,
+            before_collection.matched_calls,
+            receipt.matched_calls,
+            before_collection.failed_calls,
+            receipt.failed_calls,
+        );
+        assert_eq!(allocator_identity(allocator()), receipt.saved_allocator);
+        // Fetching the first error can initialize PyO3's exception classes.
+        assert!(before_collection.matched_calls >= 1);
+        assert_eq!(before_collection.failed_calls, 1);
+        assert_eq!(before_collection.observed_bytes, requested);
+        assert!(!PyErr::occurred(py));
+        assert!(error.is_instance_of::<PyMemoryError>(py));
+        assert_eq!(receipt.failed_calls, before_collection.failed_calls);
+        if parent_document.is_some() {
+            assert_ne!(receipt.parent_address, 0);
+            assert!(
+                receipt.parent_freed,
+                "the failed child's parent must be released"
+            );
+        }
+        drop(error);
+        let recovered = super::super::decode(py, document)?;
+        assert!(recovered.bind(py).eq(expected.bind(py))?);
+        assert!(!PyErr::occurred(py));
+        eprintln!(
+            "DECODE_CONTAINER_ALLOCATION requested={} failed={} parent_observed={} parent_freed={} recovered=true",
+            receipt.requested_bytes,
+            receipt.failed_calls,
+            receipt.parent_address != 0,
+            receipt.parent_freed,
+        );
+        Ok(())
+    })
+}
+
 #[test]
 fn feed_event_tuple_allocation_failure_recovers() -> PyResult<()> {
     event_tuple_allocation_failure(false)
@@ -486,4 +582,24 @@ fn feed_event_tuple_allocation_failure_recovers() -> PyResult<()> {
 #[test]
 fn finish_event_tuple_allocation_failure_recovers() -> PyResult<()> {
     event_tuple_allocation_failure(true)
+}
+
+#[test]
+fn decode_container_allocation_root_list() -> PyResult<()> {
+    decode_container_allocation_failure("[]", "[]", None)
+}
+
+#[test]
+fn decode_container_allocation_root_dict() -> PyResult<()> {
+    decode_container_allocation_failure("{}", "{}", None)
+}
+
+#[test]
+fn decode_container_allocation_nested_list_releases_parent() -> PyResult<()> {
+    decode_container_allocation_failure(r#"{"k":[]}"#, "[]", Some("{}"))
+}
+
+#[test]
+fn decode_container_allocation_nested_dict_releases_parent() -> PyResult<()> {
+    decode_container_allocation_failure("[{}]", "{}", Some("[]"))
 }

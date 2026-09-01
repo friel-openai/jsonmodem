@@ -73,6 +73,17 @@ const APPEND_NEWLINE: i32 = 1024;
 const INITIAL_OUTPUT_CAPACITY: usize = 256;
 const MAX_RETAINED_STRING_CAPACITY: usize = 64 * 1024;
 
+// PyO3's direct empty-container constructors panic when allocation fails.
+#[inline]
+fn empty_list(py: Python<'_>) -> PyResult<Bound<'_, PyList>> {
+    Ok(py.get_type::<PyList>().call0()?.downcast_into::<PyList>()?)
+}
+
+#[inline]
+fn empty_dict(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
+    Ok(py.get_type::<PyDict>().call0()?.downcast_into::<PyDict>()?)
+}
+
 // Keep the float parser out of the container loop's instruction footprint.
 #[inline(never)]
 fn parse_double(text: &str) -> Result<f64, lexical_parse_float::Error> {
@@ -306,7 +317,7 @@ impl<'py, 'src> Decoder<'py, 'src> {
                         return Err(self.fail("recursion depth exceeded"));
                     }
                     self.expect(b'[')?;
-                    let list = PyList::empty(py);
+                    let list = empty_list(py)?;
                     if self.reader.peek() != Some(b']') {
                         stack.push(DecodeContainer::Array(list));
                         continue;
@@ -319,7 +330,7 @@ impl<'py, 'src> Decoder<'py, 'src> {
                         return Err(self.fail("recursion depth exceeded"));
                     }
                     self.expect(b'{')?;
-                    let dict = PyDict::new(py);
+                    let dict = empty_dict(py)?;
                     if self.reader.peek() != Some(b'}') {
                         let key = self.key()?;
                         stack.push(DecodeContainer::Object(dict, key));
