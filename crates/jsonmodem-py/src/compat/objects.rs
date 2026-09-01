@@ -13,7 +13,7 @@ use smallvec::SmallVec;
 
 use super::{
     APPEND_NEWLINE, Encoder, INITIAL_OUTPUT_CAPACITY, MAX_ENCODE_DEPTH, NON_STR_KEYS, SORT_KEYS,
-    allocation_error, key_utf8_error, output, output::OutputBuffer,
+    allocation_error, key_utf8_error, output,
 };
 
 const PASSTHROUGH_SUBCLASS: i32 = 256;
@@ -462,10 +462,11 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
     }
 }
 
-/// The first traversal cannot invoke callbacks, so its storage can be reused.
+/// Callback-free traversal uses Rust allocation; callbacks write into owned
+/// bytes.
 pub(super) fn dumps<'py>(
     py: Python<'py>,
-    mut encoder: Encoder<false, output::Output<'py>>,
+    mut encoder: Encoder,
     obj: Bound<'py, PyAny>,
     default: Option<Bound<'py, PyAny>>,
 ) -> PyResult<PyObject> {
@@ -478,7 +479,7 @@ pub(super) fn dumps<'py>(
     let default_provided = default.is_some();
     let default = default.unwrap_or_else(|| py.None().into_bound(py));
     Ok(ObjectEncoder::new(
-        encoder.into_checked(),
+        encoder.into_checked(py)?,
         default,
         default_provided,
         helpers.downcast::<PyTuple>()?,

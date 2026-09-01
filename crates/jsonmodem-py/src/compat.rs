@@ -755,10 +755,10 @@ impl From<OutputAllocationError> for PyErr {
     }
 }
 
-impl<const CHECKED: bool, B: OutputBuffer> Encoder<CHECKED, B> {
-    fn into_checked(self) -> Encoder<true, B> {
-        Encoder {
-            output: self.output,
+impl Encoder {
+    fn into_checked(self, py: Python<'_>) -> PyResult<Encoder<true, output::Output<'_>>> {
+        Ok(Encoder {
+            output: output::from_vec(py, self.output)?,
             option: self.option,
             base_depth: self.base_depth,
             dataclass_root: self.dataclass_root,
@@ -774,9 +774,11 @@ impl<const CHECKED: bool, B: OutputBuffer> Encoder<CHECKED, B> {
             integer_layout: self.integer_layout,
             keys: self.keys,
             key_mask: self.key_mask,
-        }
+        })
     }
+}
 
+impl<const CHECKED: bool, B: OutputBuffer> Encoder<CHECKED, B> {
     #[inline]
     fn reserve(&mut self, additional: usize) -> Result<(), OutputAllocationError> {
         self.output.reserve::<CHECKED>(additional)
@@ -1303,8 +1305,8 @@ pub fn dumps(
     } else {
         None
     };
-    let mut encoder = Encoder::<false, _> {
-        output: output::new(py, INITIAL_OUTPUT_CAPACITY)?,
+    let mut encoder = Encoder::<false> {
+        output: Vec::with_capacity(INITIAL_OUTPUT_CAPACITY),
         option: flags,
         base_depth: 0,
         dataclass_root: false,
@@ -1331,7 +1333,7 @@ pub fn dumps(
         if flags & APPEND_NEWLINE != 0 {
             encoder.push(b'\n')?;
         }
-        return Ok(encoder.bytes(py)?.into_any());
+        return Ok(PyBytes::new(py, &encoder.output).into_any().unbind());
     }
     objects::dumps(py, encoder, obj, default)
 }
@@ -1347,8 +1349,8 @@ pub fn _dumps_fields(
     if depth > MAX_ENCODE_DEPTH {
         return Err(PyTypeError::new_err("Recursion limit reached"));
     }
-    let mut encoder = Encoder::<false, _> {
-        output: output::new(py, INITIAL_OUTPUT_CAPACITY)?,
+    let mut encoder = Encoder::<false> {
+        output: Vec::with_capacity(INITIAL_OUTPUT_CAPACITY),
         option,
         base_depth: depth,
         dataclass_root: true,
@@ -1366,7 +1368,7 @@ pub fn _dumps_fields(
         key_mask: 0,
     };
     if encoder.value(fields.as_any())? {
-        Ok(Some(encoder.bytes(py)?))
+        Ok(Some(PyBytes::new(py, &encoder.output).unbind()))
     } else {
         Ok(None)
     }

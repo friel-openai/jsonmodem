@@ -6,12 +6,17 @@ use pyo3::{prelude::*, types::PyBytes};
 
 use super::{OutputAllocationError, allocation_error};
 
+mod sealed {
+    pub trait Sealed {}
+}
+
 /// The scalar dictionary cursor may use only writers with Rust allocation.
-pub(super) trait OutputBuffer: Sized {
+/// Sealing keeps its allocation assertion limited to the two implementations
+/// here.
+pub(super) trait OutputBuffer: sealed::Sealed + Sized {
     const PYTHON_ALLOCATION: bool;
 
     fn len(&self) -> usize;
-    fn clear(&mut self);
     fn reserve<const CHECKED: bool>(
         &mut self,
         additional: usize,
@@ -30,16 +35,14 @@ pub(super) trait OutputBuffer: Sized {
     fn finish(self, py: Python<'_>) -> PyResult<Py<PyBytes>>;
 }
 
+impl sealed::Sealed for Vec<u8> {}
+
 impl OutputBuffer for Vec<u8> {
     const PYTHON_ALLOCATION: bool = false;
 
     #[inline]
     fn len(&self) -> usize {
         self.len()
-    }
-
-    fn clear(&mut self) {
-        self.clear();
     }
 
     #[inline]
@@ -149,6 +152,40 @@ pub(super) fn new(py: Python<'_>, capacity: usize) -> Result<Output<'_>, OutputA
     }
 }
 
+/// Preserve initialized bytes and capacity when changing allocation ownership.
+pub(super) fn from_vec(
+    py: Python<'_>,
+    buffer: Vec<u8>,
+) -> Result<Output<'_>, OutputAllocationError> {
+    #[cfg(all(
+        Py_3_12,
+        not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+        not(py_sys_config = "Py_TRACE_REFS")
+    ))]
+    {
+        let capacity = buffer.capacity();
+        if buffer.is_empty() {
+            // The callback restart clears the first traversal. Release that
+            // allocation before requesting its replacement of the same size.
+            drop(buffer);
+            Output::new(py, capacity)
+        } else {
+            let mut output = Output::new(py, capacity)?;
+            output.extend::<true>(&buffer)?;
+            Ok(output)
+        }
+    }
+    #[cfg(not(all(
+        Py_3_12,
+        not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+        not(py_sys_config = "Py_TRACE_REFS")
+    )))]
+    {
+        let _ = py;
+        Ok(buffer)
+    }
+}
+
 #[cfg(all(
     Py_3_12,
     not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
@@ -214,20 +251,16 @@ mod python {
                     drop(PyErr::fetch(self.py));
                     return Err(OutputAllocationError);
                 }
+                self.refresh(capacity);
+                Ok(())
             } else {
-                self.resize(capacity)?;
+                self.resize(capacity)
             }
-            // SAFETY: object is a live exact bytes allocation. The API returns
-            // its writable storage without publishing a reference to Python.
-            self.data = unsafe { ffi::PyBytes_AsString(self.object) }.cast();
-            assert!(!self.data.is_null());
-            self.capacity = capacity;
-            Ok(())
         }
 
         fn resize(&mut self, capacity: usize) -> Result<(), OutputAllocationError> {
             assert!(!self.object.is_null());
-            assert!(capacity <= MAX_CAPACITY);
+            assert!(capacity > 0 && capacity >= self.len && capacity <= MAX_CAPACITY);
             // SAFETY: object is uniquely owned, exact, and unpublished. Python
             // is attached. No borrowed view survives this call. The API replaces
             // our owned pointer and frees/nulls it on failure; it sets the final
@@ -239,9 +272,20 @@ mod python {
                 drop(PyErr::fetch(self.py));
                 return Err(OutputAllocationError);
             }
+            self.refresh(capacity);
             Ok(())
         }
+
+        fn refresh(&mut self, capacity: usize) {
+            // SAFETY: the preceding successful allocation or resize leaves a
+            // live exact bytes object. The API returns its writable storage.
+            self.data = unsafe { ffi::PyBytes_AsString(self.object) }.cast();
+            assert!(!self.data.is_null());
+            self.capacity = capacity;
+        }
     }
+
+    impl super::sealed::Sealed for PythonBytes<'_> {}
 
     impl OutputBuffer for PythonBytes<'_> {
         const PYTHON_ALLOCATION: bool = true;
@@ -249,10 +293,6 @@ mod python {
         #[inline]
         fn len(&self) -> usize {
             self.len
-        }
-
-        fn clear(&mut self) {
-            self.len = 0;
         }
 
         #[inline]
@@ -334,7 +374,7 @@ mod python {
         }
 
         fn finish(mut self, _: Python<'_>) -> PyResult<Py<PyBytes>> {
-            if self.object.is_null() {
+            if self.len == 0 {
                 return Ok(PyBytes::new(self.py, b"").unbind());
             }
             if self.len != self.capacity {
@@ -362,7 +402,21 @@ mod python {
 mod tests {
     use pyo3::{prelude::*, types::PyBytesMethods};
 
-    use super::{OutputBuffer, new};
+    use super::{OutputBuffer, from_vec, new};
+
+    #[test]
+    fn converting_vec_preserves_cached_output_ranges() -> PyResult<()> {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let mut buffer = Vec::with_capacity(1024);
+            buffer.extend_from_slice(b"first,second,");
+            let mut output = from_vec(py, buffer)?;
+            output.duplicate::<true>(6..12)?;
+            let bytes = output.finish(py)?;
+            assert_eq!(bytes.bind(py).as_bytes(), b"first,second,second");
+            Ok(())
+        })
+    }
 
     #[test]
     fn growth_and_duplicates_preserve_initialized_bytes() -> PyResult<()> {
@@ -388,12 +442,10 @@ mod tests {
     }
 
     #[test]
-    fn clear_and_padding_do_not_publish_previous_contents() -> PyResult<()> {
+    fn padding_initializes_only_the_published_contents() -> PyResult<()> {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
             let mut output = new(py, 4096)?;
-            output.repeat::<true>(4000, b'x')?;
-            output.clear();
             output.extend::<true>(b"[\n")?;
             output.repeat::<true>(2, b' ')?;
             output.extend::<true>(b"null\n]")?;

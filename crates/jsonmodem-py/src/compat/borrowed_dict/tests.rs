@@ -195,7 +195,7 @@ fn check_mixed_key_writers(first: CursorMode, second: CursorMode) -> PyResult<()
                 .collect::<Vec<_>>(),
             ranges,
         );
-        assert_eq!(encoder.into_checked().key_mask, expected_mask);
+        assert_eq!(encoder.into_checked(py)?.key_mask, expected_mask);
         Ok(())
     })
 }
