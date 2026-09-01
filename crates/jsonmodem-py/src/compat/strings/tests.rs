@@ -438,3 +438,52 @@ fn unsigned_integer_allocation_failure_recovers() -> PyResult<()> {
 fn float_allocation_failure_recovers() -> PyResult<()> {
     numeric_allocation_failure("1.25")
 }
+
+fn event_tuple_allocation_failure(at_finish: bool) -> PyResult<()> {
+    pyo3::prepare_freethreaded_python();
+    Python::with_gil(|py| {
+        let class = py.get_type::<crate::events::PyJsonModemEvents>();
+        let parser = class.call0()?;
+        if at_finish {
+            parser.call_method1("feed", ("0",))?;
+        }
+        let method = parser.getattr(if at_finish { "finish" } else { "feed" })?;
+        let input = pyo3::types::PyString::new(py, "null ");
+        let tuple = pyo3::types::PyTuple::new(py, [py.None(), py.None(), py.None()])?;
+        let requested = py
+            .import("sys")?
+            .getattr("getsizeof")?
+            .call1((&tuple,))?
+            .extract::<usize>()?;
+        drop(tuple);
+        // Full collection clears tuple freelists before the exact-size failure.
+        py.import("gc")?.call_method0("collect")?;
+        let guard = FailObjectAllocation::install(py, requested);
+        let result = if at_finish {
+            method.call0()
+        } else {
+            method.call1((&input,))
+        };
+        let receipt = guard.finish();
+        let error = result.expect_err("the event tuple allocation must fail");
+        check_failure(py, &receipt, &error);
+        drop(error);
+        let recovered = class.call0()?.call_method1("feed", (&input,))?;
+        let mut events = recovered.try_iter()?;
+        let event = events.next().expect("one null event")?;
+        assert!(event.eq(("null", py.None(), py.None()))?);
+        assert!(events.next().is_none());
+        assert!(!PyErr::occurred(py));
+        Ok(())
+    })
+}
+
+#[test]
+fn feed_event_tuple_allocation_failure_recovers() -> PyResult<()> {
+    event_tuple_allocation_failure(false)
+}
+
+#[test]
+fn finish_event_tuple_allocation_failure_recovers() -> PyResult<()> {
+    event_tuple_allocation_failure(true)
+}

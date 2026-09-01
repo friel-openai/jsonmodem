@@ -1,15 +1,13 @@
 //! Event-only parsing with path tracking selected independently per instance.
 
 use jsonmodem::{EventBackend, JsonModem, ParseEvent, lending_iterator::LendingIterator};
-use pyo3::{
-    prelude::*,
-    types::{PyBool, PyTuple},
-};
+use pyo3::{prelude::*, types::PyBool};
 
 use crate::{
     EventRecord, EventRecordPool, InternedStrings, OwnedEventKind, PyEventIter, PyJsonModem,
     PyParserOptions, PyStringPayload, error_record, is_single_json_input, load_number,
-    new_event_record_pool, read_parser_options, state_error, take_event_records, with_input_text,
+    new_event_record_pool, read_parser_options, state_error, take_event_records,
+    tuple_from_owned_items, with_input_text,
 };
 
 /// Streams fragments without paths unless the caller enables path tracking.
@@ -204,9 +202,12 @@ fn record(
         ParseEvent::ObjectEnd { .. } => (OwnedEventKind::ObjectEnd, py.None()),
     };
     let kind = interns.kind_bound(py, kind).into_any().unbind();
+    let items = smallvec::smallvec![
+        kind.into_bound(py),
+        py.None().into_bound(py),
+        payload.into_bound(py),
+    ];
     Ok(EventRecord::Event(
-        PyTuple::new(py, [kind, py.None(), payload])?
-            .into_any()
-            .unbind(),
+        tuple_from_owned_items(py, items)?.into_any().unbind(),
     ))
 }
