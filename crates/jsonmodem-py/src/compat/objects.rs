@@ -73,6 +73,9 @@ struct ObjectEncoder<'helpers, 'py> {
     key_text: Borrowed<'helpers, 'py, PyAny>,
     special: Borrowed<'helpers, 'py, PyAny>,
     datetime_types: [Borrowed<'helpers, 'py, PyAny>; 3],
+    // A successful builtin write establishes helper and Enum priority for this
+    // immutable type. The retained helper tuple cannot change during callbacks.
+    last_datetime_type: Option<Bound<'py, PyType>>,
     uuid_type: Borrowed<'helpers, 'py, PyAny>,
     str_base: Borrowed<'helpers, 'py, PyAny>,
     int_base: Borrowed<'helpers, 'py, PyAny>,
@@ -109,6 +112,7 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                 helpers.get_borrowed_item(5)?,
                 helpers.get_borrowed_item(6)?,
             ],
+            last_datetime_type: None,
             uuid_type: helpers.get_borrowed_item(7)?,
             str_base: helpers.get_borrowed_item(8)?,
             int_base: helpers.get_borrowed_item(9)?,
@@ -324,25 +328,37 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
             let depth = stack.len();
             let mut container = None;
             let mut limit = MAX_ENCODE_DEPTH;
-            if self.encoder.scalar(&value)? {
+            let cached_datetime = self
+                .last_datetime_type
+                .as_ref()
+                .is_some_and(|kind| value.get_type_ptr() == kind.as_type_ptr());
+            if !cached_datetime && self.encoder.scalar(&value)? {
                 // Scalars include empty lists and tuples at any depth.
-            } else if value
-                .get_type()
-                .mro()
-                .iter_borrowed()
-                .any(|base| base.is(self.enum_type))
+            } else if !cached_datetime
+                && value
+                    .get_type()
+                    .mro()
+                    .iter_borrowed()
+                    .any(|base| base.is(self.enum_type))
             {
                 value = value.getattr(intern!(py, "value"))?;
                 continue;
-            } else if option & PASSTHROUGH_SUBCLASS == 0 && value.is_instance_of::<PyString>() {
+            } else if !cached_datetime
+                && option & PASSTHROUGH_SUBCLASS == 0
+                && value.is_instance_of::<PyString>()
+            {
                 value = self.str_base.call1((&value,))?;
                 continue;
-            } else if option & PASSTHROUGH_SUBCLASS == 0 && value.is_instance_of::<PyInt>() {
+            } else if !cached_datetime
+                && option & PASSTHROUGH_SUBCLASS == 0
+                && value.is_instance_of::<PyInt>()
+            {
                 value = self.int_base.call1((&value,))?;
                 continue;
-            } else if value.is_exact_instance_of::<PyTuple>() {
+            } else if !cached_datetime && value.is_exact_instance_of::<PyTuple>() {
                 container = Some(array_items(value.downcast::<PyTuple>()?.iter())?);
-            } else if (option & PASSTHROUGH_SUBCLASS == 0 || value.is_exact_instance_of::<PyList>())
+            } else if !cached_datetime
+                && (option & PASSTHROUGH_SUBCLASS == 0 || value.is_exact_instance_of::<PyList>())
                 && value.is_instance_of::<PyList>()
             {
                 let list = value.downcast::<PyList>()?;
@@ -351,17 +367,23 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                 } else {
                     container = Some(array_items(list.iter())?);
                 }
-            } else if (option & PASSTHROUGH_SUBCLASS == 0 || value.is_exact_instance_of::<PyDict>())
+            } else if !cached_datetime
+                && (option & PASSTHROUGH_SUBCLASS == 0 || value.is_exact_instance_of::<PyDict>())
                 && value.is_instance_of::<PyDict>()
             {
                 container = Some(self.dict_items(value.downcast::<PyDict>()?)?);
             } else {
                 let value_type = value.get_type();
-                let is_datetime = self.datetime_types.iter().any(|kind| value_type.is(kind));
+                let is_datetime =
+                    cached_datetime || self.datetime_types.iter().any(|kind| value_type.is(kind));
                 // Aliased helper types must keep the datetime fallback behavior.
                 if !is_datetime && value_type.is(self.uuid_type) {
                     self.uuid(&value)?;
-                } else if !(is_datetime && datetime::write(&mut self.encoder, &value)?) {
+                } else if is_datetime && datetime::write(&mut self.encoder, &value)? {
+                    if !cached_datetime {
+                        self.last_datetime_type = Some(value_type);
+                    }
+                } else {
                     let attributes = self.class_attributes(&value_type)?;
                     if !is_datetime
                         && attributes.contains(intern!(py, "__dataclass_fields__"))?
