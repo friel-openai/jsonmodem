@@ -323,3 +323,42 @@ fn json_decode_error_allocation_failure_skips_factory_and_recovers() -> PyResult
         Ok(())
     })
 }
+
+#[test]
+fn ascii_constructor_requires_classified_non_singleton_text() {
+    for (input, accepted) in [
+        (r#""""#, false),
+        (r#""a""#, false),
+        (r#""ab""#, true),
+        (r#""\u0061\u0062""#, true),
+        (r#""\u00e9""#, false),
+        (r#""ab\u00e9""#, false),
+        (r#""\ud83d\ude00""#, false),
+    ] {
+        let mut reader = jsonmodem::document::DocumentReader::new(input);
+        let mut buffer = String::new();
+        let decoded = reader.string_with_metadata(&mut buffer).unwrap();
+        let text = super::AsciiText::from_decoded(&decoded);
+        assert_eq!(text.is_some(), accepted, "{input}");
+        if let Some(text) = text {
+            assert!(text.0.is_ascii() && text.0.len() > 1);
+            assert_eq!(text.0, decoded.as_str());
+        }
+    }
+}
+
+#[test]
+fn error_constructor_preserves_length_and_ascii_conditions() {
+    for (text, accepted) in [
+        (String::new(), false),
+        ("a".repeat(1023), false),
+        ("a".repeat(1024), true),
+        ("\u{e9}".repeat(1024), false),
+        (format!("{}\u{e9}", "a".repeat(1024)), false),
+    ] {
+        assert_eq!(
+            super::AsciiText::from_error_document(&text).is_some(),
+            accepted
+        );
+    }
+}
