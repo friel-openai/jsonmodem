@@ -82,6 +82,11 @@ struct ObjectEncoder<'helpers, 'py> {
     get_attribute: Borrowed<'helpers, 'py, PyAny>,
     type_dict: Borrowed<'helpers, 'py, PyAny>,
     classes: SmallVec<[ClassAttributes<'py>; 4]>,
+    // The helper tuple owns types and default helper identities for this encode.
+    numpy_types: Option<(
+        Bound<'py, crate::numpy::NumericScalarTypes>,
+        Bound<'py, PyTuple>,
+    )>,
     // Completed root output stays owned until finish returns it.
     root_bytes: Option<Bound<'py, PyBytes>>,
 }
@@ -99,6 +104,16 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
         default_provided: bool,
         helpers: &'helpers Bound<'py, PyTuple>,
     ) -> PyResult<Self> {
+        let numpy_types = if encoder.option & SERIALIZE_NUMPY != 0 && helpers.len() > 13 {
+            helpers
+                .get_item(12)?
+                .downcast_into()
+                .ok()
+                .zip(helpers.get_item(13)?.downcast_into::<PyTuple>().ok())
+                .filter(|(_, defaults)| defaults.len() == 8)
+        } else {
+            None
+        };
         Ok(Self {
             encoder,
             default,
@@ -119,6 +134,7 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
             get_attribute: helpers.get_borrowed_item(10)?,
             type_dict: helpers.get_borrowed_item(11)?,
             classes: SmallVec::new(),
+            numpy_types,
             root_bytes: None,
         })
     }
@@ -318,6 +334,54 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
         Ok(())
     }
 
+    fn numpy_scalar(&mut self, value: &Bound<'py, PyAny>, depth: usize) -> PyResult<bool> {
+        use crate::numpy::ScalarValue;
+
+        let Some((types, defaults)) = &self.numpy_types else {
+            return Ok(false);
+        };
+        let Some(number) = types.get().read(value, defaults, &self.special)? else {
+            return Ok(false);
+        };
+        if depth > 254 {
+            return Err(PyTypeError::new_err("invalid numpy snapshot metadata"));
+        }
+        // read() has released the export. Only owned primitives remain while
+        // formatting and output growth may allocate Python bytes.
+        match number {
+            ScalarValue::Bool(value) => {
+                self.encoder
+                    .extend(if value { b"true" } else { b"false" })?;
+            }
+            ScalarValue::Signed(value) => {
+                // NumPy integers do not use OPT_STRICT_INTEGER's 53-bit limit.
+                self.encoder
+                    .extend(itoa::Buffer::new().format(value).as_bytes())?;
+            }
+            ScalarValue::Unsigned(value) => {
+                self.encoder
+                    .extend(itoa::Buffer::new().format(value).as_bytes())?;
+            }
+            ScalarValue::Float32(value) => {
+                let mut buffer = zmij::Buffer::new();
+                self.encoder.extend(if value.is_finite() {
+                    buffer.format_finite(value).as_bytes()
+                } else {
+                    b"null"
+                })?;
+            }
+            ScalarValue::Float64(value) => {
+                let mut buffer = zmij::Buffer::new();
+                self.encoder.extend(if value.is_finite() {
+                    buffer.format_finite(value).as_bytes()
+                } else {
+                    b"null"
+                })?;
+            }
+        }
+        Ok(true)
+    }
+
     fn value(&mut self, value: Bound<'py, PyAny>) -> PyResult<()> {
         let py = value.py();
         let option = self.encoder.option;
@@ -332,7 +396,10 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                 .last_datetime_type
                 .as_ref()
                 .is_some_and(|kind| value.get_type_ptr() == kind.as_type_ptr());
-            if !cached_datetime && self.encoder.scalar(&value)? {
+            if !cached_datetime
+                && (self.encoder.scalar(&value)?
+                    || (option & SERIALIZE_NUMPY != 0 && self.numpy_scalar(&value, depth)?))
+            {
                 // Scalars include empty lists and tuples at any depth.
             } else if !cached_datetime
                 && value

@@ -3910,6 +3910,7 @@ fn jsonmodem(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(compat::_dumps_objects, m)?)?;
     m.add_class::<compat::Fragment>()?;
     m.add_function(wrap_pyfunction!(numpy::_numpy_dumps, m)?)?;
+    m.add_class::<numpy::NumericScalarTypes>()?;
     let json_decode_error = py.import("json")?.getattr("JSONDecodeError")?;
     m.add("JSONDecodeError", json_decode_error)?;
     m.add("JSONEncodeError", py.get_type::<PyTypeError>())?;

@@ -50,6 +50,32 @@ pub(crate) fn with_export<T>(
 }
 
 impl BufferExport<'_> {
+    /// Copy a fixed numeric value without exposing exporter storage to callers.
+    ///
+    /// # Safety
+    /// When the descriptor passes these checks, its source bytes must not be
+    /// modified during the copy, including by native writers outside the GIL.
+    /// A readonly descriptor alone does not establish that requirement.
+    pub(crate) unsafe fn copy_immutable_array<const N: usize>(&self) -> Option<[u8; N]> {
+        if !matches!(N, 1 | 2 | 4 | 8)
+            || self.view.len != N as isize
+            || !self.readonly()
+            || self.view.buf.is_null()
+        {
+            return None;
+        }
+        let mut bytes = [0; N];
+        // SAFETY: the active SIMPLE export supplies N contiguous readable bytes.
+        // The destination is fresh stack storage, with alignment one and no
+        // overlap. No Python call or GIL release occurs before the copy finishes.
+        // The caller receives owned bytes, not a borrow of exporter storage.
+        // Native exporters must still honor their storage contract.
+        unsafe {
+            std::ptr::copy_nonoverlapping(self.view.buf.cast::<u8>(), bytes.as_mut_ptr(), N);
+        }
+        Some(bytes)
+    }
+
     pub(crate) fn len(&self) -> isize {
         self.view.len
     }
@@ -120,5 +146,74 @@ impl Drop for BufferExport<'_> {
             // Its owned export is released once, while Python is still attached.
             unsafe { ffi::PyBuffer_Release(&mut self.view) };
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use pyo3::types::PyByteArray;
+
+    use super::*;
+
+    #[test]
+    fn fixed_copy_owns_bytes_after_release() {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let source = PyBytes::new(py, b"abcd");
+            let copied = with_export(source.as_any(), |export| {
+                // SAFETY: exact Python bytes own immutable storage.
+                Ok(unsafe { export.copy_immutable_array::<4>() })
+            })
+            .unwrap()
+            .unwrap()
+            .unwrap();
+            drop(source);
+            assert_eq!(copied, *b"abcd");
+        });
+    }
+
+    #[test]
+    fn fixed_copy_rejects_wrong_width_and_writable_storage() {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let source = PyBytes::new(py, b"abcd");
+            with_export(source.as_any(), |export| {
+                // SAFETY: exact Python bytes own immutable storage.
+                unsafe {
+                    assert_eq!(export.copy_immutable_array::<1>(), None);
+                    assert_eq!(export.copy_immutable_array::<8>(), None);
+                    assert_eq!(export.copy_immutable_array::<0>(), None);
+                }
+                Ok(())
+            })
+            .unwrap();
+            let writable = PyByteArray::new(py, b"abcd");
+            let copied = with_export(writable.as_any(), |export| {
+                // SAFETY: the writable descriptor is rejected before any read.
+                Ok(unsafe { export.copy_immutable_array::<4>() })
+            })
+            .unwrap();
+            assert_eq!(copied, Some(None));
+        });
+    }
+
+    #[test]
+    fn fixed_copy_rejects_null_or_negative_descriptor_without_reading() {
+        pyo3::prepare_freethreaded_python();
+        Python::with_gil(|py| {
+            let mut export = BufferExport {
+                view: ffi::Py_buffer::new(),
+                acquired: Cell::new(false),
+                _python: py,
+                _pinned: PhantomPinned,
+            };
+            export.view.readonly = 1;
+            export.view.len = 4;
+            // SAFETY: null storage is rejected before any read.
+            assert_eq!(unsafe { export.copy_immutable_array::<4>() }, None);
+            export.view.len = -1;
+            // SAFETY: negative length is rejected before any read.
+            assert_eq!(unsafe { export.copy_immutable_array::<4>() }, None);
+        });
     }
 }

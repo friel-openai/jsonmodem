@@ -1,8 +1,10 @@
-//! NumPy formatting from checked immutable bytes, without borrowing NumPy
-//! memory.
+//! NumPy arrays use owning snapshots; numeric scalars copy fixed-size values
+//! before formatting.
 
+mod scalars;
 use chrono::{Datelike, NaiveDate};
 use pyo3::{exceptions::PyTypeError, prelude::*, types::PyBytes};
+pub(crate) use scalars::{NumericScalarTypes, ScalarValue};
 
 const MICROS_PER_DAY: i64 = 86_400_000_000;
 

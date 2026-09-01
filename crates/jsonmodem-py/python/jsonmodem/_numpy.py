@@ -83,3 +83,18 @@ def encode(value, option, default_provided, depth=0):
         raw = np.ndarray.tobytes(value, order="C")
     return native._numpy_dumps(raw, () if scalar else value.shape,
                                dtype.kind, dtype.itemsize, unit, option, depth)
+
+
+_NATIVE_NUMERIC_TYPES = None if np is None else native._NumericScalarTypes(np, SCALAR_TYPES)
+if _NATIVE_NUMERIC_TYPES is not None:
+    from . import _compat
+
+    # Python's GC owns these cycles; the native table only retains scalar types.
+    # The tuple order matches helpers_are_default in numpy/scalars.rs.
+    _NUMERIC_HELPERS = (
+        sys.modules, sys.modules[__name__], native, np, encode,
+        *_compat._NUMPY_DEFAULT_HELPERS, SCALAR_TYPES,
+    )
+    _compat._ENCODER_HELPERS = _compat._ENCODER_HELPERS[:12] + (
+        _NATIVE_NUMERIC_TYPES, _NUMERIC_HELPERS,
+    )
