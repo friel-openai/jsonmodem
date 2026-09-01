@@ -1,5 +1,4 @@
-//! Exercise error-document and NumPy output constructors with one real
-//! object-allocation failure.
+//! Exercise Python result constructors with one real object-allocation failure.
 
 #![cfg(all(
     not(any(
@@ -399,4 +398,43 @@ fn numpy_output_allocation_failure_recovers() -> PyResult<()> {
         assert!(!PyErr::occurred(py));
         Ok(())
     })
+}
+
+fn numeric_allocation_failure(document: &str) -> PyResult<()> {
+    pyo3::prepare_freethreaded_python();
+    Python::with_gil(|py| {
+        let expected = super::super::decode(py, document)?;
+        let requested = expected
+            .bind(py)
+            .call_method0("__sizeof__")?
+            .extract::<usize>()?;
+        // Full collection clears CPython's float freelist before injection.
+        py.import("gc")?.call_method0("collect")?;
+        let guard = FailObjectAllocation::install(py, requested);
+        let result = super::super::decode(py, document);
+        let receipt = guard.finish();
+        let error = result.expect_err("the decoded number allocation must fail");
+        check_failure(py, &receipt, &error);
+        drop(error);
+        let recovered = super::super::decode(py, document)?;
+        assert!(recovered.bind(py).eq(expected.bind(py))?);
+        assert!(!PyErr::occurred(py));
+        Ok(())
+    })
+}
+
+#[test]
+fn signed_integer_allocation_failure_recovers() -> PyResult<()> {
+    // Multiple digits avoid the padded single-digit constructor allocation.
+    numeric_allocation_failure("-2147483648")
+}
+
+#[test]
+fn unsigned_integer_allocation_failure_recovers() -> PyResult<()> {
+    numeric_allocation_failure("18446744073709551615")
+}
+
+#[test]
+fn float_allocation_failure_recovers() -> PyResult<()> {
+    numeric_allocation_failure("1.25")
 }

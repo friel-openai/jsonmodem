@@ -75,6 +75,30 @@ fn json_decode_error(py: Python<'_>, message: &str, doc: &str, pos: usize) -> Py
     }
 }
 
+/// Preserve CPython allocation errors when constructing decoded numbers.
+#[inline]
+fn python_signed_integer(py: Python<'_>, value: i64) -> PyResult<PyObject> {
+    // SAFETY: The GIL is held. The constructor returns a new reference or NULL,
+    // which is checked before taking ownership.
+    unsafe { Bound::from_owned_ptr_or_err(py, ffi::PyLong_FromLongLong(value)).map(Bound::unbind) }
+}
+
+#[inline]
+fn python_unsigned_integer(py: Python<'_>, value: u64) -> PyResult<PyObject> {
+    // SAFETY: The GIL is held. The constructor returns a new reference or NULL,
+    // which is checked before taking ownership.
+    unsafe {
+        Bound::from_owned_ptr_or_err(py, ffi::PyLong_FromUnsignedLongLong(value)).map(Bound::unbind)
+    }
+}
+
+#[inline]
+fn python_float(py: Python<'_>, value: f64) -> PyResult<PyObject> {
+    // SAFETY: The GIL is held. The constructor returns a new reference or NULL,
+    // which is checked before taking ownership.
+    unsafe { Bound::from_owned_ptr_or_err(py, ffi::PyFloat_FromDouble(value)).map(Bound::unbind) }
+}
+
 fn load_number(py: Python<'_>, lexeme: &str) -> PyResult<PyObject> {
     let is_float = lexeme
         .as_bytes()
@@ -89,29 +113,15 @@ fn load_number(py: Python<'_>, lexeme: &str) -> PyResult<PyObject> {
                 ));
             }
         };
-        // SAFETY: Python is attached. The constructor returns a new reference
-        // or NULL, which the fallible wrapper checks before taking ownership.
-        return unsafe {
-            Bound::from_owned_ptr_or_err(py, ffi::PyFloat_FromDouble(number)).map(Bound::unbind)
-        };
+        return python_float(py, number);
     }
     // Valid JSON integers longer than twenty bytes cannot fit either type.
     if lexeme.len() <= 20 {
         if let Ok(number) = lexeme.parse::<i64>() {
-            // SAFETY: Python is attached. The constructor returns a new
-            // reference or NULL, which is checked before taking ownership.
-            return unsafe {
-                Bound::from_owned_ptr_or_err(py, ffi::PyLong_FromLongLong(number))
-                    .map(Bound::unbind)
-            };
+            return python_signed_integer(py, number);
         }
         if let Ok(number) = lexeme.parse::<u64>() {
-            // SAFETY: Python is attached. The constructor returns a new
-            // reference or NULL, which is checked before taking ownership.
-            return unsafe {
-                Bound::from_owned_ptr_or_err(py, ffi::PyLong_FromUnsignedLongLong(number))
-                    .map(Bound::unbind)
-            };
+            return python_unsigned_integer(py, number);
         }
     }
     let number = py.get_type::<PyInt>().call1((lexeme,))?;

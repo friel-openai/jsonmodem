@@ -394,10 +394,10 @@ impl<'py, 'src> Decoder<'py, 'src> {
                     let number = self.reader.number().map_err(|error| self.error(error))?;
                     match number.integer {
                         Some(IntegerToken::Signed(value)) => {
-                            value.into_pyobject(py)?.into_any().unbind()
+                            super::python_signed_integer(py, value)?
                         }
                         Some(IntegerToken::Unsigned(value)) => {
-                            value.into_pyobject(py)?.into_any().unbind()
+                            super::python_unsigned_integer(py, value)?
                         }
                         None => {
                             let value = parse_double(number.text)
@@ -405,7 +405,7 @@ impl<'py, 'src> Decoder<'py, 'src> {
                             if !value.is_finite() {
                                 return Err(self.fail("number is infinity when parsed as double"));
                             }
-                            value.into_pyobject(py)?.into_any().unbind()
+                            super::python_float(py, value)?
                         }
                     }
                 }
