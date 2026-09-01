@@ -37,6 +37,12 @@ def encode(value, option, default_provided, depth=0):
         unit, multiplier = np.datetime_data(dtype)
         if multiplier != 1:
             raise TypeError("numpy.datetime64 unit multipliers are not supported")
-    raw = np.generic.tobytes(value) if scalar else np.ndarray.tobytes(value, order="C")
+    if scalar:
+        # A custom metaclass can compare equal to SCALAR_TYPES. Preserve the
+        # forced base method instead of invoking its instance's buffer hook.
+        raw = (memoryview(value).tobytes() if type(value_type) is type
+               else np.generic.tobytes(value))
+    else:
+        raw = np.ndarray.tobytes(value, order="C")
     return native._numpy_dumps(raw, () if scalar else value.shape,
                                dtype.kind, dtype.itemsize, unit, option, depth)
