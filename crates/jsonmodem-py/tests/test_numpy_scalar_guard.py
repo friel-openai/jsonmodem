@@ -1,5 +1,6 @@
 """Per-value checks observe helper changes without borrowing mutable storage."""
 
+import os
 import subprocess
 import sys
 import types
@@ -14,10 +15,14 @@ orjson = pytest.importorskip("orjson")
 
 def test_native_replacement_before_first_numpy_call():
     code = """
+import os
 import sys
 import jsonmodem
 import numpy as np
 from jsonmodem import _jsonmodem as native
+if os.environ.get('JSONMODEM_MEMORY_RUNNER'):
+    import ctypes
+    assert getattr(ctypes.CDLL(None), '__asan_init')
 assert 'jsonmodem._numpy' not in sys.modules
 original = native._numpy_dumps
 calls = []
@@ -33,7 +38,9 @@ native._numpy_dumps = original
 assert jsonmodem.dumps(np.int64(11), option=16) == b'11'
 assert len(calls) == 2
 """
-    process = subprocess.run([sys.executable, "-B", "-c", code],
+    runner = os.environ.get("JSONMODEM_MEMORY_RUNNER")
+    command = [runner] if runner else []
+    process = subprocess.run([*command, sys.executable, "-B", "-c", code],
                              capture_output=True, text=True, timeout=30)
     assert process.returncode == 0, process.stdout + process.stderr
 
