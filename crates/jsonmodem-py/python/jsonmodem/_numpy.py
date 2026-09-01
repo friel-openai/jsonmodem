@@ -1,5 +1,7 @@
 """Optional NumPy support using immutable snapshots rather than Python value trees."""
 
+import sys
+
 from . import _jsonmodem as native
 
 try:
@@ -14,6 +16,26 @@ SCALAR_TYPES = () if np is None else (
 )
 
 
+def _numeric_scalar_metadata():
+    """Retain fixed storage metadata only for immutable built-in scalar types."""
+    metadata = {}
+    if np is None or sys.implementation.name != "cpython":
+        return metadata
+    for scalar_type in SCALAR_TYPES:
+        # Py_TPFLAGS_IMMUTABLETYPE is absent on older Python versions, which
+        # retain the per-value lookup. Custom metaclasses retain it as well.
+        if type(scalar_type) is not type or not scalar_type.__flags__ & (1 << 8):
+            continue
+        dtype = np.dtype(scalar_type)
+        if (dtype.type is scalar_type and dtype.isnative
+                and dtype.kind in "biuf" and dtype.itemsize in (1, 2, 4, 8)):
+            metadata[scalar_type] = (dtype.kind, dtype.itemsize)
+    return metadata
+
+
+_NUMERIC_SCALAR_METADATA = _numeric_scalar_metadata()
+
+
 def encode(value, option, default_provided, depth=0):
     if np is None:
         return None
@@ -21,6 +43,12 @@ def encode(value, option, default_provided, depth=0):
     scalar = value_type in SCALAR_TYPES
     if value_type is not np.ndarray and not scalar:
         return None
+    if scalar and type(value_type) is type:
+        metadata = _NUMERIC_SCALAR_METADATA.get(value_type)
+        if metadata is not None:
+            kind, itemsize = metadata
+            return native._numpy_dumps(memoryview(value).tobytes(), (),
+                                       kind, itemsize, "", option, depth)
     if not scalar and not value.flags.c_contiguous:
         if default_provided:
             return None
