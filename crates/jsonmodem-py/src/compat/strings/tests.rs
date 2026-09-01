@@ -603,3 +603,143 @@ fn decode_container_allocation_nested_list_releases_parent() -> PyResult<()> {
 fn decode_container_allocation_nested_dict_releases_parent() -> PyResult<()> {
     decode_container_allocation_failure("[{}]", "{}", Some("[]"))
 }
+
+#[test]
+#[ignore = "requires NumPy and the matching jsonmodem Python helpers"]
+fn numpy_scalar_then_dates_output_allocation_failure_recovers() -> PyResult<()> {
+    pyo3::prepare_freethreaded_python();
+    Python::with_gil(|py| {
+        let fixture = PyModule::from_code(
+            py,
+            pyo3::ffi::c_str!(
+                r#"
+import json
+import sys
+from unittest.mock import patch
+
+import numpy as np
+from jsonmodem import _compat, _numpy
+
+def prepare(native):
+    text = [
+        "2000-02-28T01:02:03.123456",
+        "2000-02-28T04:05:06.000001",
+        "2000-02-29T00:00:00",
+    ] * 100
+    fresh_text = [
+        "2024-03-01T12:30:00.654321",
+        "2024-03-01T00:00:00",
+        "2024-03-02T08:09:10.000001",
+    ]
+    dates = np.array(text, dtype="datetime64[us]")
+    fresh_dates = np.array(fresh_text, dtype="datetime64[us]")
+    scalar = np.int64(7)
+    scalar_types = _numpy.SCALAR_TYPES
+    table = native._NumericScalarTypes(np, scalar_types)
+    special = _compat._ENCODER_HELPERS[3]
+    defaults = (
+        sys.modules, _numpy, native, np, _numpy.encode,
+        special, native._numpy_dumps, scalar_types,
+    )
+    def encoded(value):
+        return json.dumps(value, separators=(",", ":")).encode("ascii")
+    return {
+        "module": _numpy,
+        "original_native": _numpy.native,
+        "context": patch.object(_numpy, "native", native),
+        "helpers": _compat._ENCODER_HELPERS[:12] + (table, defaults),
+        "scalar": scalar,
+        "value": [scalar, dates],
+        "fresh_value": [np.int64(13), fresh_dates],
+        "expected_dates": encoded(text),
+        "expected": encoded([7, text]),
+        "expected_fresh": encoded([13, fresh_text]),
+        "input_bytes": dates.nbytes,
+    }
+"#
+            ),
+            pyo3::ffi::c_str!("numpy_scalar_day_prefix_allocation_fixture.py"),
+            pyo3::ffi::c_str!("numpy_scalar_day_prefix_allocation_fixture"),
+        )?;
+
+        // Use this test binary's class and function, not a second extension's
+        // PyO3 class identity. The Python serialization helpers remain unchanged.
+        let native = PyModule::new(py, "_numpy_scalar_day_prefix_test_native")?;
+        native.add_function(pyo3::wrap_pyfunction!(crate::numpy::_numpy_dumps, &native)?)?;
+        native.add_class::<crate::numpy::NumericScalarTypes>()?;
+        let setup = fixture.getattr("prepare")?.call1((&native,))?;
+        let module = setup.get_item("module")?;
+        let original_native = setup.get_item("original_native")?;
+        let context = setup.get_item("context")?;
+        context.call_method0("__enter__")?;
+
+        // Restore the Python helper even if a native assertion unwinds.
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> PyResult<()> {
+            let helpers = setup
+                .get_item("helpers")?
+                .downcast_into::<pyo3::types::PyTuple>()?;
+            let types = helpers
+                .get_item(12)?
+                .downcast_into::<crate::numpy::NumericScalarTypes>()?;
+            let defaults = helpers
+                .get_item(13)?
+                .downcast_into::<pyo3::types::PyTuple>()?;
+            let scalar = setup.get_item("scalar")?;
+            assert!(matches!(
+                types
+                    .get()
+                    .read(&scalar, &defaults, &helpers.get_item(3)?)?,
+                Some(crate::numpy::ScalarValue::Signed(7))
+            ));
+
+            let value = setup.get_item("value")?;
+            let fresh_value = setup.get_item("fresh_value")?;
+            let expected_dates = setup
+                .get_item("expected_dates")?
+                .downcast_into::<PyBytes>()?;
+            let expected = setup.get_item("expected")?.downcast_into::<PyBytes>()?;
+            let expected_fresh = setup
+                .get_item("expected_fresh")?
+                .downcast_into::<PyBytes>()?;
+            let target_length = expected_dates.as_bytes().len();
+            assert_eq!(target_length, 8001);
+            assert_ne!(
+                target_length,
+                setup.get_item("input_bytes")?.extract::<usize>()?
+            );
+            assert_ne!(target_length, expected.as_bytes().len());
+            let encode = |value| {
+                crate::compat::_dumps_objects(
+                    py,
+                    value,
+                    py.None().into_bound(py),
+                    16,
+                    false,
+                    helpers.clone(),
+                )
+            };
+            let control = encode(value.clone())?;
+            assert_eq!(control.bind(py).as_bytes(), expected.as_bytes());
+            drop(control);
+            assert!(!PyErr::occurred(py));
+
+            let guard = FailObjectAllocation::bytes(py, target_length);
+            let result = encode(value);
+            let receipt = guard.finish();
+            let error = result.expect_err("the date-array bytes allocation must fail");
+            check_failure(py, &receipt, &error);
+            drop(error);
+
+            let recovered = encode(fresh_value)?;
+            assert_eq!(recovered.bind(py).as_bytes(), expected_fresh.as_bytes());
+            assert!(!PyErr::occurred(py));
+            Ok(())
+        }));
+        context.call_method1("__exit__", (py.None(), py.None(), py.None()))?;
+        assert!(module.getattr("native")?.is(&original_native));
+        match outcome {
+            Ok(result) => result,
+            Err(panic) => std::panic::resume_unwind(panic),
+        }
+    })
+}
