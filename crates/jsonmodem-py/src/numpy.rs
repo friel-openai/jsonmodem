@@ -1,61 +1,13 @@
 //! NumPy formatting from checked immutable bytes, without borrowing NumPy
 //! memory.
 
-use chrono::{Datelike, NaiveDate, NaiveDateTime, Timelike};
+use chrono::{Datelike, NaiveDate};
 use pyo3::{exceptions::PyTypeError, prelude::*, types::PyBytes};
 
-fn datetime(value: i64, unit: &str) -> PyResult<NaiveDateTime> {
-    let invalid = || PyTypeError::new_err("unrepresentable numpy.datetime64");
-    let result = match unit {
-        "Y" | "M" => {
-            let (years, month) = if unit == "Y" {
-                (value, 1)
-            } else {
-                (value.div_euclid(12), value.rem_euclid(12) as u32 + 1)
-            };
-            let year = years
-                .checked_add(1970)
-                .and_then(|n| i32::try_from(n).ok())
-                .ok_or_else(invalid)?;
-            NaiveDate::from_ymd_opt(year, month, 1)
-                .and_then(|date| date.and_hms_opt(0, 0, 0))
-                .ok_or_else(invalid)?
-        }
-        "W" | "D" | "h" | "m" | "s" | "ms" | "us" | "ns" => {
-            let micros = match unit {
-                "ns" => Some(value.div_euclid(1000)),
-                "us" => Some(value),
-                _ => value.checked_mul(match unit {
-                    "ms" => 1000,
-                    "s" => 1_000_000,
-                    "m" => 60_000_000,
-                    "h" => 3_600_000_000,
-                    "D" => 86_400_000_000,
-                    "W" => 604_800_000_000,
-                    _ => unreachable!(),
-                }),
-            }
-            .ok_or_else(invalid)?;
-            chrono::DateTime::from_timestamp_micros(micros)
-                .ok_or_else(invalid)?
-                .naive_utc()
-        }
-        _ => {
-            return Err(PyTypeError::new_err(format!(
-                "unsupported numpy.datetime64 unit: {}",
-                match unit {
-                    "ps" => "picoseconds",
-                    "fs" => "femtoseconds",
-                    "as" => "attoseconds",
-                    _ => "generic",
-                }
-            )));
-        }
-    };
-    if !(0..=9999).contains(&result.year()) {
-        return Err(invalid());
-    }
-    Ok(result)
+const MICROS_PER_DAY: i64 = 86_400_000_000;
+
+fn invalid_datetime() -> PyErr {
+    PyTypeError::new_err("unrepresentable numpy.datetime64")
 }
 
 /// Encode a checked value below 100 as two zero-padded ASCII digits.
@@ -77,20 +29,107 @@ fn two_digits(value: u32) -> [u8; 2] {
     DIGIT_PAIRS[value as usize]
 }
 
-fn write_datetime(output: &mut Vec<u8>, value: i64, unit: &str, option: i32) -> PyResult<()> {
-    let date = datetime(value, unit)?;
-    let mut text = *b"\"0000-00-00T00:00:00.000000+00:00\"";
+fn date_prefix(date: NaiveDate) -> PyResult<[u8; 10]> {
+    if !(0..=9999).contains(&date.year()) {
+        return Err(invalid_datetime());
+    }
+    let mut prefix = *b"0000-00-00";
     let year = date.year() as u32;
-    text[1..3].copy_from_slice(&two_digits(year / 100));
-    text[3..5].copy_from_slice(&two_digits(year % 100));
-    text[6..8].copy_from_slice(&two_digits(date.month()));
-    text[9..11].copy_from_slice(&two_digits(date.day()));
-    text[12..14].copy_from_slice(&two_digits(date.hour()));
-    text[15..17].copy_from_slice(&two_digits(date.minute()));
-    text[18..20].copy_from_slice(&two_digits(date.second()));
+    prefix[0..2].copy_from_slice(&two_digits(year / 100));
+    prefix[2..4].copy_from_slice(&two_digits(year % 100));
+    prefix[5..7].copy_from_slice(&two_digits(date.month()));
+    prefix[8..10].copy_from_slice(&two_digits(date.day()));
+    Ok(prefix)
+}
+
+/// Retain one validated date prefix within a single snapshot serialization.
+#[derive(Default)]
+struct DayPrefix {
+    /// Unix-epoch day and its date bytes, populated only after range
+    /// validation.
+    previous: Option<(i64, [u8; 10])>,
+}
+
+impl DayPrefix {
+    fn get(&mut self, day: i64) -> PyResult<[u8; 10]> {
+        if let Some((previous, prefix)) = &self.previous {
+            if *previous == day {
+                return Ok(*prefix);
+            }
+        }
+        let date = i32::try_from(day)
+            .ok()
+            .and_then(NaiveDate::from_epoch_days)
+            .ok_or_else(invalid_datetime)?;
+        let prefix = date_prefix(date)?;
+        self.previous = Some((day, prefix));
+        Ok(prefix)
+    }
+}
+
+fn write_datetime(
+    output: &mut Vec<u8>,
+    value: i64,
+    unit: &str,
+    option: i32,
+    day_prefix: &mut DayPrefix,
+) -> PyResult<()> {
+    let (prefix, micros_in_day) = match unit {
+        "Y" | "M" => {
+            let (years, month) = if unit == "Y" {
+                (value, 1)
+            } else {
+                (value.div_euclid(12), value.rem_euclid(12) as u32 + 1)
+            };
+            let year = years
+                .checked_add(1970)
+                .and_then(|n| i32::try_from(n).ok())
+                .ok_or_else(invalid_datetime)?;
+            let date = NaiveDate::from_ymd_opt(year, month, 1).ok_or_else(invalid_datetime)?;
+            (date_prefix(date)?, 0)
+        }
+        "W" | "D" | "h" | "m" | "s" | "ms" | "us" | "ns" => {
+            let micros = match unit {
+                "ns" => Some(value.div_euclid(1000)),
+                "us" => Some(value),
+                _ => value.checked_mul(match unit {
+                    "ms" => 1000,
+                    "s" => 1_000_000,
+                    "m" => 60_000_000,
+                    "h" => 3_600_000_000,
+                    "D" => MICROS_PER_DAY,
+                    "W" => 604_800_000_000,
+                    _ => unreachable!(),
+                }),
+            }
+            .ok_or_else(invalid_datetime)?;
+            (
+                day_prefix.get(micros.div_euclid(MICROS_PER_DAY))?,
+                micros.rem_euclid(MICROS_PER_DAY),
+            )
+        }
+        _ => {
+            return Err(PyTypeError::new_err(format!(
+                "unsupported numpy.datetime64 unit: {}",
+                match unit {
+                    "ps" => "picoseconds",
+                    "fs" => "femtoseconds",
+                    "as" => "attoseconds",
+                    _ => "generic",
+                }
+            )));
+        }
+    };
+    let mut text = *b"\"0000-00-00T00:00:00.000000+00:00\"";
+    text[1..11].copy_from_slice(&prefix);
+    // The nonnegative remainder is within one day; these fields cannot be leap
+    // seconds.
+    let seconds = (micros_in_day / 1_000_000) as u32;
+    let micros = (micros_in_day % 1_000_000) as u32;
+    text[12..14].copy_from_slice(&two_digits(seconds / 3600));
+    text[15..17].copy_from_slice(&two_digits(seconds / 60 % 60));
+    text[18..20].copy_from_slice(&two_digits(seconds % 60));
     let mut end = 20;
-    // datetime() constructs epoch-based or midnight values, never leap seconds.
-    let micros = date.nanosecond() / 1000;
     if micros != 0 && option & 8 == 0 {
         text[21..23].copy_from_slice(&two_digits(micros / 10_000));
         text[23..25].copy_from_slice(&two_digits(micros / 100 % 100));
@@ -109,6 +148,21 @@ fn write_datetime(output: &mut Vec<u8>, value: i64, unit: &str, option: i32) -> 
     text[end] = b'"';
     output.extend_from_slice(&text[..end + 1]);
     Ok(())
+}
+
+/// Keep the per-snapshot date cache out of numeric serialization calls.
+#[inline(never)]
+fn write_datetimes(
+    data: &[u8],
+    shape: &[usize],
+    unit: &str,
+    option: i32,
+    depth: usize,
+) -> PyResult<Vec<u8>> {
+    let mut prefix = DayPrefix::default();
+    write_values::<8>(data, shape, option, depth, |out, raw| {
+        write_datetime(out, i64::from_ne_bytes(raw), unit, option, &mut prefix)
+    })
 }
 
 /// Format checked snapshot bytes with one numeric formatter selected for the
@@ -247,9 +301,7 @@ pub fn _numpy_dumps(
                 .to_f32()),
             ("f", 4) => float!(4, f32::from_ne_bytes),
             ("f", 8) => float!(8, f64::from_ne_bytes),
-            ("M", 8) => write_values::<8>(bytes, &shape, option, depth, |out, raw| {
-                write_datetime(out, i64::from_ne_bytes(raw), unit, option)
-            })?,
+            ("M", 8) => write_datetimes(bytes, &shape, unit, option, depth)?,
             _ => return Err(PyTypeError::new_err("unsupported datatype in numpy array")),
         }
     };
