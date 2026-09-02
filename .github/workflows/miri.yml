@@ -8,7 +8,8 @@ on:
 jobs:
   miri:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # The full suite plus both borrow models and SIMD checks exceed 30 minutes.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
