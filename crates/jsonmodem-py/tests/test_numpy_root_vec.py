@@ -73,22 +73,25 @@ def _run_child(body, *arguments):
 @pytest.mark.parametrize("length", [2, 1024])
 @pytest.mark.parametrize("container", ["list", "tuple"])
 @pytest.mark.parametrize("entry", ["public", "native"])
-def test_root_helper_key_callback_keeps_original_order(key_type, length, container, entry):
-    _run_child(r'''
-key_type, length, container, entry = sys.argv[1:]
+def test_root_helper_key_callback_keeps_original_order(key_type, length, container, entry, tmp_path):
+    body = r'''
+key_type, length, container, entry, mode, report_path = sys.argv[1:]
 length = int(length)
 assert jsonmodem.dumps(np.int64(0), option=16) == b"0"
 from jsonmodem import _compat, _numpy
 scalar_types = _numpy.SCALAR_TYPES
 armed = False
 calls = []
+events = []
 
 def replacement(*args):
     calls.append(args[0])
+    events.append(["encode", args[0].hex()])
     return b"123"
 
 def matches(other):
     global armed
+    events.append(["lookup", other])
     if other != "SCALAR_TYPES":
         return False
     if armed:
@@ -114,15 +117,46 @@ first, later = np.int64(7), np.int64(9)
 payload = [first] + [later] * (length - 1)
 if container == "tuple":
     payload = tuple(payload)
+raw_values = [np.generic.tobytes(value).hex() for value in payload]
+
+def encode(value):
+    if entry == "public":
+        return jsonmodem.dumps(value, option=16)
+    return native._dumps_objects(value, None, 16, False, _compat._ENCODER_HELPERS)
+
 armed = True
-if entry == "public":
-    result = jsonmodem.dumps(payload, option=16)
+if mode == "scalars":
+    result = b"[" + b",".join(encode(value) for value in payload) + b"]"
+elif mode == "container":
+    result = encode(payload)
 else:
-    result = native._dumps_objects(payload, None, 16, False, _compat._ENCODER_HELPERS)
-assert result == b"[7" + b",123" * (length - 1) + b"]", result
-assert calls == [np.generic.tobytes(later)] * (length - 1), calls
+    raise AssertionError("unknown encoding mode")
+
+# The Python fallback observes the replacement before encoding the first value.
+native_first = b"[7" + b",123" * (length - 1) + b"]"
+fallback_first = b"[" + b",".join([b"123"] * length) + b"]"
+assert result in (native_first, fallback_first), result
+first_is_native = result == native_first
+expected_calls = raw_values[1:] if first_is_native else raw_values
+call_bytes = [value.hex() for value in calls]
+assert call_bytes == expected_calls, calls
+expected_events = []
+for index, raw in enumerate(raw_values):
+    expected_events.append(["lookup", "SCALAR_TYPES"])
+    if index or not first_is_native:
+        expected_events.append(["encode", raw])
+assert events == expected_events, events
 assert not armed
-''', key_type, length, container, entry)
+with Path(report_path).open("x") as report:
+    json.dump({"result": result.hex(), "calls": call_bytes, "events": events}, report)
+'''
+    # Fresh children give both encoders the same unmodified helper dictionaries.
+    reports = []
+    for mode in ("scalars", "container"):
+        report_path = tmp_path / f"{mode}.json"
+        _run_child(body, key_type, length, container, entry, mode, report_path)
+        reports.append(json.loads(report_path.read_text()))
+    assert reports[0] == reports[1]
 
 
 @pytest.mark.parametrize("dictionary", ["modules", "module", "native"])
