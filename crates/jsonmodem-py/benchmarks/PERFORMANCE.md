@@ -10,7 +10,10 @@ against this report's jsonmodem build and orjson.
 The later [public-document and date/time report](PERFORMANCE_36H.md) adds
 external parser benchmarks and compares the subsequent changes with orjson.
 The [large-document and worst-case report](PERFORMANCE_24H.md) records the
-latest measured optimizations, CPU profiles, allocations and RSS.
+next optimizations, CPU profiles, allocations and RSS.
+The latest [safer-storage and optional-path report](PERFORMANCE_SAFE_CAPABILITIES.md)
+compares complete calls, streaming, allocations and RSS after the ownership
+and parser-capability changes. It includes the remaining regressions.
 
 The measured jsonmodem runtime is
 [`9285795`](https://github.com/friel-openai/jsonmodem/commit/9285795ca2ca10570e47a48564d29e12160c2d4d).

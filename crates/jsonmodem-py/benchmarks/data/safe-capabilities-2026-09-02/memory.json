@@ -1,0 +1,2275 @@
+{
+  "schema_version": 1,
+  "scope": "complete-call-memory",
+  "allocation_method": {
+    "calls": 30,
+    "warmup_calls": 10,
+    "captures_per_case_library": 1,
+    "gc_before_capture": true,
+    "trace_python_allocators": true
+  },
+  "allocations": {
+    "original": {
+      "loads_medium": {
+        "allocation_events": 135842,
+        "allocated_bytes": 10014842,
+        "peak_live_bytes": 289852
+      },
+      "dumps_small": {
+        "allocation_events": 127,
+        "allocated_bytes": 12688,
+        "peak_live_bytes": 388
+      },
+      "dumps_medium": {
+        "allocation_events": 397,
+        "allocated_bytes": 5535418,
+        "peak_live_bytes": 119199
+      },
+      "long_string": {
+        "allocation_events": 97,
+        "allocated_bytes": 4304098,
+        "peak_live_bytes": 143467
+      },
+      "sorted_medium": {
+        "allocation_events": 30457,
+        "allocated_bytes": 7459738,
+        "peak_live_bytes": 122823
+      },
+      "fragments_1000": {
+        "allocation_events": 307,
+        "allocated_bytes": 1398628,
+        "peak_live_bytes": 30458
+      },
+      "dataclasses_1000": {
+        "allocation_events": 457,
+        "allocated_bytes": 3070648,
+        "peak_live_bytes": 61758
+      },
+      "numpy_float32": {
+        "allocation_events": 1147,
+        "allocated_bytes": 98184868,
+        "peak_live_bytes": 2292069
+      },
+      "late_default": {
+        "allocation_events": 727,
+        "allocated_bytes": 2630690188,
+        "peak_live_bytes": 54077751
+      },
+      "loads_small_array_view": {
+        "allocation_events": 277,
+        "allocated_bytes": 12748,
+        "peak_live_bytes": 390
+      },
+      "loads_small": {
+        "allocation_events": 247,
+        "allocated_bytes": 9988,
+        "peak_live_bytes": 330
+      },
+      "loads_medium_array_view": {
+        "allocation_events": 135888,
+        "allocated_bytes": 11621484,
+        "peak_live_bytes": 343379
+      },
+      "loads_long_string_array_view": {
+        "allocation_events": 127,
+        "allocated_bytes": 8606128,
+        "peak_live_bytes": 286836
+      },
+      "loads_long_string": {
+        "allocation_events": 97,
+        "allocated_bytes": 4304278,
+        "peak_live_bytes": 143473
+      }
+    },
+    "selected": {
+      "loads_medium": {
+        "allocation_events": 138169,
+        "allocated_bytes": 10527730,
+        "peak_live_bytes": 308280
+      },
+      "dumps_small": {
+        "allocation_events": 127,
+        "allocated_bytes": 12688,
+        "peak_live_bytes": 388
+      },
+      "dumps_medium": {
+        "allocation_events": 397,
+        "allocated_bytes": 5535418,
+        "peak_live_bytes": 119199
+      },
+      "long_string": {
+        "allocation_events": 97,
+        "allocated_bytes": 4304098,
+        "peak_live_bytes": 143467
+      },
+      "sorted_medium": {
+        "allocation_events": 30457,
+        "allocated_bytes": 7459738,
+        "peak_live_bytes": 122823
+      },
+      "fragments_1000": {
+        "allocation_events": 307,
+        "allocated_bytes": 1398628,
+        "peak_live_bytes": 30458
+      },
+      "dataclasses_1000": {
+        "allocation_events": 457,
+        "allocated_bytes": 3077578,
+        "peak_live_bytes": 40977
+      },
+      "numpy_float32": {
+        "allocation_events": 1147,
+        "allocated_bytes": 98185108,
+        "peak_live_bytes": 2292077
+      },
+      "late_default": {
+        "allocation_events": 757,
+        "allocated_bytes": 3638061418,
+        "peak_live_bytes": 33622897
+      },
+      "loads_small_array_view": {
+        "allocation_events": 337,
+        "allocated_bytes": 16348,
+        "peak_live_bytes": 3990
+      },
+      "loads_small": {
+        "allocation_events": 307,
+        "allocated_bytes": 13588,
+        "peak_live_bytes": 3930
+      },
+      "loads_medium_array_view": {
+        "allocation_events": 138211,
+        "allocated_bytes": 12134116,
+        "peak_live_bytes": 362063
+      },
+      "loads_long_string_array_view": {
+        "allocation_events": 127,
+        "allocated_bytes": 8606128,
+        "peak_live_bytes": 286836
+      },
+      "loads_long_string": {
+        "allocation_events": 97,
+        "allocated_bytes": 4304278,
+        "peak_live_bytes": 143473
+      }
+    },
+    "orjson": {
+      "loads_medium": {
+        "allocation_events": 134942,
+        "allocated_bytes": 27371942,
+        "peak_live_bytes": 928870
+      },
+      "dumps_small": {
+        "allocation_events": 97,
+        "allocated_bytes": 33958,
+        "peak_live_bytes": 1129
+      },
+      "dumps_medium": {
+        "allocation_events": 277,
+        "allocated_bytes": 3910618,
+        "peak_live_bytes": 65641
+      },
+      "long_string": {
+        "allocation_events": 127,
+        "allocated_bytes": 62949508,
+        "peak_live_bytes": 2097257
+      },
+      "sorted_medium": {
+        "allocation_events": 30337,
+        "allocated_bytes": 6074938,
+        "peak_live_bytes": 69305
+      },
+      "fragments_1000": {
+        "allocation_events": 217,
+        "allocated_bytes": 959518,
+        "peak_live_bytes": 16489
+      },
+      "dataclasses_1000": {
+        "allocation_events": 247,
+        "allocated_bytes": 1943548,
+        "peak_live_bytes": 32873
+      },
+      "numpy_float32": {
+        "allocation_events": 751027,
+        "allocated_bytes": 232187458,
+        "peak_live_bytes": 4073865
+      },
+      "late_default": {
+        "allocation_events": 487,
+        "allocated_bytes": 2011352338,
+        "peak_live_bytes": 33558273
+      },
+      "loads_small_array_view": {
+        "allocation_events": 247,
+        "allocated_bytes": 131128,
+        "peak_live_bytes": 4336
+      },
+      "loads_small": {
+        "allocation_events": 247,
+        "allocated_bytes": 131128,
+        "peak_live_bytes": 4336
+      },
+      "loads_medium_array_view": {
+        "allocation_events": 134958,
+        "allocated_bytes": 27372774,
+        "peak_live_bytes": 928870
+      },
+      "loads_long_string_array_view": {
+        "allocation_events": 127,
+        "allocated_bytes": 56036758,
+        "peak_live_bytes": 1867857
+      },
+      "loads_long_string": {
+        "allocation_events": 127,
+        "allocated_bytes": 56036758,
+        "peak_live_bytes": 1867857
+      }
+    }
+  },
+  "rss_method": {
+    "calls_per_process": 10,
+    "processes_per_case_library": 3,
+    "gc_before_calls": true,
+    "result_retained": false
+  },
+  "rss": {
+    "loads_medium": {
+      "original": {
+        "samples": [
+          {
+            "startup": {
+              "VmRSS_kib": 21104,
+              "VmHWM_kib": 21772,
+              "ru_maxrss_kib": 21772
+            },
+            "before": {
+              "VmRSS_kib": 21104,
+              "VmHWM_kib": 21772,
+              "ru_maxrss_kib": 21772
+            },
+            "first": {
+              "VmRSS_kib": 21488,
+              "VmHWM_kib": 21772,
+              "ru_maxrss_kib": 21772
+            },
+            "final": {
+              "VmRSS_kib": 21488,
+              "VmHWM_kib": 21772,
+              "ru_maxrss_kib": 21772
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21120,
+              "VmHWM_kib": 21812,
+              "ru_maxrss_kib": 21812
+            },
+            "before": {
+              "VmRSS_kib": 21120,
+              "VmHWM_kib": 21812,
+              "ru_maxrss_kib": 21812
+            },
+            "first": {
+              "VmRSS_kib": 21444,
+              "VmHWM_kib": 21812,
+              "ru_maxrss_kib": 21812
+            },
+            "final": {
+              "VmRSS_kib": 21444,
+              "VmHWM_kib": 21812,
+              "ru_maxrss_kib": 21812
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21060,
+              "VmHWM_kib": 21748,
+              "ru_maxrss_kib": 21748
+            },
+            "before": {
+              "VmRSS_kib": 21060,
+              "VmHWM_kib": 21748,
+              "ru_maxrss_kib": 21748
+            },
+            "first": {
+              "VmRSS_kib": 21384,
+              "VmHWM_kib": 21748,
+              "ru_maxrss_kib": 21748
+            },
+            "final": {
+              "VmRSS_kib": 21384,
+              "VmHWM_kib": 21748,
+              "ru_maxrss_kib": 21748
+            }
+          }
+        ],
+        "median_kib": {
+          "startup": {
+            "VmRSS_kib": 21104,
+            "VmHWM_kib": 21772,
+            "ru_maxrss_kib": 21772
+          },
+          "before": {
+            "VmRSS_kib": 21104,
+            "VmHWM_kib": 21772,
+            "ru_maxrss_kib": 21772
+          },
+          "first": {
+            "VmRSS_kib": 21444,
+            "VmHWM_kib": 21772,
+            "ru_maxrss_kib": 21772
+          },
+          "final": {
+            "VmRSS_kib": 21444,
+            "VmHWM_kib": 21772,
+            "ru_maxrss_kib": 21772
+          }
+        }
+      },
+      "selected": {
+        "samples": [
+          {
+            "startup": {
+              "VmRSS_kib": 21180,
+              "VmHWM_kib": 21820,
+              "ru_maxrss_kib": 21820
+            },
+            "before": {
+              "VmRSS_kib": 21180,
+              "VmHWM_kib": 21820,
+              "ru_maxrss_kib": 21820
+            },
+            "first": {
+              "VmRSS_kib": 21564,
+              "VmHWM_kib": 21820,
+              "ru_maxrss_kib": 21820
+            },
+            "final": {
+              "VmRSS_kib": 21564,
+              "VmHWM_kib": 21820,
+              "ru_maxrss_kib": 21820
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21220,
+              "VmHWM_kib": 21888,
+              "ru_maxrss_kib": 21888
+            },
+            "before": {
+              "VmRSS_kib": 21220,
+              "VmHWM_kib": 21888,
+              "ru_maxrss_kib": 21888
+            },
+            "first": {
+              "VmRSS_kib": 21544,
+              "VmHWM_kib": 21888,
+              "ru_maxrss_kib": 21888
+            },
+            "final": {
+              "VmRSS_kib": 21544,
+              "VmHWM_kib": 21888,
+              "ru_maxrss_kib": 21888
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21228,
+              "VmHWM_kib": 21892,
+              "ru_maxrss_kib": 21892
+            },
+            "before": {
+              "VmRSS_kib": 21228,
+              "VmHWM_kib": 21892,
+              "ru_maxrss_kib": 21892
+            },
+            "first": {
+              "VmRSS_kib": 21612,
+              "VmHWM_kib": 21892,
+              "ru_maxrss_kib": 21892
+            },
+            "final": {
+              "VmRSS_kib": 21612,
+              "VmHWM_kib": 21892,
+              "ru_maxrss_kib": 21892
+            }
+          }
+        ],
+        "median_kib": {
+          "startup": {
+            "VmRSS_kib": 21220,
+            "VmHWM_kib": 21888,
+            "ru_maxrss_kib": 21888
+          },
+          "before": {
+            "VmRSS_kib": 21220,
+            "VmHWM_kib": 21888,
+            "ru_maxrss_kib": 21888
+          },
+          "first": {
+            "VmRSS_kib": 21564,
+            "VmHWM_kib": 21888,
+            "ru_maxrss_kib": 21888
+          },
+          "final": {
+            "VmRSS_kib": 21564,
+            "VmHWM_kib": 21888,
+            "ru_maxrss_kib": 21888
+          }
+        }
+      },
+      "orjson": {
+        "samples": [
+          {
+            "startup": {
+              "VmRSS_kib": 20404,
+              "VmHWM_kib": 20404,
+              "ru_maxrss_kib": 20404
+            },
+            "before": {
+              "VmRSS_kib": 20404,
+              "VmHWM_kib": 20404,
+              "ru_maxrss_kib": 20404
+            },
+            "first": {
+              "VmRSS_kib": 20728,
+              "VmHWM_kib": 20728,
+              "ru_maxrss_kib": 20728
+            },
+            "final": {
+              "VmRSS_kib": 20728,
+              "VmHWM_kib": 20728,
+              "ru_maxrss_kib": 20728
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 20408,
+              "VmHWM_kib": 20408,
+              "ru_maxrss_kib": 20408
+            },
+            "before": {
+              "VmRSS_kib": 20408,
+              "VmHWM_kib": 20408,
+              "ru_maxrss_kib": 20408
+            },
+            "first": {
+              "VmRSS_kib": 20700,
+              "VmHWM_kib": 20700,
+              "ru_maxrss_kib": 20700
+            },
+            "final": {
+              "VmRSS_kib": 20700,
+              "VmHWM_kib": 20700,
+              "ru_maxrss_kib": 20700
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 20400,
+              "VmHWM_kib": 20400,
+              "ru_maxrss_kib": 20400
+            },
+            "before": {
+              "VmRSS_kib": 20400,
+              "VmHWM_kib": 20400,
+              "ru_maxrss_kib": 20400
+            },
+            "first": {
+              "VmRSS_kib": 20724,
+              "VmHWM_kib": 20724,
+              "ru_maxrss_kib": 20724
+            },
+            "final": {
+              "VmRSS_kib": 20724,
+              "VmHWM_kib": 20724,
+              "ru_maxrss_kib": 20724
+            }
+          }
+        ],
+        "median_kib": {
+          "startup": {
+            "VmRSS_kib": 20404,
+            "VmHWM_kib": 20404,
+            "ru_maxrss_kib": 20404
+          },
+          "before": {
+            "VmRSS_kib": 20404,
+            "VmHWM_kib": 20404,
+            "ru_maxrss_kib": 20404
+          },
+          "first": {
+            "VmRSS_kib": 20724,
+            "VmHWM_kib": 20724,
+            "ru_maxrss_kib": 20724
+          },
+          "final": {
+            "VmRSS_kib": 20724,
+            "VmHWM_kib": 20724,
+            "ru_maxrss_kib": 20724
+          }
+        }
+      }
+    },
+    "loads_large": {
+      "original": {
+        "samples": [
+          {
+            "startup": {
+              "VmRSS_kib": 21212,
+              "VmHWM_kib": 21852,
+              "ru_maxrss_kib": 21852
+            },
+            "before": {
+              "VmRSS_kib": 26884,
+              "VmHWM_kib": 26884,
+              "ru_maxrss_kib": 26884
+            },
+            "first": {
+              "VmRSS_kib": 29356,
+              "VmHWM_kib": 58888,
+              "ru_maxrss_kib": 58888
+            },
+            "final": {
+              "VmRSS_kib": 31404,
+              "VmHWM_kib": 58920,
+              "ru_maxrss_kib": 58920
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21072,
+              "VmHWM_kib": 21712,
+              "ru_maxrss_kib": 21712
+            },
+            "before": {
+              "VmRSS_kib": 26744,
+              "VmHWM_kib": 26744,
+              "ru_maxrss_kib": 26744
+            },
+            "first": {
+              "VmRSS_kib": 28668,
+              "VmHWM_kib": 58748,
+              "ru_maxrss_kib": 58748
+            },
+            "final": {
+              "VmRSS_kib": 30684,
+              "VmHWM_kib": 58760,
+              "ru_maxrss_kib": 58760
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21060,
+              "VmHWM_kib": 21700,
+              "ru_maxrss_kib": 21700
+            },
+            "before": {
+              "VmRSS_kib": 26536,
+              "VmHWM_kib": 26536,
+              "ru_maxrss_kib": 26536
+            },
+            "first": {
+              "VmRSS_kib": 28656,
+              "VmHWM_kib": 58804,
+              "ru_maxrss_kib": 58804
+            },
+            "final": {
+              "VmRSS_kib": 30672,
+              "VmHWM_kib": 58804,
+              "ru_maxrss_kib": 58804
+            }
+          }
+        ],
+        "median_kib": {
+          "startup": {
+            "VmRSS_kib": 21072,
+            "VmHWM_kib": 21712,
+            "ru_maxrss_kib": 21712
+          },
+          "before": {
+            "VmRSS_kib": 26744,
+            "VmHWM_kib": 26744,
+            "ru_maxrss_kib": 26744
+          },
+          "first": {
+            "VmRSS_kib": 28668,
+            "VmHWM_kib": 58804,
+            "ru_maxrss_kib": 58804
+          },
+          "final": {
+            "VmRSS_kib": 30684,
+            "VmHWM_kib": 58804,
+            "ru_maxrss_kib": 58804
+          }
+        }
+      },
+      "selected": {
+        "samples": [
+          {
+            "startup": {
+              "VmRSS_kib": 21220,
+              "VmHWM_kib": 21888,
+              "ru_maxrss_kib": 21888
+            },
+            "before": {
+              "VmRSS_kib": 26892,
+              "VmHWM_kib": 26892,
+              "ru_maxrss_kib": 26892
+            },
+            "first": {
+              "VmRSS_kib": 28820,
+              "VmHWM_kib": 58896,
+              "ru_maxrss_kib": 58896
+            },
+            "final": {
+              "VmRSS_kib": 30840,
+              "VmHWM_kib": 58912,
+              "ru_maxrss_kib": 58912
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21180,
+              "VmHWM_kib": 21820,
+              "ru_maxrss_kib": 21820
+            },
+            "before": {
+              "VmRSS_kib": 26656,
+              "VmHWM_kib": 26656,
+              "ru_maxrss_kib": 26656
+            },
+            "first": {
+              "VmRSS_kib": 28832,
+              "VmHWM_kib": 58984,
+              "ru_maxrss_kib": 58984
+            },
+            "final": {
+              "VmRSS_kib": 30852,
+              "VmHWM_kib": 58984,
+              "ru_maxrss_kib": 58984
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21044,
+              "VmHWM_kib": 21736,
+              "ru_maxrss_kib": 21736
+            },
+            "before": {
+              "VmRSS_kib": 26716,
+              "VmHWM_kib": 26716,
+              "ru_maxrss_kib": 26716
+            },
+            "first": {
+              "VmRSS_kib": 28696,
+              "VmHWM_kib": 58780,
+              "ru_maxrss_kib": 58780
+            },
+            "final": {
+              "VmRSS_kib": 30716,
+              "VmHWM_kib": 58788,
+              "ru_maxrss_kib": 58788
+            }
+          }
+        ],
+        "median_kib": {
+          "startup": {
+            "VmRSS_kib": 21180,
+            "VmHWM_kib": 21820,
+            "ru_maxrss_kib": 21820
+          },
+          "before": {
+            "VmRSS_kib": 26716,
+            "VmHWM_kib": 26716,
+            "ru_maxrss_kib": 26716
+          },
+          "first": {
+            "VmRSS_kib": 28820,
+            "VmHWM_kib": 58896,
+            "ru_maxrss_kib": 58896
+          },
+          "final": {
+            "VmRSS_kib": 30840,
+            "VmHWM_kib": 58912,
+            "ru_maxrss_kib": 58912
+          }
+        }
+      },
+      "orjson": {
+        "samples": [
+          {
+            "startup": {
+              "VmRSS_kib": 20408,
+              "VmHWM_kib": 20408,
+              "ru_maxrss_kib": 20408
+            },
+            "before": {
+              "VmRSS_kib": 26080,
+              "VmHWM_kib": 26080,
+              "ru_maxrss_kib": 26080
+            },
+            "first": {
+              "VmRSS_kib": 27848,
+              "VmHWM_kib": 77504,
+              "ru_maxrss_kib": 77504
+            },
+            "final": {
+              "VmRSS_kib": 29864,
+              "VmHWM_kib": 77656,
+              "ru_maxrss_kib": 77656
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 20356,
+              "VmHWM_kib": 20356,
+              "ru_maxrss_kib": 20356
+            },
+            "before": {
+              "VmRSS_kib": 25764,
+              "VmHWM_kib": 25764,
+              "ru_maxrss_kib": 25764
+            },
+            "first": {
+              "VmRSS_kib": 27824,
+              "VmHWM_kib": 77220,
+              "ru_maxrss_kib": 77220
+            },
+            "final": {
+              "VmRSS_kib": 29840,
+              "VmHWM_kib": 77368,
+              "ru_maxrss_kib": 77368
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 20356,
+              "VmHWM_kib": 20356,
+              "ru_maxrss_kib": 20356
+            },
+            "before": {
+              "VmRSS_kib": 25764,
+              "VmHWM_kib": 25764,
+              "ru_maxrss_kib": 25764
+            },
+            "first": {
+              "VmRSS_kib": 27824,
+              "VmHWM_kib": 77220,
+              "ru_maxrss_kib": 77220
+            },
+            "final": {
+              "VmRSS_kib": 29840,
+              "VmHWM_kib": 77220,
+              "ru_maxrss_kib": 77220
+            }
+          }
+        ],
+        "median_kib": {
+          "startup": {
+            "VmRSS_kib": 20356,
+            "VmHWM_kib": 20356,
+            "ru_maxrss_kib": 20356
+          },
+          "before": {
+            "VmRSS_kib": 25764,
+            "VmHWM_kib": 25764,
+            "ru_maxrss_kib": 25764
+          },
+          "first": {
+            "VmRSS_kib": 27824,
+            "VmHWM_kib": 77220,
+            "ru_maxrss_kib": 77220
+          },
+          "final": {
+            "VmRSS_kib": 29840,
+            "VmHWM_kib": 77368,
+            "ru_maxrss_kib": 77368
+          }
+        }
+      }
+    },
+    "dumps_medium": {
+      "original": {
+        "samples": [
+          {
+            "startup": {
+              "VmRSS_kib": 21112,
+              "VmHWM_kib": 21804,
+              "ru_maxrss_kib": 21804
+            },
+            "before": {
+              "VmRSS_kib": 21376,
+              "VmHWM_kib": 21804,
+              "ru_maxrss_kib": 21804
+            },
+            "first": {
+              "VmRSS_kib": 21376,
+              "VmHWM_kib": 21804,
+              "ru_maxrss_kib": 21804
+            },
+            "final": {
+              "VmRSS_kib": 21376,
+              "VmHWM_kib": 21804,
+              "ru_maxrss_kib": 21804
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21100,
+              "VmHWM_kib": 21768,
+              "ru_maxrss_kib": 21768
+            },
+            "before": {
+              "VmRSS_kib": 21364,
+              "VmHWM_kib": 21768,
+              "ru_maxrss_kib": 21768
+            },
+            "first": {
+              "VmRSS_kib": 21364,
+              "VmHWM_kib": 21768,
+              "ru_maxrss_kib": 21768
+            },
+            "final": {
+              "VmRSS_kib": 21364,
+              "VmHWM_kib": 21768,
+              "ru_maxrss_kib": 21768
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21172,
+              "VmHWM_kib": 21808,
+              "ru_maxrss_kib": 21808
+            },
+            "before": {
+              "VmRSS_kib": 21436,
+              "VmHWM_kib": 21808,
+              "ru_maxrss_kib": 21808
+            },
+            "first": {
+              "VmRSS_kib": 21436,
+              "VmHWM_kib": 21808,
+              "ru_maxrss_kib": 21808
+            },
+            "final": {
+              "VmRSS_kib": 21436,
+              "VmHWM_kib": 21808,
+              "ru_maxrss_kib": 21808
+            }
+          }
+        ],
+        "median_kib": {
+          "startup": {
+            "VmRSS_kib": 21112,
+            "VmHWM_kib": 21804,
+            "ru_maxrss_kib": 21804
+          },
+          "before": {
+            "VmRSS_kib": 21376,
+            "VmHWM_kib": 21804,
+            "ru_maxrss_kib": 21804
+          },
+          "first": {
+            "VmRSS_kib": 21376,
+            "VmHWM_kib": 21804,
+            "ru_maxrss_kib": 21804
+          },
+          "final": {
+            "VmRSS_kib": 21376,
+            "VmHWM_kib": 21804,
+            "ru_maxrss_kib": 21804
+          }
+        }
+      },
+      "selected": {
+        "samples": [
+          {
+            "startup": {
+              "VmRSS_kib": 21136,
+              "VmHWM_kib": 21776,
+              "ru_maxrss_kib": 21776
+            },
+            "before": {
+              "VmRSS_kib": 21400,
+              "VmHWM_kib": 21776,
+              "ru_maxrss_kib": 21776
+            },
+            "first": {
+              "VmRSS_kib": 21400,
+              "VmHWM_kib": 21776,
+              "ru_maxrss_kib": 21776
+            },
+            "final": {
+              "VmRSS_kib": 21400,
+              "VmHWM_kib": 21776,
+              "ru_maxrss_kib": 21776
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21216,
+              "VmHWM_kib": 21884,
+              "ru_maxrss_kib": 21884
+            },
+            "before": {
+              "VmRSS_kib": 21480,
+              "VmHWM_kib": 21884,
+              "ru_maxrss_kib": 21884
+            },
+            "first": {
+              "VmRSS_kib": 21480,
+              "VmHWM_kib": 21884,
+              "ru_maxrss_kib": 21884
+            },
+            "final": {
+              "VmRSS_kib": 21480,
+              "VmHWM_kib": 21884,
+              "ru_maxrss_kib": 21884
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21044,
+              "VmHWM_kib": 21736,
+              "ru_maxrss_kib": 21736
+            },
+            "before": {
+              "VmRSS_kib": 21308,
+              "VmHWM_kib": 21736,
+              "ru_maxrss_kib": 21736
+            },
+            "first": {
+              "VmRSS_kib": 21308,
+              "VmHWM_kib": 21736,
+              "ru_maxrss_kib": 21736
+            },
+            "final": {
+              "VmRSS_kib": 21308,
+              "VmHWM_kib": 21736,
+              "ru_maxrss_kib": 21736
+            }
+          }
+        ],
+        "median_kib": {
+          "startup": {
+            "VmRSS_kib": 21136,
+            "VmHWM_kib": 21776,
+            "ru_maxrss_kib": 21776
+          },
+          "before": {
+            "VmRSS_kib": 21400,
+            "VmHWM_kib": 21776,
+            "ru_maxrss_kib": 21776
+          },
+          "first": {
+            "VmRSS_kib": 21400,
+            "VmHWM_kib": 21776,
+            "ru_maxrss_kib": 21776
+          },
+          "final": {
+            "VmRSS_kib": 21400,
+            "VmHWM_kib": 21776,
+            "ru_maxrss_kib": 21776
+          }
+        }
+      },
+      "orjson": {
+        "samples": [
+          {
+            "startup": {
+              "VmRSS_kib": 20376,
+              "VmHWM_kib": 20376,
+              "ru_maxrss_kib": 20376
+            },
+            "before": {
+              "VmRSS_kib": 20640,
+              "VmHWM_kib": 20640,
+              "ru_maxrss_kib": 20640
+            },
+            "first": {
+              "VmRSS_kib": 20640,
+              "VmHWM_kib": 20640,
+              "ru_maxrss_kib": 20640
+            },
+            "final": {
+              "VmRSS_kib": 20640,
+              "VmHWM_kib": 20640,
+              "ru_maxrss_kib": 20640
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 20468,
+              "VmHWM_kib": 20468,
+              "ru_maxrss_kib": 20468
+            },
+            "before": {
+              "VmRSS_kib": 20732,
+              "VmHWM_kib": 20732,
+              "ru_maxrss_kib": 20732
+            },
+            "first": {
+              "VmRSS_kib": 20732,
+              "VmHWM_kib": 20732,
+              "ru_maxrss_kib": 20732
+            },
+            "final": {
+              "VmRSS_kib": 20732,
+              "VmHWM_kib": 20732,
+              "ru_maxrss_kib": 20732
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 20368,
+              "VmHWM_kib": 20368,
+              "ru_maxrss_kib": 20368
+            },
+            "before": {
+              "VmRSS_kib": 20632,
+              "VmHWM_kib": 20632,
+              "ru_maxrss_kib": 20632
+            },
+            "first": {
+              "VmRSS_kib": 20632,
+              "VmHWM_kib": 20632,
+              "ru_maxrss_kib": 20632
+            },
+            "final": {
+              "VmRSS_kib": 20632,
+              "VmHWM_kib": 20632,
+              "ru_maxrss_kib": 20632
+            }
+          }
+        ],
+        "median_kib": {
+          "startup": {
+            "VmRSS_kib": 20376,
+            "VmHWM_kib": 20376,
+            "ru_maxrss_kib": 20376
+          },
+          "before": {
+            "VmRSS_kib": 20640,
+            "VmHWM_kib": 20640,
+            "ru_maxrss_kib": 20640
+          },
+          "first": {
+            "VmRSS_kib": 20640,
+            "VmHWM_kib": 20640,
+            "ru_maxrss_kib": 20640
+          },
+          "final": {
+            "VmRSS_kib": 20640,
+            "VmHWM_kib": 20640,
+            "ru_maxrss_kib": 20640
+          }
+        }
+      }
+    },
+    "fragments_1000": {
+      "original": {
+        "samples": [
+          {
+            "startup": {
+              "VmRSS_kib": 21144,
+              "VmHWM_kib": 21784,
+              "ru_maxrss_kib": 21784
+            },
+            "before": {
+              "VmRSS_kib": 21144,
+              "VmHWM_kib": 21784,
+              "ru_maxrss_kib": 21784
+            },
+            "first": {
+              "VmRSS_kib": 21144,
+              "VmHWM_kib": 21784,
+              "ru_maxrss_kib": 21784
+            },
+            "final": {
+              "VmRSS_kib": 21144,
+              "VmHWM_kib": 21784,
+              "ru_maxrss_kib": 21784
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21060,
+              "VmHWM_kib": 21700,
+              "ru_maxrss_kib": 21700
+            },
+            "before": {
+              "VmRSS_kib": 21060,
+              "VmHWM_kib": 21700,
+              "ru_maxrss_kib": 21700
+            },
+            "first": {
+              "VmRSS_kib": 21060,
+              "VmHWM_kib": 21700,
+              "ru_maxrss_kib": 21700
+            },
+            "final": {
+              "VmRSS_kib": 21060,
+              "VmHWM_kib": 21700,
+              "ru_maxrss_kib": 21700
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21168,
+              "VmHWM_kib": 21784,
+              "ru_maxrss_kib": 21784
+            },
+            "before": {
+              "VmRSS_kib": 21168,
+              "VmHWM_kib": 21784,
+              "ru_maxrss_kib": 21784
+            },
+            "first": {
+              "VmRSS_kib": 21168,
+              "VmHWM_kib": 21784,
+              "ru_maxrss_kib": 21784
+            },
+            "final": {
+              "VmRSS_kib": 21168,
+              "VmHWM_kib": 21784,
+              "ru_maxrss_kib": 21784
+            }
+          }
+        ],
+        "median_kib": {
+          "startup": {
+            "VmRSS_kib": 21144,
+            "VmHWM_kib": 21784,
+            "ru_maxrss_kib": 21784
+          },
+          "before": {
+            "VmRSS_kib": 21144,
+            "VmHWM_kib": 21784,
+            "ru_maxrss_kib": 21784
+          },
+          "first": {
+            "VmRSS_kib": 21144,
+            "VmHWM_kib": 21784,
+            "ru_maxrss_kib": 21784
+          },
+          "final": {
+            "VmRSS_kib": 21144,
+            "VmHWM_kib": 21784,
+            "ru_maxrss_kib": 21784
+          }
+        }
+      },
+      "selected": {
+        "samples": [
+          {
+            "startup": {
+              "VmRSS_kib": 21216,
+              "VmHWM_kib": 21884,
+              "ru_maxrss_kib": 21884
+            },
+            "before": {
+              "VmRSS_kib": 21216,
+              "VmHWM_kib": 21884,
+              "ru_maxrss_kib": 21884
+            },
+            "first": {
+              "VmRSS_kib": 21216,
+              "VmHWM_kib": 21884,
+              "ru_maxrss_kib": 21884
+            },
+            "final": {
+              "VmRSS_kib": 21216,
+              "VmHWM_kib": 21884,
+              "ru_maxrss_kib": 21884
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21220,
+              "VmHWM_kib": 21888,
+              "ru_maxrss_kib": 21888
+            },
+            "before": {
+              "VmRSS_kib": 21220,
+              "VmHWM_kib": 21888,
+              "ru_maxrss_kib": 21888
+            },
+            "first": {
+              "VmRSS_kib": 21220,
+              "VmHWM_kib": 21888,
+              "ru_maxrss_kib": 21888
+            },
+            "final": {
+              "VmRSS_kib": 21220,
+              "VmHWM_kib": 21888,
+              "ru_maxrss_kib": 21888
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21132,
+              "VmHWM_kib": 21772,
+              "ru_maxrss_kib": 21772
+            },
+            "before": {
+              "VmRSS_kib": 21132,
+              "VmHWM_kib": 21772,
+              "ru_maxrss_kib": 21772
+            },
+            "first": {
+              "VmRSS_kib": 21132,
+              "VmHWM_kib": 21772,
+              "ru_maxrss_kib": 21772
+            },
+            "final": {
+              "VmRSS_kib": 21132,
+              "VmHWM_kib": 21772,
+              "ru_maxrss_kib": 21772
+            }
+          }
+        ],
+        "median_kib": {
+          "startup": {
+            "VmRSS_kib": 21216,
+            "VmHWM_kib": 21884,
+            "ru_maxrss_kib": 21884
+          },
+          "before": {
+            "VmRSS_kib": 21216,
+            "VmHWM_kib": 21884,
+            "ru_maxrss_kib": 21884
+          },
+          "first": {
+            "VmRSS_kib": 21216,
+            "VmHWM_kib": 21884,
+            "ru_maxrss_kib": 21884
+          },
+          "final": {
+            "VmRSS_kib": 21216,
+            "VmHWM_kib": 21884,
+            "ru_maxrss_kib": 21884
+          }
+        }
+      },
+      "orjson": {
+        "samples": [
+          {
+            "startup": {
+              "VmRSS_kib": 20416,
+              "VmHWM_kib": 20416,
+              "ru_maxrss_kib": 20416
+            },
+            "before": {
+              "VmRSS_kib": 20416,
+              "VmHWM_kib": 20416,
+              "ru_maxrss_kib": 20416
+            },
+            "first": {
+              "VmRSS_kib": 20416,
+              "VmHWM_kib": 20416,
+              "ru_maxrss_kib": 20416
+            },
+            "final": {
+              "VmRSS_kib": 20416,
+              "VmHWM_kib": 20416,
+              "ru_maxrss_kib": 20416
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 20416,
+              "VmHWM_kib": 20416,
+              "ru_maxrss_kib": 20416
+            },
+            "before": {
+              "VmRSS_kib": 20416,
+              "VmHWM_kib": 20416,
+              "ru_maxrss_kib": 20416
+            },
+            "first": {
+              "VmRSS_kib": 20416,
+              "VmHWM_kib": 20416,
+              "ru_maxrss_kib": 20416
+            },
+            "final": {
+              "VmRSS_kib": 20416,
+              "VmHWM_kib": 20416,
+              "ru_maxrss_kib": 20416
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 20432,
+              "VmHWM_kib": 20432,
+              "ru_maxrss_kib": 20432
+            },
+            "before": {
+              "VmRSS_kib": 20432,
+              "VmHWM_kib": 20432,
+              "ru_maxrss_kib": 20432
+            },
+            "first": {
+              "VmRSS_kib": 20432,
+              "VmHWM_kib": 20432,
+              "ru_maxrss_kib": 20432
+            },
+            "final": {
+              "VmRSS_kib": 20432,
+              "VmHWM_kib": 20432,
+              "ru_maxrss_kib": 20432
+            }
+          }
+        ],
+        "median_kib": {
+          "startup": {
+            "VmRSS_kib": 20416,
+            "VmHWM_kib": 20416,
+            "ru_maxrss_kib": 20416
+          },
+          "before": {
+            "VmRSS_kib": 20416,
+            "VmHWM_kib": 20416,
+            "ru_maxrss_kib": 20416
+          },
+          "first": {
+            "VmRSS_kib": 20416,
+            "VmHWM_kib": 20416,
+            "ru_maxrss_kib": 20416
+          },
+          "final": {
+            "VmRSS_kib": 20416,
+            "VmHWM_kib": 20416,
+            "ru_maxrss_kib": 20416
+          }
+        }
+      }
+    },
+    "dataclasses_1000": {
+      "original": {
+        "samples": [
+          {
+            "startup": {
+              "VmRSS_kib": 21092,
+              "VmHWM_kib": 21756,
+              "ru_maxrss_kib": 21756
+            },
+            "before": {
+              "VmRSS_kib": 21092,
+              "VmHWM_kib": 21756,
+              "ru_maxrss_kib": 21756
+            },
+            "first": {
+              "VmRSS_kib": 21476,
+              "VmHWM_kib": 21756,
+              "ru_maxrss_kib": 21756
+            },
+            "final": {
+              "VmRSS_kib": 21476,
+              "VmHWM_kib": 21756,
+              "ru_maxrss_kib": 21756
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21208,
+              "VmHWM_kib": 21848,
+              "ru_maxrss_kib": 21848
+            },
+            "before": {
+              "VmRSS_kib": 21208,
+              "VmHWM_kib": 21848,
+              "ru_maxrss_kib": 21848
+            },
+            "first": {
+              "VmRSS_kib": 21532,
+              "VmHWM_kib": 21848,
+              "ru_maxrss_kib": 21848
+            },
+            "final": {
+              "VmRSS_kib": 21532,
+              "VmHWM_kib": 21848,
+              "ru_maxrss_kib": 21848
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21124,
+              "VmHWM_kib": 21764,
+              "ru_maxrss_kib": 21764
+            },
+            "before": {
+              "VmRSS_kib": 21124,
+              "VmHWM_kib": 21764,
+              "ru_maxrss_kib": 21764
+            },
+            "first": {
+              "VmRSS_kib": 21448,
+              "VmHWM_kib": 21764,
+              "ru_maxrss_kib": 21764
+            },
+            "final": {
+              "VmRSS_kib": 21448,
+              "VmHWM_kib": 21764,
+              "ru_maxrss_kib": 21764
+            }
+          }
+        ],
+        "median_kib": {
+          "startup": {
+            "VmRSS_kib": 21124,
+            "VmHWM_kib": 21764,
+            "ru_maxrss_kib": 21764
+          },
+          "before": {
+            "VmRSS_kib": 21124,
+            "VmHWM_kib": 21764,
+            "ru_maxrss_kib": 21764
+          },
+          "first": {
+            "VmRSS_kib": 21476,
+            "VmHWM_kib": 21764,
+            "ru_maxrss_kib": 21764
+          },
+          "final": {
+            "VmRSS_kib": 21476,
+            "VmHWM_kib": 21764,
+            "ru_maxrss_kib": 21764
+          }
+        }
+      },
+      "selected": {
+        "samples": [
+          {
+            "startup": {
+              "VmRSS_kib": 21136,
+              "VmHWM_kib": 21800,
+              "ru_maxrss_kib": 21800
+            },
+            "before": {
+              "VmRSS_kib": 21136,
+              "VmHWM_kib": 21800,
+              "ru_maxrss_kib": 21800
+            },
+            "first": {
+              "VmRSS_kib": 21520,
+              "VmHWM_kib": 21800,
+              "ru_maxrss_kib": 21800
+            },
+            "final": {
+              "VmRSS_kib": 21520,
+              "VmHWM_kib": 21800,
+              "ru_maxrss_kib": 21800
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21220,
+              "VmHWM_kib": 21888,
+              "ru_maxrss_kib": 21888
+            },
+            "before": {
+              "VmRSS_kib": 21220,
+              "VmHWM_kib": 21888,
+              "ru_maxrss_kib": 21888
+            },
+            "first": {
+              "VmRSS_kib": 21544,
+              "VmHWM_kib": 21888,
+              "ru_maxrss_kib": 21888
+            },
+            "final": {
+              "VmRSS_kib": 21544,
+              "VmHWM_kib": 21888,
+              "ru_maxrss_kib": 21888
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21200,
+              "VmHWM_kib": 21840,
+              "ru_maxrss_kib": 21840
+            },
+            "before": {
+              "VmRSS_kib": 21200,
+              "VmHWM_kib": 21840,
+              "ru_maxrss_kib": 21840
+            },
+            "first": {
+              "VmRSS_kib": 21464,
+              "VmHWM_kib": 21840,
+              "ru_maxrss_kib": 21840
+            },
+            "final": {
+              "VmRSS_kib": 21464,
+              "VmHWM_kib": 21840,
+              "ru_maxrss_kib": 21840
+            }
+          }
+        ],
+        "median_kib": {
+          "startup": {
+            "VmRSS_kib": 21200,
+            "VmHWM_kib": 21840,
+            "ru_maxrss_kib": 21840
+          },
+          "before": {
+            "VmRSS_kib": 21200,
+            "VmHWM_kib": 21840,
+            "ru_maxrss_kib": 21840
+          },
+          "first": {
+            "VmRSS_kib": 21520,
+            "VmHWM_kib": 21840,
+            "ru_maxrss_kib": 21840
+          },
+          "final": {
+            "VmRSS_kib": 21520,
+            "VmHWM_kib": 21840,
+            "ru_maxrss_kib": 21840
+          }
+        }
+      },
+      "orjson": {
+        "samples": [
+          {
+            "startup": {
+              "VmRSS_kib": 20384,
+              "VmHWM_kib": 20384,
+              "ru_maxrss_kib": 20384
+            },
+            "before": {
+              "VmRSS_kib": 20384,
+              "VmHWM_kib": 20384,
+              "ru_maxrss_kib": 20384
+            },
+            "first": {
+              "VmRSS_kib": 20708,
+              "VmHWM_kib": 20708,
+              "ru_maxrss_kib": 20708
+            },
+            "final": {
+              "VmRSS_kib": 20708,
+              "VmHWM_kib": 20708,
+              "ru_maxrss_kib": 20708
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 20416,
+              "VmHWM_kib": 20416,
+              "ru_maxrss_kib": 20416
+            },
+            "before": {
+              "VmRSS_kib": 20416,
+              "VmHWM_kib": 20416,
+              "ru_maxrss_kib": 20416
+            },
+            "first": {
+              "VmRSS_kib": 20740,
+              "VmHWM_kib": 20740,
+              "ru_maxrss_kib": 20740
+            },
+            "final": {
+              "VmRSS_kib": 20740,
+              "VmHWM_kib": 20740,
+              "ru_maxrss_kib": 20740
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 20460,
+              "VmHWM_kib": 20460,
+              "ru_maxrss_kib": 20460
+            },
+            "before": {
+              "VmRSS_kib": 20460,
+              "VmHWM_kib": 20460,
+              "ru_maxrss_kib": 20460
+            },
+            "first": {
+              "VmRSS_kib": 20784,
+              "VmHWM_kib": 20784,
+              "ru_maxrss_kib": 20784
+            },
+            "final": {
+              "VmRSS_kib": 20784,
+              "VmHWM_kib": 20784,
+              "ru_maxrss_kib": 20784
+            }
+          }
+        ],
+        "median_kib": {
+          "startup": {
+            "VmRSS_kib": 20416,
+            "VmHWM_kib": 20416,
+            "ru_maxrss_kib": 20416
+          },
+          "before": {
+            "VmRSS_kib": 20416,
+            "VmHWM_kib": 20416,
+            "ru_maxrss_kib": 20416
+          },
+          "first": {
+            "VmRSS_kib": 20740,
+            "VmHWM_kib": 20740,
+            "ru_maxrss_kib": 20740
+          },
+          "final": {
+            "VmRSS_kib": 20740,
+            "VmHWM_kib": 20740,
+            "ru_maxrss_kib": 20740
+          }
+        }
+      }
+    },
+    "numpy_float32": {
+      "original": {
+        "samples": [
+          {
+            "startup": {
+              "VmRSS_kib": 21156,
+              "VmHWM_kib": 21796,
+              "ru_maxrss_kib": 21796
+            },
+            "before": {
+              "VmRSS_kib": 36080,
+              "VmHWM_kib": 36080,
+              "ru_maxrss_kib": 36080
+            },
+            "first": {
+              "VmRSS_kib": 36516,
+              "VmHWM_kib": 38252,
+              "ru_maxrss_kib": 38252
+            },
+            "final": {
+              "VmRSS_kib": 36516,
+              "VmHWM_kib": 38360,
+              "ru_maxrss_kib": 38360
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21064,
+              "VmHWM_kib": 21704,
+              "ru_maxrss_kib": 21704
+            },
+            "before": {
+              "VmRSS_kib": 36132,
+              "VmHWM_kib": 36132,
+              "ru_maxrss_kib": 36132
+            },
+            "first": {
+              "VmRSS_kib": 36704,
+              "VmHWM_kib": 38424,
+              "ru_maxrss_kib": 38424
+            },
+            "final": {
+              "VmRSS_kib": 36704,
+              "VmHWM_kib": 38548,
+              "ru_maxrss_kib": 38548
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21120,
+              "VmHWM_kib": 21812,
+              "ru_maxrss_kib": 21812
+            },
+            "before": {
+              "VmRSS_kib": 36072,
+              "VmHWM_kib": 36072,
+              "ru_maxrss_kib": 36072
+            },
+            "first": {
+              "VmRSS_kib": 36516,
+              "VmHWM_kib": 38244,
+              "ru_maxrss_kib": 38244
+            },
+            "final": {
+              "VmRSS_kib": 36516,
+              "VmHWM_kib": 38360,
+              "ru_maxrss_kib": 38360
+            }
+          }
+        ],
+        "median_kib": {
+          "startup": {
+            "VmRSS_kib": 21120,
+            "VmHWM_kib": 21796,
+            "ru_maxrss_kib": 21796
+          },
+          "before": {
+            "VmRSS_kib": 36080,
+            "VmHWM_kib": 36080,
+            "ru_maxrss_kib": 36080
+          },
+          "first": {
+            "VmRSS_kib": 36516,
+            "VmHWM_kib": 38252,
+            "ru_maxrss_kib": 38252
+          },
+          "final": {
+            "VmRSS_kib": 36516,
+            "VmHWM_kib": 38360,
+            "ru_maxrss_kib": 38360
+          }
+        }
+      },
+      "selected": {
+        "samples": [
+          {
+            "startup": {
+              "VmRSS_kib": 21220,
+              "VmHWM_kib": 21888,
+              "ru_maxrss_kib": 21888
+            },
+            "before": {
+              "VmRSS_kib": 35944,
+              "VmHWM_kib": 35944,
+              "ru_maxrss_kib": 35944
+            },
+            "first": {
+              "VmRSS_kib": 36696,
+              "VmHWM_kib": 38500,
+              "ru_maxrss_kib": 38500
+            },
+            "final": {
+              "VmRSS_kib": 36696,
+              "VmHWM_kib": 38540,
+              "ru_maxrss_kib": 38540
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21148,
+              "VmHWM_kib": 21788,
+              "ru_maxrss_kib": 21788
+            },
+            "before": {
+              "VmRSS_kib": 36048,
+              "VmHWM_kib": 36048,
+              "ru_maxrss_kib": 36048
+            },
+            "first": {
+              "VmRSS_kib": 36800,
+              "VmHWM_kib": 38604,
+              "ru_maxrss_kib": 38604
+            },
+            "final": {
+              "VmRSS_kib": 36800,
+              "VmHWM_kib": 38644,
+              "ru_maxrss_kib": 38644
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21056,
+              "VmHWM_kib": 21696,
+              "ru_maxrss_kib": 21696
+            },
+            "before": {
+              "VmRSS_kib": 35948,
+              "VmHWM_kib": 35948,
+              "ru_maxrss_kib": 35948
+            },
+            "first": {
+              "VmRSS_kib": 36768,
+              "VmHWM_kib": 38564,
+              "ru_maxrss_kib": 38564
+            },
+            "final": {
+              "VmRSS_kib": 36768,
+              "VmHWM_kib": 38612,
+              "ru_maxrss_kib": 38612
+            }
+          }
+        ],
+        "median_kib": {
+          "startup": {
+            "VmRSS_kib": 21148,
+            "VmHWM_kib": 21788,
+            "ru_maxrss_kib": 21788
+          },
+          "before": {
+            "VmRSS_kib": 35948,
+            "VmHWM_kib": 35948,
+            "ru_maxrss_kib": 35948
+          },
+          "first": {
+            "VmRSS_kib": 36768,
+            "VmHWM_kib": 38564,
+            "ru_maxrss_kib": 38564
+          },
+          "final": {
+            "VmRSS_kib": 36768,
+            "VmHWM_kib": 38612,
+            "ru_maxrss_kib": 38612
+          }
+        }
+      },
+      "orjson": {
+        "samples": [
+          {
+            "startup": {
+              "VmRSS_kib": 20380,
+              "VmHWM_kib": 20380,
+              "ru_maxrss_kib": 20380
+            },
+            "before": {
+              "VmRSS_kib": 35260,
+              "VmHWM_kib": 35260,
+              "ru_maxrss_kib": 35260
+            },
+            "first": {
+              "VmRSS_kib": 36708,
+              "VmHWM_kib": 38464,
+              "ru_maxrss_kib": 38464
+            },
+            "final": {
+              "VmRSS_kib": 38552,
+              "VmHWM_kib": 38552,
+              "ru_maxrss_kib": 38552
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 20384,
+              "VmHWM_kib": 20384,
+              "ru_maxrss_kib": 20384
+            },
+            "before": {
+              "VmRSS_kib": 35264,
+              "VmHWM_kib": 35264,
+              "ru_maxrss_kib": 35264
+            },
+            "first": {
+              "VmRSS_kib": 36704,
+              "VmHWM_kib": 38460,
+              "ru_maxrss_kib": 38460
+            },
+            "final": {
+              "VmRSS_kib": 38548,
+              "VmHWM_kib": 38548,
+              "ru_maxrss_kib": 38548
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 20412,
+              "VmHWM_kib": 20412,
+              "ru_maxrss_kib": 20412
+            },
+            "before": {
+              "VmRSS_kib": 35332,
+              "VmHWM_kib": 35332,
+              "ru_maxrss_kib": 35332
+            },
+            "first": {
+              "VmRSS_kib": 36732,
+              "VmHWM_kib": 38488,
+              "ru_maxrss_kib": 38488
+            },
+            "final": {
+              "VmRSS_kib": 38576,
+              "VmHWM_kib": 38576,
+              "ru_maxrss_kib": 38576
+            }
+          }
+        ],
+        "median_kib": {
+          "startup": {
+            "VmRSS_kib": 20384,
+            "VmHWM_kib": 20384,
+            "ru_maxrss_kib": 20384
+          },
+          "before": {
+            "VmRSS_kib": 35264,
+            "VmHWM_kib": 35264,
+            "ru_maxrss_kib": 35264
+          },
+          "first": {
+            "VmRSS_kib": 36708,
+            "VmHWM_kib": 38464,
+            "ru_maxrss_kib": 38464
+          },
+          "final": {
+            "VmRSS_kib": 38552,
+            "VmHWM_kib": 38552,
+            "ru_maxrss_kib": 38552
+          }
+        }
+      }
+    },
+    "late_default": {
+      "original": {
+        "samples": [
+          {
+            "startup": {
+              "VmRSS_kib": 21164,
+              "VmHWM_kib": 21804,
+              "ru_maxrss_kib": 21804
+            },
+            "before": {
+              "VmRSS_kib": 21164,
+              "VmHWM_kib": 21804,
+              "ru_maxrss_kib": 21804
+            },
+            "first": {
+              "VmRSS_kib": 22228,
+              "VmHWM_kib": 64012,
+              "ru_maxrss_kib": 64012
+            },
+            "final": {
+              "VmRSS_kib": 42412,
+              "VmHWM_kib": 64216,
+              "ru_maxrss_kib": 64216
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21060,
+              "VmHWM_kib": 21700,
+              "ru_maxrss_kib": 21700
+            },
+            "before": {
+              "VmRSS_kib": 21060,
+              "VmHWM_kib": 21700,
+              "ru_maxrss_kib": 21700
+            },
+            "first": {
+              "VmRSS_kib": 22124,
+              "VmHWM_kib": 63644,
+              "ru_maxrss_kib": 63644
+            },
+            "final": {
+              "VmRSS_kib": 42160,
+              "VmHWM_kib": 63808,
+              "ru_maxrss_kib": 63808
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21072,
+              "VmHWM_kib": 21764,
+              "ru_maxrss_kib": 21764
+            },
+            "before": {
+              "VmRSS_kib": 21072,
+              "VmHWM_kib": 21764,
+              "ru_maxrss_kib": 21764
+            },
+            "first": {
+              "VmRSS_kib": 22144,
+              "VmHWM_kib": 63400,
+              "ru_maxrss_kib": 63400
+            },
+            "final": {
+              "VmRSS_kib": 41968,
+              "VmHWM_kib": 63400,
+              "ru_maxrss_kib": 63400
+            }
+          }
+        ],
+        "median_kib": {
+          "startup": {
+            "VmRSS_kib": 21072,
+            "VmHWM_kib": 21764,
+            "ru_maxrss_kib": 21764
+          },
+          "before": {
+            "VmRSS_kib": 21072,
+            "VmHWM_kib": 21764,
+            "ru_maxrss_kib": 21764
+          },
+          "first": {
+            "VmRSS_kib": 22144,
+            "VmHWM_kib": 63644,
+            "ru_maxrss_kib": 63644
+          },
+          "final": {
+            "VmRSS_kib": 42160,
+            "VmHWM_kib": 63808,
+            "ru_maxrss_kib": 63808
+          }
+        }
+      },
+      "selected": {
+        "samples": [
+          {
+            "startup": {
+              "VmRSS_kib": 21136,
+              "VmHWM_kib": 21776,
+              "ru_maxrss_kib": 21776
+            },
+            "before": {
+              "VmRSS_kib": 21136,
+              "VmHWM_kib": 21776,
+              "ru_maxrss_kib": 21776
+            },
+            "first": {
+              "VmRSS_kib": 22264,
+              "VmHWM_kib": 44076,
+              "ru_maxrss_kib": 44076
+            },
+            "final": {
+              "VmRSS_kib": 39812,
+              "VmHWM_kib": 61648,
+              "ru_maxrss_kib": 61648
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21048,
+              "VmHWM_kib": 21688,
+              "ru_maxrss_kib": 21688
+            },
+            "before": {
+              "VmRSS_kib": 21048,
+              "VmHWM_kib": 21688,
+              "ru_maxrss_kib": 21688
+            },
+            "first": {
+              "VmRSS_kib": 22164,
+              "VmHWM_kib": 43184,
+              "ru_maxrss_kib": 43184
+            },
+            "final": {
+              "VmRSS_kib": 37820,
+              "VmHWM_kib": 58820,
+              "ru_maxrss_kib": 58820
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 21040,
+              "VmHWM_kib": 21732,
+              "ru_maxrss_kib": 21732
+            },
+            "before": {
+              "VmRSS_kib": 21040,
+              "VmHWM_kib": 21732,
+              "ru_maxrss_kib": 21732
+            },
+            "first": {
+              "VmRSS_kib": 22156,
+              "VmHWM_kib": 42636,
+              "ru_maxrss_kib": 42636
+            },
+            "final": {
+              "VmRSS_kib": 39612,
+              "VmHWM_kib": 60108,
+              "ru_maxrss_kib": 60108
+            }
+          }
+        ],
+        "median_kib": {
+          "startup": {
+            "VmRSS_kib": 21048,
+            "VmHWM_kib": 21732,
+            "ru_maxrss_kib": 21732
+          },
+          "before": {
+            "VmRSS_kib": 21048,
+            "VmHWM_kib": 21732,
+            "ru_maxrss_kib": 21732
+          },
+          "first": {
+            "VmRSS_kib": 22164,
+            "VmHWM_kib": 43184,
+            "ru_maxrss_kib": 43184
+          },
+          "final": {
+            "VmRSS_kib": 39612,
+            "VmHWM_kib": 60108,
+            "ru_maxrss_kib": 60108
+          }
+        }
+      },
+      "orjson": {
+        "samples": [
+          {
+            "startup": {
+              "VmRSS_kib": 20488,
+              "VmHWM_kib": 20488,
+              "ru_maxrss_kib": 20488
+            },
+            "before": {
+              "VmRSS_kib": 20488,
+              "VmHWM_kib": 20488,
+              "ru_maxrss_kib": 20488
+            },
+            "first": {
+              "VmRSS_kib": 21524,
+              "VmHWM_kib": 41916,
+              "ru_maxrss_kib": 41916
+            },
+            "final": {
+              "VmRSS_kib": 21524,
+              "VmHWM_kib": 41980,
+              "ru_maxrss_kib": 41980
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 20488,
+              "VmHWM_kib": 20488,
+              "ru_maxrss_kib": 20488
+            },
+            "before": {
+              "VmRSS_kib": 20488,
+              "VmHWM_kib": 20488,
+              "ru_maxrss_kib": 20488
+            },
+            "first": {
+              "VmRSS_kib": 21520,
+              "VmHWM_kib": 41444,
+              "ru_maxrss_kib": 41444
+            },
+            "final": {
+              "VmRSS_kib": 21520,
+              "VmHWM_kib": 41508,
+              "ru_maxrss_kib": 41508
+            }
+          },
+          {
+            "startup": {
+              "VmRSS_kib": 20480,
+              "VmHWM_kib": 20480,
+              "ru_maxrss_kib": 20480
+            },
+            "before": {
+              "VmRSS_kib": 20480,
+              "VmHWM_kib": 20480,
+              "ru_maxrss_kib": 20480
+            },
+            "first": {
+              "VmRSS_kib": 21476,
+              "VmHWM_kib": 42656,
+              "ru_maxrss_kib": 42656
+            },
+            "final": {
+              "VmRSS_kib": 21476,
+              "VmHWM_kib": 42720,
+              "ru_maxrss_kib": 42720
+            }
+          }
+        ],
+        "median_kib": {
+          "startup": {
+            "VmRSS_kib": 20488,
+            "VmHWM_kib": 20488,
+            "ru_maxrss_kib": 20488
+          },
+          "before": {
+            "VmRSS_kib": 20488,
+            "VmHWM_kib": 20488,
+            "ru_maxrss_kib": 20488
+          },
+          "first": {
+            "VmRSS_kib": 21520,
+            "VmHWM_kib": 41916,
+            "ru_maxrss_kib": 41916
+          },
+          "final": {
+            "VmRSS_kib": 21520,
+            "VmHWM_kib": 41980,
+            "ru_maxrss_kib": 41980
+          }
+        }
+      }
+    }
+  },
+  "labels": {
+    "original": "PR #6",
+    "selected": "Selected build",
+    "orjson": "orjson 3.11.9"
+  },
+  "case_labels": {
+    "allocations": {
+      "loads_medium": "Decode 1,000 records",
+      "dumps_small": "Encode a small object",
+      "dumps_medium": "Encode 1,000 records",
+      "long_string": "Encode a long string",
+      "sorted_medium": "Encode 1,000 records, sorted keys",
+      "fragments_1000": "Encode 1,000 fragments",
+      "dataclasses_1000": "Encode 1,000 two-field dataclasses",
+      "numpy_float32": "Encode a 25,000 \u00d7 4 float32 array (100,000 values)",
+      "late_default": "Large output followed by a callback",
+      "loads_small_array_view": "Decode a small object from an array view",
+      "loads_small": "Decode a small object",
+      "loads_medium_array_view": "Decode 1,000 records from an array view",
+      "loads_long_string_array_view": "Decode a long string from an array view",
+      "loads_long_string": "Decode a long string"
+    },
+    "rss": {
+      "loads_medium": "Decode 1,000 records",
+      "loads_large": "Decode 100,000 records",
+      "dumps_medium": "Encode 1,000 records",
+      "fragments_1000": "Encode 1,000 fragments",
+      "dataclasses_1000": "Encode 1,000 two-field dataclasses",
+      "numpy_float32": "Encode a 25,000 \u00d7 4 float32 array (100,000 values)",
+      "late_default": "Large output followed by a callback"
+    }
+  },
+  "identities": {
+    "builds": {
+      "original": {
+        "name": "jsonmodem",
+        "version": "0.0.0-alpha.0",
+        "runtime_revision": "b889f4cd0323b2f60729eb61c35429fbe611fd47",
+        "runtime_source_sha256": "629ffb23baff62497b8d2c143b4ad6ac37e97043fcfc1143602cf47be72676c6",
+        "native_sha256": "399121185efd08c5e8d3e6c23472fb191b8fc15ef95a909a1bc76ba5b6771a65",
+        "publication_revision": "d58069ec7aad73bba2f66e2961957bc9b06bf007"
+      },
+      "selected": {
+        "name": "jsonmodem",
+        "version": "0.0.0-alpha.0",
+        "runtime_revision": "7b7e21c3bd49d22c0964c4a30be16b5367160caf",
+        "runtime_source_sha256": "d099075e16f625c7d0a528115ce13acf666eda3edbfec38a02ed9b9b99123ff0",
+        "native_sha256": "ee2015735b27d4b86e6af3276c37fc4c99fb256c562c1d2f804d1e3d5e7028b3"
+      }
+    },
+    "interpreter": {
+      "implementation": "CPython",
+      "version": "3.12.13",
+      "executable_sha256": "7d43f6e86a6c6dd12005ec77eb2055f1be3f1bb3adedf8afe0a87973fa7371ce"
+    },
+    "reference": {
+      "name": "orjson",
+      "version": "3.11.9",
+      "native_sha256": "cf95e4edd9c6752be617f8afc1f08bfd6b015007520e15069e56c102ffb9d295"
+    },
+    "numpy": {
+      "name": "numpy",
+      "version": "2.5.2"
+    },
+    "memray": {
+      "name": "memray",
+      "version": "1.20.0"
+    },
+    "benchmark_sources_sha256": {
+      "bench_allocations.py": "8867cbd3d8ae049dd41531fbce82c2ce533bf10ebf8fd1231be577869483e04d",
+      "bench_rss.py": "6839ff52e66d2b9c659ebb1b9b8e09270a52985d606f7e364711e6aa4eca27d9",
+      "allocation_stats.py": "811f04e52c2177df802cf45589ab02a15f5c25260815c3975af07bbeafe86f15"
+    }
+  },
+  "measurement_units": {
+    "allocation_events": "requests",
+    "allocated_bytes": "bytes",
+    "peak_live_bytes": "bytes",
+    "VmRSS_kib": "KiB",
+    "VmHWM_kib": "KiB",
+    "ru_maxrss_kib": "KiB"
+  },
+  "limits": [
+    "One Memray capture per workload and library does not establish variance.",
+    "Inputs exist before capture; results are discarded inside the thirty-call capture.",
+    "Allocation requests include zero-size requests and full realloc sizes; free and unmap events are excluded.",
+    "RSS workers do not import Memray. The library is loaded at every reported stage.",
+    "There is no result-retained RSS reading; first and final readings follow result disposal.",
+    "Peak RSS covers the whole process, including temporary memory during calls.",
+    "Allocation requests, total requested bytes, peak tracked live bytes and RSS answer different questions.",
+    "Artifact integrity does not validate discarded serializer outputs; correctness requires separate release tests and benchmark preflight."
+  ]
+}
