@@ -15,6 +15,7 @@ mod escape_mask;
     allow(dead_code)
 )]
 mod integer;
+mod long_float;
 mod objects;
 mod output;
 mod owned_list;
@@ -88,7 +89,11 @@ fn empty_dict(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
 #[inline(never)]
 fn parse_double(text: &str) -> Result<f64, lexical_parse_float::Error> {
     // DocumentReader already checked JSON syntax; only decimal conversion remains.
-    f64::from_lexical(text.as_bytes())
+    if text.len() >= long_float::MIN_LENGTH {
+        long_float::parse(text)
+    } else {
+        f64::from_lexical(text.as_bytes())
+    }
 }
 
 /// Borrow text from an owned string, using inline ASCII storage on supported
