@@ -105,7 +105,7 @@ fn load_number(py: Python<'_>, lexeme: &str) -> PyResult<PyObject> {
         .iter()
         .any(|byte| matches!(byte, b'.' | b'e' | b'E'));
     if is_float {
-        let number = match lexeme.parse::<f64>() {
+        let number = match ::jsonmodem::parse_number_f64(lexeme) {
             Ok(number) if number.is_finite() => number,
             _ => {
                 return Err(PyTypeError::new_err(

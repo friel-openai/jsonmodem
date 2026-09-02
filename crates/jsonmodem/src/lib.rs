@@ -32,6 +32,7 @@ mod event;
 mod jsonmodem_buffers;
 mod jsonmodem_values;
 pub mod lending_iterator;
+mod number;
 mod parser;
 mod path;
 mod value;
@@ -49,6 +50,7 @@ pub use event::ParseEvent;
 pub use event::test_util;
 pub use jsonmodem_buffers::{BufferedEvent, JsonModemBuffers};
 pub use jsonmodem_values::{JsonModemValues, StreamingValue, ValuesError, ValuesOptions};
+pub use number::parse_number_f64;
 #[doc(hidden)]
 pub use parser::JsonModem;
 pub use parser::{DecodeMode, ParserError, ParserOptions};
