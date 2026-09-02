@@ -15,13 +15,14 @@ Parse → filter → act **while the bytes are still in flight**.
 
 ## ✨ Why jsonmodem?
 
-* **Linear performance, bounded memory** – work grows with bytes received; peak usage is limited to
-  the largest in‑flight fragment when default options are used.
+* **Incremental parsing** - consumes new chunks without reparsing the whole
+  document. Paths, buffered strings, values and retained events still require
+  storage. Applications must set input and output limits.
 * **LLM‑ready** – handles multi‑kilobyte tool calls without the quadratic “buffer, patch, re‑parse”
   dance.
 * **First‑class moderation hooks** – inspect or cancel as soon as a sentinel field appears.
-* **Hardened core** – QuickCheck property tests, `cargo‑fuzz` (via `libafl_libfuzzer`), and Miri
-  runs to verify safety.
+* **Safety tests** - QuickCheck, `cargo-fuzz` (via `libafl_libfuzzer`), and Miri
+  check selected executions. Passing them is not a proof of memory safety.
 
 ---
 
@@ -31,7 +32,8 @@ Parse → filter → act **while the bytes are still in flight**.
 cargo add jsonmodem
 ````
 
-*(Python, Node‑API, and WASM bindings are on the roadmap.)*
+The [Python binding](crates/jsonmodem-py/README.md) supports streaming and
+complete-document operations. Node-API and WASM bindings remain on the roadmap.
 
 ### Rust features
 
@@ -145,7 +147,7 @@ _Benchmarks recorded on an AMD Ryzen Threadripper PRO 5975WX (64 cores @ 4.56 
 | Target              | Status      | Notes                       |
 | ------------------- | ----------- | --------------------------- |
 | Rust crate          | ✅ released |                             |
-| **Python** bindings | 🛠 next      | `pyo3`, published to PyPI  |
+| **Python** bindings | Available in source | PyO3; see the Python README |
 | **Node‑API** module | ⏩ queued   | Native addon for TS/JS      |
 | **WASM** build      | ⏩ queued   | For browsers and more       |
 
