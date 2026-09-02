@@ -25,7 +25,7 @@ use pyo3::{
     exceptions::{PyMemoryError, PyRuntimeError},
     ffi,
     prelude::*,
-    types::{PyBytes, PyBytesMethods, PyCFunction, PyModule},
+    types::{PyBytes, PyBytesMethods, PyCFunction, PyModule, PyString},
 };
 
 type Malloc = extern "C" fn(*mut c_void, usize) -> *mut c_void;
@@ -410,7 +410,20 @@ fn numpy_output_allocation_failure_recovers() -> PyResult<()> {
     pyo3::prepare_freethreaded_python();
     Python::with_gil(|py| {
         let data = PyBytes::new(py, &[42; 1000]);
-        let encode = || crate::numpy::_numpy_dumps(py, data.clone(), vec![1000], "u", 1, "", 16, 0);
+        let kind = PyString::new(py, "u").into_any();
+        let unit = PyString::new(py, "").into_any();
+        let encode = || {
+            crate::numpy::_numpy_dumps(
+                py,
+                data.clone(),
+                vec![1000],
+                kind.clone(),
+                1,
+                unit.clone(),
+                16,
+                0,
+            )
+        };
         let expected = encode()?;
         let expected_bytes = expected.bind(py).downcast::<PyBytes>()?.as_bytes();
         assert_eq!(expected_bytes.len(), 3001);
