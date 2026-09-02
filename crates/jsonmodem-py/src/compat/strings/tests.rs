@@ -585,6 +585,45 @@ fn finish_event_tuple_allocation_failure_recovers() -> PyResult<()> {
 }
 
 #[test]
+fn owned_tuple_allocation_failure_releases_prepared_owners() -> PyResult<()> {
+    pyo3::prepare_freethreaded_python();
+    Python::with_gil(|py| {
+        // This length is outside CPython's small-tuple freelist.
+        let length = 37;
+        let sample = crate::tuple_from_owned_items(
+            py,
+            (0..length).map(|_| py.None().into_bound(py)).collect(),
+        )?;
+        let requested = py
+            .import("sys")?
+            .getattr("getsizeof")?
+            .call1((&sample,))?
+            .extract::<usize>()?;
+        drop(sample);
+        let owner = pyo3::types::PyList::empty(py).into_any();
+        let references = owner.get_refcnt();
+        let items = (0..length).map(|_| owner.clone()).collect();
+        py.import("gc")?.call_method0("collect")?;
+
+        let guard = FailObjectAllocation::install(py, requested);
+        let result = crate::tuple_from_owned_items(py, items);
+        let receipt = guard.finish();
+        let error = result.expect_err("the tuple allocation must fail");
+        check_failure(py, &receipt, &error);
+        assert_eq!(owner.get_refcnt(), references);
+        drop(error);
+
+        let recovered =
+            crate::tuple_from_owned_items(py, (0..length).map(|_| owner.clone()).collect())?;
+        assert_eq!(owner.get_refcnt(), references + length);
+        drop(recovered);
+        assert_eq!(owner.get_refcnt(), references);
+        assert!(!PyErr::occurred(py));
+        Ok(())
+    })
+}
+
+#[test]
 fn decode_container_allocation_root_list() -> PyResult<()> {
     decode_container_allocation_failure("[]", "[]", None)
 }

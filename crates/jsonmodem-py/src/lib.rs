@@ -8,6 +8,8 @@ mod compat;
 mod events;
 mod numpy;
 mod text;
+#[cfg(test)]
+mod tuple_tests;
 
 use std::{
     borrow::Cow,
@@ -399,13 +401,19 @@ fn tuple_from_owned_items<'py>(
 ) -> PyResult<Bound<'py, PyTuple>> {
     let length = ffi::Py_ssize_t::try_from(items.len())
         .map_err(|_| PyOverflowError::new_err("tuple is too large"))?;
-    // SAFETY: Python is attached, and a NULL allocation becomes MemoryError.
+    // SAFETY: The GIL is held, and a NULL allocation becomes MemoryError.
     let tuple = unsafe { Bound::from_owned_ptr_or_err(py, ffi::PyTuple_New(length))? };
     for (index, item) in items.into_iter().enumerate() {
         // SAFETY: all owners were prepared before allocating the tuple. Moving
         // them into NULL slots cannot allocate, release the GIL, or call Python.
         // Thus the tuple remains uniquely owned and every index is in bounds.
-        // SetItem consumes item on both success and failure.
+        // Both setters take ownership; PyTuple_SetItem also consumes on failure.
+        #[cfg(not(any(Py_LIMITED_API, PyPy, GraalPy)))]
+        let status = unsafe {
+            ffi::PyTuple_SET_ITEM(tuple.as_ptr(), index as ffi::Py_ssize_t, item.into_ptr());
+            0
+        };
+        #[cfg(any(Py_LIMITED_API, PyPy, GraalPy))]
         let status = unsafe {
             ffi::PyTuple_SetItem(tuple.as_ptr(), index as ffi::Py_ssize_t, item.into_ptr())
         };
