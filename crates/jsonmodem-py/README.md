@@ -366,6 +366,11 @@ remaining tests.
 
 ## Benchmark
 
+The [corrected-build report](benchmarks/PERFORMANCE_SAFE_CAPABILITIES_CORRECTED.md)
+measures runtime `96318df` against PR #6 and orjson 3.11.9. It includes
+complete calls, streaming, allocations, RSS, and regressions, including the
+long non-ASCII string slowdown. orjson 3.12.0 was not measured.
+
 See the [Python performance report](benchmarks/PERFORMANCE.md) for streaming
 comparisons, complete-document comparisons with orjson, and CPU and allocation
 profiles. The [large-document and worst-case report](benchmarks/PERFORMANCE_24H.md)

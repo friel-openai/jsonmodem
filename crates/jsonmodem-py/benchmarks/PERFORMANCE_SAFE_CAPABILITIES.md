@@ -10,6 +10,8 @@ This report measures runtime revision
 correction, checked local Unicode conversions, revised tuple setter, and
 dedicated NumPy container writer. Its timings, memory measurements, and
 validation counts do not describe those later changes.
+See the [corrected-build report](PERFORMANCE_SAFE_CAPABILITIES_CORRECTED.md)
+for their separate measurements and validation results.
 The reference is **orjson 3.11.9; version 3.12.0 was not measured**.
 
 ## Complete calls

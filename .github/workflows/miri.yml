@@ -8,8 +8,8 @@ on:
 jobs:
   miri:
     runs-on: ubuntu-latest
-    # The full suite plus both borrow models and SIMD checks exceed 30 minutes.
-    timeout-minutes: 60
+    # Allow a 60-minute decimal test, then the targeted borrow and SIMD checks.
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
