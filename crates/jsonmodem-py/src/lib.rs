@@ -7,6 +7,7 @@ mod buffer;
 mod compat;
 mod events;
 mod numpy;
+mod text;
 
 use std::{
     borrow::Cow,
@@ -30,11 +31,11 @@ use pyo3::{
     ffi,
     prelude::*,
     types::{
-        PyAny, PyBool, PyBytes, PyDict, PyInt, PyList, PyMemoryView, PySlice, PyString,
-        PyStringMethods, PyTuple,
+        PyAny, PyBool, PyBytes, PyDict, PyInt, PyList, PyMemoryView, PySlice, PyString, PyTuple,
     },
 };
 use smallvec::SmallVec;
+use text::string_text;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum DecodeMode {
@@ -667,7 +668,16 @@ impl PyDecodeMode {
 impl PyDecodeMode {
     #[new]
     #[pyo3(signature=(name=None))]
-    fn new(name: Option<&str>) -> PyResult<Self> {
+    fn new(name: Option<Bound<'_, PyAny>>) -> PyResult<Self> {
+        let name = name
+            .as_ref()
+            .map(|name| {
+                let text = name
+                    .downcast::<PyString>()
+                    .map_err(|_| PyTypeError::new_err("name must be str"))?;
+                string_text(text)
+            })
+            .transpose()?;
         let mode = match name {
             None => DecodeMode::StrictUnicode,
             Some("StrictUnicode") => DecodeMode::StrictUnicode,
@@ -957,10 +967,10 @@ impl PyPathView {
 
     fn endswith(&self, value: Bound<'_, PyAny>) -> PyResult<bool> {
         if let Ok(text) = value.downcast::<PyString>() {
-            let text = <Bound<'_, PyString> as PyStringMethods<'_>>::to_cow(text)?;
+            let text = string_text(text)?;
             return Ok(matches!(
                 self.path.last(),
-                Some(OwnedPathComponent::Key(key)) if key.as_ref() == text.as_ref()
+                Some(OwnedPathComponent::Key(key)) if key.as_ref() == text
             ));
         }
 
@@ -973,8 +983,8 @@ impl PyPathView {
         self.tuple_matches_at(items, self.path.len() - items.len())
     }
 
-    fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
-        Ok(self.tuple_object(py)?.bind(py).repr()?.to_string())
+    fn __repr__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyString>> {
+        self.tuple_object(py)?.bind(py).repr()
     }
 
     fn __richcmp__(&self, other: Bound<'_, PyAny>, op: CompareOp) -> PyResult<PyObject> {
@@ -1029,7 +1039,11 @@ impl PyStringPayload {
         Ok(dict)
     }
 
-    fn __getitem__(&self, key: &str) -> PyResult<PyObject> {
+    fn __getitem__(&self, key: Bound<'_, PyAny>) -> PyResult<PyObject> {
+        let key = key
+            .downcast::<PyString>()
+            .map_err(|_| PyTypeError::new_err("key must be str"))?;
+        let key = string_text(key)?;
         Python::with_gil(|py| match key {
             "fragment" => Ok(PyString::new(py, &self.fragment).into_any().unbind()),
             "is_initial" => Ok(PyBool::new(py, self.is_initial)
@@ -1046,8 +1060,8 @@ impl PyStringPayload {
         })
     }
 
-    fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
-        Ok(self.as_dict(py)?.repr()?.to_string())
+    fn __repr__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyString>> {
+        self.as_dict(py)?.repr()
     }
 
     fn __richcmp__(&self, other: Bound<'_, PyAny>, op: CompareOp) -> PyResult<PyObject> {
@@ -1669,8 +1683,11 @@ impl PyJsonModemValueView {
                 .ok_or_else(|| PyIndexError::new_err("value view is empty"))?;
             match value {
                 CoreValue::Object(map) => {
-                    let key: String = key.extract()?;
-                    if !map.contains_key(key.as_str()) {
+                    let key = key
+                        .downcast::<PyString>()
+                        .map_err(|_| PyTypeError::new_err("object key must be str"))?;
+                    let key = string_text(key)?;
+                    if !map.contains_key(key) {
                         return Err(PyIndexError::new_err(format!("missing object key {key:?}")));
                     }
                     path.push(OwnedPathComponent::Key(key.into()));
@@ -1733,7 +1750,11 @@ impl PyJsonModemValueView {
 
     fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
         let snapshot = self.snapshot(py)?;
-        Ok(format!("JsonModemValueView({})", snapshot.bind(py).repr()?))
+        let representation = snapshot.bind(py).repr()?;
+        Ok(format!(
+            "JsonModemValueView({})",
+            string_text(&representation)?
+        ))
     }
 }
 
@@ -3005,7 +3026,14 @@ fn mutable_apply_event(
                 )?;
             } else {
                 let mut text = py_value_at_path(py, root, &path)?
-                    .and_then(|value| value.extract::<String>(py).ok())
+                    .and_then(|value| {
+                        value
+                            .bind(py)
+                            .downcast::<PyString>()
+                            .ok()
+                            .and_then(|text| string_text(text).ok())
+                            .map(str::to_owned)
+                    })
                     .unwrap_or_default();
                 text.push_str(fragment.as_ref());
                 py_assign_at_path(
@@ -3577,17 +3605,19 @@ fn byte_view_fragment(
 
 fn read_path_patterns(value: &Bound<'_, PyAny>) -> PyResult<Vec<PathPattern>> {
     if let Ok(text) = value.downcast::<PyString>() {
-        let text = <Bound<'_, PyString> as PyStringMethods<'_>>::to_cow(text)?;
-        return Ok(vec![parse_path_pattern(text.as_ref())?]);
+        return Ok(vec![parse_path_pattern(string_text(text)?)?]);
     }
 
     let mut patterns = Vec::new();
     for item in value.try_iter()? {
         let item = item?;
-        let text: String = item.extract().map_err(|_| {
+        let text = item.downcast::<PyString>().map_err(|_| {
             PyTypeError::new_err("paths must be a path string or an iterable of path strings")
         })?;
-        patterns.push(parse_path_pattern(&text)?);
+        let text = string_text(text).map_err(|_| {
+            PyTypeError::new_err("paths must be a path string or an iterable of path strings")
+        })?;
+        patterns.push(parse_path_pattern(text)?);
     }
 
     if patterns.is_empty() {
@@ -3650,9 +3680,10 @@ fn extract_decode_mode(value: &Bound<'_, PyAny>) -> PyResult<DecodeMode> {
     if let Ok(handle) = value.extract::<Py<PyDecodeMode>>() {
         Ok(handle.borrow(value.py()).mode)
     } else {
+        let name = value.get_type().name()?;
         Err(PyTypeError::new_err(format!(
             "decode_mode must be a DecodeMode, got {}",
-            value.get_type().name()?
+            string_text(&name)?
         )))
     }
 }
@@ -3696,8 +3727,7 @@ fn with_input_text<T>(
     f: impl FnOnce(&str) -> PyResult<T>,
 ) -> PyResult<T> {
     if let Ok(text) = data.downcast::<PyString>() {
-        let text = <Bound<'_, PyString> as PyStringMethods<'_>>::to_cow(text)?;
-        return f(text.as_ref());
+        return f(string_text(text)?);
     }
 
     if let Ok(bytes) = data.downcast::<PyBytes>() {
@@ -3711,9 +3741,10 @@ fn with_input_text<T>(
         return result;
     }
 
+    let name = data.get_type().name()?;
     Err(PyTypeError::new_err(format!(
         "{caller} expected str, bytes, bytearray, or contiguous memoryview, got {}",
-        data.get_type().name()?
+        string_text(&name)?
     )))
 }
 
@@ -3843,10 +3874,13 @@ fn with_readonly_byte_text<T>(
     })?;
     match result {
         Some(result) => Ok(result),
-        None => Err(PyTypeError::new_err(format!(
-            "{caller} expected bytes or a read-only contiguous memoryview, got {}",
-            data.get_type().name()?
-        ))),
+        None => {
+            let name = data.get_type().name()?;
+            Err(PyTypeError::new_err(format!(
+                "{caller} expected bytes or a read-only contiguous memoryview, got {}",
+                string_text(&name)?
+            )))
+        }
     }
 }
 

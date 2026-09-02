@@ -63,6 +63,8 @@ use pyo3::{
 };
 use smallvec::SmallVec;
 
+use crate::text::string_text;
+
 const MAX_DECODE_DEPTH: usize = 1024;
 const MAX_ENCODE_DEPTH: usize = 254;
 const INDENT: i32 = 1;
@@ -95,40 +97,6 @@ fn parse_double(text: &str) -> Result<f64, lexical_parse_float::Error> {
     } else {
         f64::from_lexical(text.as_bytes())
     }
-}
-
-/// Borrow text from an owned string, using inline ASCII storage on supported
-/// builds.
-#[inline]
-fn string_text<'value>(value: &'value Bound<'_, PyString>) -> PyResult<&'value str> {
-    #[cfg(all(
-        Py_3_12,
-        not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
-        not(py_sys_config = "Py_TRACE_REFS"),
-        target_os = "linux",
-        target_arch = "x86_64",
-        target_pointer_width = "64",
-        target_endian = "little",
-    ))]
-    if value.is_exact_instance_of::<PyString>() {
-        // SAFETY: value owns an exact CPython str while the GIL is held. In the
-        // selected ABI, compact ASCII has initialized, immutable ASCII data of
-        // GET_LENGTH bytes. PyO3 computes its address for that ABI, including
-        // empty strings. The returned view cannot outlive the owning reference.
-        unsafe {
-            let pointer = value.as_ptr();
-            if pyo3::ffi::PyUnicode_IS_COMPACT_ASCII(pointer) != 0 {
-                if let Ok(length) = usize::try_from(pyo3::ffi::PyUnicode_GET_LENGTH(pointer)) {
-                    let bytes = std::slice::from_raw_parts(
-                        pyo3::ffi::PyUnicode_1BYTE_DATA(pointer),
-                        length,
-                    );
-                    return Ok(std::str::from_utf8_unchecked(bytes));
-                }
-            }
-        }
-    }
-    value.to_str()
 }
 
 /// Explicit raw output, retaining its owner without parsing or placeholder
@@ -286,6 +254,9 @@ impl<'py, 'src> Decoder<'py, 'src> {
                         not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
                     )))]
                     let key = PyString::new(self.py, text).unbind();
+                    // The decoder validated this text, and the newly created
+                    // key has not been exposed to caller code. Its UTF-8 cache
+                    // cannot have come from a caller-supplied codec replacement.
                     let text = PyBackedStr::try_from(key.bind(self.py).clone())?;
                     *entry = Some(text);
                     key
@@ -497,8 +468,7 @@ fn decode(py: Python<'_>, input: &str) -> PyResult<PyObject> {
 #[pyo3(signature = (input, /))]
 pub fn loads(py: Python<'_>, input: Bound<'_, PyAny>) -> PyResult<PyObject> {
     if let Ok(text) = input.downcast_exact::<PyString>() {
-        let text = text
-            .to_str()
+        let text = string_text(text)
             .map_err(|_| super::json_decode_error(py, "str is not valid UTF-8", "", 0))?;
         return decode(py, text);
     }
@@ -871,8 +841,7 @@ impl<const CHECKED: bool, B: OutputBuffer> Encoder<CHECKED, B> {
         // errors and their order before any value is serialized.
         for (key, _) in dict.iter() {
             if let Ok(key) = key.downcast_exact::<PyString>() {
-                key.to_str()
-                    .map_err(|cause| key_utf8_error(key.py(), cause))?;
+                string_text(key).map_err(|cause| key_utf8_error(key.py(), cause))?;
             } else if let Ok(key) = key.downcast_exact::<PyInt>() {
                 self.integer(key)
                     .map_err(|error| integer_key_error(key, error))?;
@@ -1076,7 +1045,7 @@ impl<const CHECKED: bool, B: OutputBuffer> Encoder<CHECKED, B> {
                 self.extend(bytes.as_bytes())?;
             } else if let Ok(text) = contents.downcast_exact::<PyString>() {
                 self.extend(
-                    text.to_str()
+                    string_text(text)
                         .map_err(|_| {
                             PyTypeError::new_err("str is not valid UTF-8: surrogates not allowed")
                         })?
@@ -1131,15 +1100,12 @@ impl<const CHECKED: bool, B: OutputBuffer> Encoder<CHECKED, B> {
                         let Ok(key) = key.downcast_exact::<PyString>() else {
                             return Ok(false);
                         };
-                        key.to_str()
-                            .map_err(|cause| key_utf8_error(key.py(), cause))?;
+                        string_text(key).map_err(|cause| key_utf8_error(key.py(), cause))?;
                     }
                     items.sort_unstable_by(|(left, _), (right, _)| {
-                        left.downcast::<PyString>()
+                        string_text(left.downcast::<PyString>().unwrap())
                             .unwrap()
-                            .to_str()
-                            .unwrap()
-                            .cmp(right.downcast::<PyString>().unwrap().to_str().unwrap())
+                            .cmp(string_text(right.downcast::<PyString>().unwrap()).unwrap())
                     });
                     (EncodeIterator::Sorted(items.into_iter()), b'{', b'}')
                 } else {

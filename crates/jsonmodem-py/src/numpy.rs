@@ -3,8 +3,14 @@
 
 mod scalars;
 use chrono::{Datelike, NaiveDate};
-use pyo3::{exceptions::PyTypeError, prelude::*, types::PyBytes};
+use pyo3::{
+    exceptions::PyTypeError,
+    prelude::*,
+    types::{PyBytes, PyString},
+};
 pub(crate) use scalars::{NumericScalarTypes, ScalarValue};
+
+use crate::text::string_text;
 
 const MICROS_PER_DAY: i64 = 86_400_000_000;
 
@@ -236,12 +242,20 @@ pub fn _numpy_dumps(
     py: Python<'_>,
     data: Bound<'_, PyBytes>,
     shape: Vec<usize>,
-    kind: &str,
+    kind: Bound<'_, PyAny>,
     itemsize: usize,
-    unit: &str,
+    unit: Bound<'_, PyAny>,
     option: i32,
     depth: usize,
 ) -> PyResult<PyObject> {
+    let kind = kind
+        .downcast::<PyString>()
+        .map_err(|_| PyTypeError::new_err("kind must be str"))?;
+    let kind = string_text(kind)?;
+    let unit = unit
+        .downcast::<PyString>()
+        .map_err(|_| PyTypeError::new_err("unit must be str"))?;
+    let unit = string_text(unit)?;
     if shape.len() > 64 || !matches!(itemsize, 1 | 2 | 4 | 8) || depth > 254 {
         return Err(PyTypeError::new_err("invalid numpy snapshot metadata"));
     }

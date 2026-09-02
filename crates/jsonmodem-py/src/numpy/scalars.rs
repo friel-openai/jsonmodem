@@ -1,13 +1,17 @@
 //! Exact numeric types own fixed metadata; scalar storage is copied per value.
 
 use pyo3::{
+    exceptions::PyTypeError,
     gc::{PyTraverseError, PyVisit},
     intern,
     prelude::*,
     types::{PyCFunction, PyDict, PyModule, PyString, PyTuple, PyType},
 };
 
-use crate::buffer::{self, BufferExport};
+use crate::{
+    buffer::{self, BufferExport},
+    text::string_text,
+};
 
 /// Values own their bits after the Python export has been released.
 pub(crate) enum ScalarValue {
@@ -133,8 +137,11 @@ impl NumericScalarTypes {
             }
             let class = class.downcast_into::<PyType>()?;
             let name = class.getattr(intern!(py, "__name__"))?;
+            let name = name
+                .downcast::<PyString>()
+                .map_err(|_| PyTypeError::new_err("NumPy scalar type name must be str"))?;
             if !matches!(
-                name.downcast::<PyString>()?.to_str()?,
+                string_text(name)?,
                 "bool"
                     | "bool_"
                     | "int8"
@@ -166,7 +173,10 @@ impl NumericScalarTypes {
             }
             let kind = dtype.getattr(intern!(py, "kind"))?;
             let width = dtype.getattr(intern!(py, "itemsize"))?.extract::<usize>()?;
-            let kind = match (kind.downcast::<PyString>()?.to_str()?, width) {
+            let kind = kind
+                .downcast::<PyString>()
+                .map_err(|_| PyTypeError::new_err("NumPy dtype kind must be str"))?;
+            let kind = match (string_text(kind)?, width) {
                 ("b", 1) => ScalarKind::Bool,
                 ("i", 1) => ScalarKind::I8,
                 ("i", 2) => ScalarKind::I16,

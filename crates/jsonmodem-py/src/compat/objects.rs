@@ -183,10 +183,10 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                 if option & NON_STR_KEYS != 0 && !key.is_exact_instance_of::<PyString>() {
                     *key = self.key_text.call1((&*key, option))?;
                 }
-                key.downcast_exact::<PyString>()
-                    .map_err(|_| PyTypeError::new_err("Dict key must be str"))?
-                    .to_str()
-                    .map_err(|cause| key_utf8_error(key.py(), cause))?;
+                let text = key
+                    .downcast_exact::<PyString>()
+                    .map_err(|_| PyTypeError::new_err("Dict key must be str"))?;
+                string_text(text).map_err(|cause| key_utf8_error(key.py(), cause))?;
             }
         }
         if option & SORT_KEYS != 0 {
@@ -198,20 +198,9 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                 .map_err(|_| allocation_error())?;
             order.extend(0..items.len());
             order.sort_unstable_by(|&left, &right| {
-                items[left]
-                    .0
-                    .downcast::<PyString>()
+                string_text(items[left].0.downcast::<PyString>().unwrap())
                     .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .cmp(
-                        items[right]
-                            .0
-                            .downcast::<PyString>()
-                            .unwrap()
-                            .to_str()
-                            .unwrap(),
-                    )
+                    .cmp(string_text(items[right].0.downcast::<PyString>().unwrap()).unwrap())
                     .then_with(|| left.cmp(&right))
             });
             for start in 0..order.len() {
@@ -261,12 +250,13 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                 let mut items = ObjectItems::new();
                 for field in fields.iter_borrowed() {
                     let name = field.getattr(intern!(py, "name"))?;
-                    let text = name
-                        .downcast::<PyString>()?
-                        .to_str()
+                    let name_text = name
+                        .downcast::<PyString>()
+                        .map_err(|_| PyTypeError::new_err("dataclass field name must be str"))?;
+                    let text = string_text(name_text)
                         .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
                     if !text.starts_with('_') {
-                        let item = value.getattr(name.downcast::<PyString>()?)?;
+                        let item = value.getattr(name_text)?;
                         push_field(&mut items, name, item)?;
                     }
                 }
