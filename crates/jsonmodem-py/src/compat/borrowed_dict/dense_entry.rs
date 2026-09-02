@@ -3,7 +3,7 @@
 use std::ffi::c_void;
 
 const DK_LOG2_INDEX_BYTES_OFFSET: usize = 9;
-const DK_KIND_OFFSET: usize = 10;
+pub(super) const DK_KIND_OFFSET: usize = 10;
 const DK_NENTRIES_OFFSET: usize = 24;
 const DK_INDICES_OFFSET: usize = 32;
 const ENTRY_BYTES: usize = 16;

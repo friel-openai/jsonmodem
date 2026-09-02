@@ -2,6 +2,21 @@
 
 mod datetime;
 
+#[cfg(all(
+    Py_3_12,
+    not(any(Py_3_13, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+    not(any(
+        py_sys_config = "Py_DEBUG",
+        py_sys_config = "Py_REF_DEBUG",
+        py_sys_config = "Py_TRACE_REFS",
+    )),
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64",
+    target_endian = "little",
+))]
+mod numpy_root;
+
 use pyo3::{
     Borrowed,
     exceptions::{PyOverflowError, PyTypeError, PyUnicodeEncodeError, PyValueError},
@@ -557,6 +572,22 @@ pub(super) fn dumps<'py>(
         .getattr(intern!(py, "_ENCODER_HELPERS"))?;
     let default_provided = default.is_some();
     let default = default.unwrap_or_else(|| py.None().into_bound(py));
+    #[cfg(all(
+        Py_3_12,
+        not(any(Py_3_13, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+        not(any(
+            py_sys_config = "Py_DEBUG",
+            py_sys_config = "Py_REF_DEBUG",
+            py_sys_config = "Py_TRACE_REFS",
+        )),
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64",
+        target_endian = "little",
+    ))]
+    if let Some(bytes) = numpy_root::try_dumps(&obj, encoder.option, &helpers)? {
+        return Ok(bytes.into_any());
+    }
     Ok(ObjectEncoder::new(
         encoder.into_checked(py)?,
         default,
@@ -578,6 +609,22 @@ pub fn _dumps_objects(
     default_provided: bool,
     helpers: Bound<'_, PyTuple>,
 ) -> PyResult<Py<PyBytes>> {
+    #[cfg(all(
+        Py_3_12,
+        not(any(Py_3_13, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+        not(any(
+            py_sys_config = "Py_DEBUG",
+            py_sys_config = "Py_REF_DEBUG",
+            py_sys_config = "Py_TRACE_REFS",
+        )),
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64",
+        target_endian = "little",
+    ))]
+    if let Some(bytes) = numpy_root::try_dumps(&obj, option, helpers.as_any())? {
+        return Ok(bytes);
+    }
     let encoder = Encoder {
         output: output::new(py, INITIAL_OUTPUT_CAPACITY)?,
         option,

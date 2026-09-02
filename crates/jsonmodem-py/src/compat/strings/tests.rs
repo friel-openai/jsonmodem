@@ -795,3 +795,150 @@ def prepare(native):
         }
     })
 }
+
+#[cfg(not(Py_3_13))]
+#[test]
+#[ignore = "requires NumPy and the matching jsonmodem Python helpers"]
+fn numpy_root_output_allocation_failure_recovers() -> PyResult<()> {
+    numpy_root_output_allocation_failure(false)
+}
+
+#[cfg(not(Py_3_13))]
+#[test]
+#[ignore = "requires NumPy and the matching jsonmodem Python helpers"]
+fn numpy_root_dict_output_allocation_failure_recovers() -> PyResult<()> {
+    numpy_root_output_allocation_failure(true)
+}
+
+#[cfg(not(Py_3_13))]
+fn numpy_root_output_allocation_failure(dictionaries: bool) -> PyResult<()> {
+    pyo3::prepare_freethreaded_python();
+    Python::with_gil(|py| {
+        let fixture = PyModule::from_code(
+            py,
+            pyo3::ffi::c_str!(
+                r#"
+import sys
+from unittest.mock import patch
+
+import numpy as np
+from jsonmodem import _compat, _numpy
+
+def prepare(native, dictionaries):
+    scalar_types = _numpy.SCALAR_TYPES
+    table = native._NumericScalarTypes(np, scalar_types)
+    special = _compat._ENCODER_HELPERS[3]
+    defaults = (
+        sys.modules, _numpy, native, np, _numpy.encode,
+        special, native._numpy_dumps, scalar_types,
+    )
+    scalar = np.int64(7)
+    values = [scalar] * 1024
+    fresh_values = [np.int64(13)] * 1024
+    expected = b"[" + b",".join([b"7"] * 1024) + b"]"
+    expected_fresh = b"[" + b",".join([b"13"] * 1024) + b"]"
+    roots = (values, tuple(values))
+    fresh_roots = (fresh_values, tuple(fresh_values))
+    if dictionaries:
+        keys = [f"key_{index:03}" for index in range(128)]
+        roots = ({key: scalar for key in keys},)
+        fresh_roots = ({key: np.int64(13) for key in keys},)
+        expected = b"{" + b",".join(b'"' + key.encode() + b'":7' for key in keys) + b"}"
+        expected_fresh = b"{" + b",".join(b'"' + key.encode() + b'":13' for key in keys) + b"}"
+    return {
+        "module": _numpy,
+        "original_native": _numpy.native,
+        "context": patch.object(_numpy, "native", native),
+        "helpers": _compat._ENCODER_HELPERS[:12] + (table, defaults),
+        "scalar": scalar,
+        "values": roots,
+        "fresh_values": fresh_roots,
+        "expected": expected,
+        "expected_fresh": expected_fresh,
+    }
+"#
+            ),
+            pyo3::ffi::c_str!("numpy_root_allocation_fixture.py"),
+            pyo3::ffi::c_str!("numpy_root_allocation_fixture"),
+        )?;
+        let native = PyModule::new(py, "_numpy_root_test_native")?;
+        native.add_function(pyo3::wrap_pyfunction!(crate::numpy::_numpy_dumps, &native)?)?;
+        native.add_class::<crate::numpy::NumericScalarTypes>()?;
+        let setup = fixture.getattr("prepare")?.call1((&native, dictionaries))?;
+        let module = setup.get_item("module")?;
+        let original_native = setup.get_item("original_native")?;
+        let context = setup.get_item("context")?;
+        context.call_method0("__enter__")?;
+
+        // The local type table and C function belong to this executable. Restore
+        // the Python helper and allocator before reporting a native assertion.
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> PyResult<()> {
+            let helpers = setup
+                .get_item("helpers")?
+                .downcast_into::<pyo3::types::PyTuple>()?;
+            let types = helpers
+                .get_item(12)?
+                .downcast_into::<crate::numpy::NumericScalarTypes>()?;
+            let defaults = helpers
+                .get_item(13)?
+                .downcast_into::<pyo3::types::PyTuple>()?;
+            let queries = types
+                .get()
+                .root_query_names()
+                .expect("prepared root queries");
+            assert_eq!(queries[0].bind(py).to_str()?, "jsonmodem._numpy");
+            let scalar = setup.get_item("scalar")?;
+            assert!(matches!(
+                types
+                    .get()
+                    .read(&scalar, &defaults, &helpers.get_item(3)?)?,
+                Some(crate::numpy::ScalarValue::Signed(7))
+            ));
+            let values = setup
+                .get_item("values")?
+                .downcast_into::<pyo3::types::PyTuple>()?;
+            let fresh_values = setup
+                .get_item("fresh_values")?
+                .downcast_into::<pyo3::types::PyTuple>()?;
+            let expected = setup.get_item("expected")?.downcast_into::<PyBytes>()?;
+            let expected_fresh = setup
+                .get_item("expected_fresh")?
+                .downcast_into::<PyBytes>()?;
+            assert!(expected.as_bytes().len() > 1024);
+            let encode = |value| {
+                crate::compat::_dumps_objects(
+                    py,
+                    value,
+                    py.None().into_bound(py),
+                    16,
+                    false,
+                    helpers.clone(),
+                )
+            };
+            for (value, fresh_value) in values.iter().zip(fresh_values.iter()) {
+                let control = encode(value.clone())?;
+                assert_eq!(control.bind(py).as_bytes(), expected.as_bytes());
+                drop(control);
+                assert!(!PyErr::occurred(py));
+
+                let guard = FailObjectAllocation::bytes(py, expected.as_bytes().len());
+                let result = encode(value);
+                let receipt = guard.finish();
+                let error = result.expect_err("root publication must fail without a retry");
+                check_failure(py, &receipt, &error);
+                drop(error);
+
+                let recovered = encode(fresh_value)?;
+                assert_eq!(recovered.bind(py).as_bytes(), expected_fresh.as_bytes());
+                assert!(!PyErr::occurred(py));
+            }
+            Ok(())
+        }));
+        context.call_method1("__exit__", (py.None(), py.None(), py.None()))?;
+        assert!(module.getattr("native")?.is(&original_native));
+        match outcome {
+            Ok(result) => result,
+            Err(panic) => std::panic::resume_unwind(panic),
+        }
+    })
+}

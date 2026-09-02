@@ -1,5 +1,20 @@
 //! Exact numeric types own fixed metadata; scalar storage is copied per value.
 
+#[cfg(all(
+    Py_3_12,
+    not(any(Py_3_13, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+    not(any(
+        py_sys_config = "Py_DEBUG",
+        py_sys_config = "Py_REF_DEBUG",
+        py_sys_config = "Py_TRACE_REFS",
+    )),
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64",
+    target_endian = "little",
+))]
+mod root;
+
 use pyo3::{
     exceptions::PyTypeError,
     gc::{PyTraverseError, PyVisit},
@@ -43,7 +58,7 @@ impl ScalarKind {
     /// The export must belong to the exact immutable scalar admitted for this
     /// kind.
     unsafe fn read(self, export: &BufferExport<'_>) -> Option<ScalarValue> {
-        // SAFETY: the sole caller establishes immutable scalar storage before
+        // SAFETY: callers establish immutable scalar storage before
         // acquiring the export. Each copy still checks its descriptor and width.
         unsafe {
             match self {
@@ -97,8 +112,24 @@ struct ScalarType {
 
 /// The lazy NumPy module owns this table separately in each interpreter.
 #[pyclass(module = "jsonmodem._jsonmodem", name = "_NumericScalarTypes", frozen)]
+#[derive(Default)]
 pub(crate) struct NumericScalarTypes {
     types: [Option<ScalarType>; 12],
+    // Query names exist before any root attempt, including its first call.
+    #[cfg(all(
+        Py_3_12,
+        not(any(Py_3_13, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+        not(any(
+            py_sys_config = "Py_DEBUG",
+            py_sys_config = "Py_REF_DEBUG",
+            py_sys_config = "Py_TRACE_REFS",
+        )),
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64",
+        target_endian = "little",
+    ))]
+    root_queries: Option<[Py<PyString>; 6]>,
 }
 
 #[pymethods]
@@ -106,13 +137,13 @@ impl NumericScalarTypes {
     #[new]
     fn new(numpy: Bound<'_, PyAny>, scalar_types: Bound<'_, PyAny>) -> PyResult<Self> {
         let py = numpy.py();
-        let mut types = std::array::from_fn(|_| None);
+        let mut table = Self::default();
         if cfg!(PyPy)
             || cfg!(GraalPy)
             || !numpy.is_exact_instance_of::<PyModule>()
             || !scalar_types.is_exact_instance_of::<PyTuple>()
         {
-            return Ok(Self { types });
+            return Ok(table);
         }
         let scalar_types = scalar_types.downcast::<PyTuple>()?;
         let immutable = |class: &Bound<'_, PyAny>| -> PyResult<bool> {
@@ -128,7 +159,7 @@ impl NumericScalarTypes {
                 .iter()
                 .all(|class| class.is_exact_instance_of::<PyType>())
         {
-            return Ok(Self { types });
+            return Ok(table);
         }
         let mut index = 0;
         for class in scalar_types.iter() {
@@ -191,21 +222,55 @@ impl NumericScalarTypes {
                 ("f", 8) => ScalarKind::F64,
                 _ => continue,
             };
-            if index == types.len() {
+            if index == table.types.len() {
                 break;
             }
-            types[index] = Some(ScalarType {
+            table.types[index] = Some(ScalarType {
                 class: class.unbind(),
                 kind,
             });
             index += 1;
         }
-        Ok(Self { types })
+        #[cfg(all(
+            Py_3_12,
+            not(any(Py_3_13, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+            not(any(
+                py_sys_config = "Py_DEBUG",
+                py_sys_config = "Py_REF_DEBUG",
+                py_sys_config = "Py_TRACE_REFS",
+            )),
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64",
+            target_endian = "little",
+        ))]
+        if index != 0 {
+            table.root_queries = Some(root::query_names(py)?);
+        }
+        Ok(table)
     }
 
     fn __traverse__(&self, visit: PyVisit<'_>) -> Result<(), PyTraverseError> {
         for scalar_type in self.types.iter().flatten() {
             visit.call(&scalar_type.class)?;
+        }
+        #[cfg(all(
+            Py_3_12,
+            not(any(Py_3_13, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+            not(any(
+                py_sys_config = "Py_DEBUG",
+                py_sys_config = "Py_REF_DEBUG",
+                py_sys_config = "Py_TRACE_REFS",
+            )),
+            target_os = "linux",
+            target_arch = "x86_64",
+            target_pointer_width = "64",
+            target_endian = "little",
+        ))]
+        if let Some(queries) = &self.root_queries {
+            for query in queries {
+                visit.call(query)?;
+            }
         }
         Ok(())
     }

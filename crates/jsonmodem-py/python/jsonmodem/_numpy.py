@@ -89,7 +89,7 @@ def _initialize_numeric_helpers():
     """Retain matching type-table inputs and helpers across constructor callbacks."""
     from . import _compat
 
-    # Python's GC owns these cycles; the native table only retains scalar types.
+    # The native table retains scalar types and fixed query strings, not helpers.
     # The tuple order matches helpers_are_default in numpy/scalars.rs.
     helpers = (
         sys.modules, sys.modules[__name__], native, np, encode,

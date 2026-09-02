@@ -8,6 +8,12 @@
 mod key_validation;
 mod lookup;
 
+#[cfg(all(
+    not(Py_3_13),
+    not(any(py_sys_config = "Py_DEBUG", py_sys_config = "Py_REF_DEBUG")),
+))]
+mod root_keys;
+
 use std::{
     any::Any,
     ffi::CString,

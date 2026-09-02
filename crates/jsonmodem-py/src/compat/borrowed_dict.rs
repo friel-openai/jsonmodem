@@ -16,6 +16,29 @@ use pyo3::{
 
 use super::{Encoder, INDENT, OutputAllocationError, key_identity_bit, output::OutputBuffer};
 
+/// Exact-string lookups cannot call stored keys on this current table.
+/// Recheck after Python reentry; retaining the dictionary does not freeze it.
+#[cfg(all(
+    not(Py_3_13),
+    not(any(py_sys_config = "Py_DEBUG", py_sys_config = "Py_REF_DEBUG")),
+))]
+pub(super) fn has_exact_unicode_keys(dict: &Bound<'_, PyDict>) -> bool {
+    if !dict.is_exact_instance_of::<PyDict>() {
+        return false;
+    }
+    let pointer = dict.as_ptr().cast::<ffi::PyDictObject>();
+    // SAFETY: the exact dictionary owner is live under the GIL. The selected
+    // nondebug CPython 3.12 layout has an initialized ma_keys pointer, whose
+    // allocation includes dk_kind at byte 10. Nothing here can allocate,
+    // call Python, release the GIL or decrement an owner before the read.
+    // Unicode and split tables store only exact str keys; general tables may
+    // contain str subclasses. No table pointer or borrowed entry escapes.
+    unsafe {
+        let keys = std::ptr::addr_of!((*pointer).ma_keys).read().cast::<u8>();
+        !keys.is_null() && matches!(keys.add(dense_entry::DK_KIND_OFFSET).read(), 1 | 2)
+    }
+}
+
 /// Certify common keys without conversions, output, or temporary owners.
 /// False requires the full owning validation; it does not mean a key is
 /// invalid.
