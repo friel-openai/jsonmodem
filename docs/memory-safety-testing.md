@@ -77,18 +77,29 @@ feed of the same input.
 
 ### ValueZipper
 
-`backend/std/value_zipper.rs` stores pointers to the current value and its
-ancestors. `align_path` must discard pointers to old children before inserting
-into a parent that might move its contents. `with_leaf` and `with_leaf_mut`
-return references tied to the borrow of the zipper, preventing callers from
-mutating the tree while those references remain in use.
+With `cached-zipper` enabled, `backend/std/value_zipper/cached.rs` caches
+pointers to the current value and its ancestors. The root is boxed to keep
+its address stable. `align_path` removes descendant pointers before a parent
+can grow or be replaced. Its three pointer dereferences return references
+tied to the mutable borrow of the owning zipper. The path and value occupy
+disjoint fields, so returning both does not require an unsafe reborrow.
+Without that feature, `value_zipper.rs` walks the owned tree using safe Rust,
+and the core crate forbids unsafe code.
 
-Three direct tests exercise all five explicit unsafe operations. They grow
+The zipper's containing modules are private. No public API accepts arbitrary
+paths for these cached mutations. That restriction and the parser's event
+ordering are part of the safety argument. Raw pointers can coexist, but
+overlapping live mutable Rust references cannot.
+
+Three direct tests exercise the cached pointer operations. They grow
 arrays and ordered maps, read the root between mutations, change siblings,
 replace nested values, insert beyond an array's current end, and reuse the
 zipper after `take_root`. The tests assert values and paths, not just that the
 process survives. Integration tests also exercise generated containers, multiple
 roots, partial values, iterator drop, and cleanup after parse errors.
+A fourth direct test checks that selecting safe traversal preserves the
+zipper's `Send` and `Sync` behavior. Cargo feature unification can enable the
+cache through another dependency; see [Rust features](../README.md#rust-features).
 
 ### Complete-document pointer helpers
 
@@ -152,7 +163,7 @@ callback during Python 3.9 parsing. Ordinary buffer input is now copied unless
 its storage is known to be immutable. `scripts/gc_buffer_regression.py` runs in a
 subprocess and requires actual callbacks inside `feed` on Python 3.9-3.11.
 
-Path conversion, slicing, and no-copy byte events prepare every tuple element
+Path conversion, slicing, no-copy byte events, and minimal events prepare every tuple element
 before allocating the outer tuple. `tuple_from_owned_items` accepts owned
 objects in a concrete collection; it cannot call an arbitrary iterator while
 filling slots. The helper checks the allocation and length, then transfers each
@@ -184,8 +195,9 @@ guard releases its export.
 
 ### Complete-document decoding
 
-`strings::new_ascii_string` receives ASCII text longer than one byte. Decoded
-strings carry a classification tied to immutable scanner output. It checks the length and
+`AsciiText` carries validated ASCII and length requirements into
+`strings::new_ascii_string`. Decoded strings carry a classification tied to
+immutable scanner output. The constructor checks the length and
 `PyUnicode_New` result, then copies into fresh one-byte string storage.
 No further Python call or allocation occurs before initialization finishes.
 Empty, single-character and non-ASCII strings keep the ordinary constructor.
@@ -216,6 +228,13 @@ self-references, clear/shrink/grow/replace operations, sorting and an injected
 growth failure followed by recovery. A separate native test explicitly runs
 GC callbacks that mutate a retained list between value construction and append.
 It checks current storage without relying on automatic GC inside the decoder.
+
+The decoder's integer and float constructors check new references and propagate
+allocation errors. `empty_list` and `empty_dict` call the actual builtin types
+through PyO3's safe `call0` and checked owning downcasts. The native tests inject
+one-shot allocation failures and check `MemoryError` and recovery. They do not
+establish recovery from sustained memory exhaustion. Older streaming container
+constructors still include PyO3 operations that panic on allocation failure.
 
 ### Reading Python storage while encoding
 
@@ -271,6 +290,24 @@ conditions differ by helper:
 a debug interpreter. These conditions still require valid CPython objects and
 allocator-provided storage. Other builds keep existing PyO3 or C API operations.
 
+The output writer and NumPy scalar copies below have separate conditions;
+the Linux x86_64 restriction above does not apply to all native operations.
+
+### NumPy scalar copies and date formatting
+
+`NumericScalarTypes` retains admitted immutable numeric type objects. Its safe
+`read` method checks the exact value type and current helper identities before
+acquiring a scoped buffer export. Its private unsafe helpers require immutable
+scalar storage, check the descriptor and byte width, and return owned primitive
+bits. The export is released before formatting can grow output storage.
+A read-only descriptor alone would not establish immutability. Valid native
+NumPy storage and no unsynchronized native writes remain required.
+
+Arrays and other scalar types use owning snapshots. The date formatter retains
+one validated calendar-day prefix within a snapshot serialization. It checks
+each tick conversion, recomputes clock and fractional digits, and discards the
+prefix after that call. This reuse adds no unsafe operation.
+
 ### Other Python calls
 
 Streaming `load_number` uses `PyFloat_FromDouble`, `PyLong_FromLongLong`, and
@@ -284,14 +321,43 @@ each constructor; those branches also require source review.
 
 `compat/objects.rs` retains container entries before invoking field getters
 or callbacks. Its snapshots, frame storage, class cache, and output buffer use
-fallible growth. `Encoder::bytes` in `compat.rs` calls `PyBytes_FromStringAndSize` with a
-borrow of the initialized Rust output. The borrow remains valid until the
-synchronous copy returns. PyO3 takes ownership of the new Python object or
-propagates the allocation error. No raw pointer escapes the call.
+fallible growth.
 `test_dataclass_native.py` checks callback mutation, field ordering, depth,
 cleanup, and allocation failures in subprocesses with address-space limits.
 The callback-free encoder retains its existing allocation policy; these tests
 do not establish catchable allocation failure for every operation in the package.
+
+### Output storage
+
+`OutputBuffer` has two implementations. `Vec<u8>::finish` retains initialized
+Rust bytes until `PyBytes_FromStringAndSize` completes its synchronous copy.
+The new reference is checked and allocation failure becomes a Python exception.
+
+`PythonOutput` starts with a Rust vector and can promote it to private Python
+bytes. `len` counts initialized bytes; `capacity` counts writable storage.
+Writes reserve storage before forming destination pointers, initialize the
+bytes, and then advance the length. The small vector's own length is updated
+when the writer transfers the vector back to its caller.
+
+Growth checks length arithmetic and space for the CPython object header.
+`_PyBytes_Resize` receives an exact, uniquely owned, unpublished bytes object.
+It can move storage, so the writer refreshes its pointer before writing again.
+Cached output ranges use offsets rather than pointers. A failed resize frees
+and nulls the object; cleanup must not release it a second time.
+
+`finish()` consumes the writer, sets the initialized length and terminator,
+and transfers its one owned reference. No borrowed view can outlive a resize.
+The sealed `OutputBuffer::PYTHON_ALLOCATION` flag excludes this writer from
+`DictScalarCursor`, which must not retain borrowed dictionary entries across
+Python allocation. That cursor keeps Rust-only output storage.
+
+`PythonOutput` requires GIL-enabled CPython 3.12 or 3.13 with the full API and
+without `Py_TRACE_REFS`. Other builds keep the Rust vector implementation.
+`test_owned_output.py` and native tests cover growth, retained bytes, callbacks,
+copied output ranges, empty output and failed reservations. Miri does not run
+the live CPython writer. These tests do not prove recovery from every allocation
+failure or that freed capacity is returned to the operating system. Measure
+allocation traffic, peak live bytes and process RSS separately.
 
 ## Measuring buffer-copy cost
 

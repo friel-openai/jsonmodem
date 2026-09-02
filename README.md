@@ -40,11 +40,12 @@ pointers along the current branch instead of walking from the root for each
 access. Its unsafe implementation has safe interfaces tied to the tree's owner;
 enabling it does not permit unchecked JSON or overlapping mutable references.
 
-To use safe tree traversal instead:
+To use safe tree traversal in this unreleased implementation, pin its Git
+revision and disable default features:
 
 ```toml
 [dependencies]
-jsonmodem = { version = "0.1.2", default-features = false }
+jsonmodem = { git = "https://github.com/friel-openai/jsonmodem", rev = "7b7e21c3bd49d22c0964c4a30be16b5367160caf", default-features = false }
 ```
 
 Without `cached-zipper`, the core crate uses `forbid(unsafe_code)`. The public
@@ -58,6 +59,16 @@ uses the cache. `default-features = false` is not a veto. Check the resolved
 features with `cargo tree -e features -i jsonmodem` in your application.
 
 The independent `serde` feature can be enabled with or without `cached-zipper`.
+
+### Events without paths
+
+Use `JsonModem<EventBackend>` when you need events but not their locations.
+`EventBackend` keeps the parent container kinds needed to validate JSON, but
+does not store event paths. Choose `LexemeBackend` when paths are needed.
+The shared lexer can still buffer property-name text, especially across feeds.
+This choice belongs to each parser, not to Cargo features; another dependency
+cannot turn path tracking on for that parser. The Python equivalent is
+[`JsonModemEvents`](crates/jsonmodem-py/README.md#streaming-usage).
 
 ---
 

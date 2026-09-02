@@ -28,9 +28,11 @@ list(parser.finish())
 ```
 
 `JsonModemEvents(track_paths=True)` enables paths for that instance. Without
-tracking, the parser keeps the parent container kinds needed to validate JSON,
-but does not retain property names or count array indices. Omitted paths are
-`None`; an empty path still means the document root. Parsing, UTF-8 checks,
+tracking, `EventBackend` keeps the parent container kinds needed to validate
+JSON, but does not store property names or array indices in event paths. The
+shared lexer can still buffer property-name text, including names split across
+feeds. Omitted paths are `None`; an empty path still means the document root.
+Parsing, UTF-8 checks,
 number handling, error locations, and the nesting limit are unchanged.
 
 `JsonModemEvents` does not build values or cumulative string prefixes. Its
@@ -153,7 +155,7 @@ several complete root values, stored updates will all see the latest root by the
 time the returned iterator is consumed. To keep earlier values, feed one root
 at a time and call `view.snapshot()` before feeding the next root.
 
-Both streaming APIs reject nesting beyond 256 containers before emitting an
+The streaming APIs reject nesting beyond 256 containers before emitting an
 event for the excess container. Paths reuse object-key text instead of copying it.
 `feed()` creates all events from the supplied chunks before returning;
 limit the total data passed to each call and consume its result before feeding
@@ -220,6 +222,9 @@ These behaviors deliberately differ from orjson:
   the callback do not change which entries the serializer visits.
 - Combining dataclasses with other containers cannot bypass the nesting limit
   by overflowing the counter. Inputs exceeding the limit raise `TypeError`.
+- `datetime.time` fractions retain all six microsecond digits. The pinned
+  orjson 3.11.9 reference omits a leading zero for some five-digit microsecond
+  values; jsonmodem does not reproduce that change in represented time.
 
 The package is named `jsonmodem`, not `orjson`. Passing orjson's public tests does
 not prove identical behavior for every Python object or malformed input. Test the
@@ -249,12 +254,14 @@ storage, not recursive Rust calls. Cycle and depth checks run while writing.
 Rust handles sorted dictionaries, Fragments, and primitive non-string keys.
 
 Dataclasses, subclasses, sorted converted keys, and callback results share one
-Rust output buffer instead of producing one byte string per dataclass. The
-serializer retains parent entries before calling field getters or callbacks.
-Rust formats exact UUIDs and supported exact date/time objects directly.
-Python helpers handle the remaining date/time cases and prepare NumPy arrays.
-Dataclass fields retain their order under `OPT_SORT_KEYS`; ordinary dictionaries
-inside them are sorted.
+output buffer instead of producing one byte string per dataclass. On supported
+CPython builds, this buffer starts in Rust storage and can switch to unpublished
+Python bytes when it grows. Other builds keep Rust storage. The serializer
+retains parent entries before calling field getters or callbacks. Rust formats
+exact UUIDs and supported exact date/time objects directly. Python helpers
+handle the remaining date/time cases and prepare NumPy arrays. Dataclass fields
+retain their order under `OPT_SORT_KEYS`; ordinary dictionaries inside them
+are sorted.
 
 Long strings reserve their UTF-8 length and both quotes before writing, avoiding
 a second buffer growth just for the closing quote when no escaping is needed.
@@ -266,6 +273,12 @@ Rust chooses how to format the number type once per array and processes each
 row together. It does not check the number type or update its position in the
 outer array for every element. NumPy arrays must point to valid memory; this
 does not protect against arrays constructed from invalid native pointers.
+
+Supported exact immutable numeric scalars use a scoped buffer export and copy
+their primitive bits before formatting. Other scalars retain the Python helper
+and owning byte snapshot. Date arrays can reuse one validated calendar-day
+prefix within a single serialization; clock and fractional digits are still
+computed for every value. No date prefix persists between `dumps()` calls.
 
 Wheels are interpreter-specific rather than `abi3-py39`. This lets PyO3 use
 CPython's public UTF-8 string access without an encoded copy on Python 3.9.
@@ -288,6 +301,16 @@ and `string_text` borrows immutable ASCII text from an owned Python string.
 Python owners. It permits no Python call or reference release while entry
 storage is borrowed. Other entries gain owning references before general
 serialization continues. Callback serialization keeps its owning snapshots.
+
+`output::PythonOutput` owns its writable storage until serialization finishes.
+Each write checks capacity and initializes bytes before increasing the written
+length. No pointer or borrowed view of that storage is exposed to callers.
+Resizing refreshes the storage pointer. Before returning Python bytes, `finish()`
+sets the final size and terminator and transfers ownership once. This
+implementation requires GIL-enabled CPython 3.12 or 3.13 with the full API and
+excludes `Py_TRACE_REFS` builds. Other builds use a Rust vector and copy its
+initialized contents at the end. Borrowed dictionary entries use Rust-only
+output storage, so growth cannot call Python while those entries are borrowed.
 
 These optimizations have interpreter and build restrictions. Raw object-layout
 readers and the list writer require CPython 3.12 or 3.13 with the GIL on 64-bit,
