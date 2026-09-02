@@ -515,9 +515,9 @@ mod tests {
             let mut expected = Vec::new();
             for index in 0..2000 {
                 let bytes = index.to_string();
-                output.extend::<true>(bytes.as_bytes())?;
+                OutputBuffer::extend::<true>(&mut output, bytes.as_bytes())?;
                 expected.extend_from_slice(bytes.as_bytes());
-                output.push::<true>(b',')?;
+                OutputBuffer::push::<true>(&mut output, b',')?;
                 expected.push(b',');
                 if index % 7 == 6 {
                     output.duplicate::<true>(0..4)?;
@@ -535,9 +535,9 @@ mod tests {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
             let mut output = new(py, 4096)?;
-            output.extend::<true>(b"[\n")?;
+            OutputBuffer::extend::<true>(&mut output, b"[\n")?;
             output.repeat::<true>(2, b' ')?;
-            output.extend::<true>(b"null\n]")?;
+            OutputBuffer::extend::<true>(&mut output, b"null\n]")?;
             let bytes = output.finish(py)?;
             assert_eq!(bytes.bind(py).as_bytes(), b"[\n  null\n]");
             Ok(())
@@ -549,8 +549,8 @@ mod tests {
         pyo3::prepare_freethreaded_python();
         Python::with_gil(|py| {
             let mut output = new(py, 8)?;
-            output.extend::<true>(b"current")?;
-            assert!(output.reserve::<true>(usize::MAX).is_err());
+            OutputBuffer::extend::<true>(&mut output, b"current")?;
+            assert!(OutputBuffer::reserve::<true>(&mut output, usize::MAX).is_err());
             let bytes = output.finish(py)?;
             assert_eq!(bytes.bind(py).as_bytes(), b"current");
             Ok(())
@@ -564,7 +564,7 @@ mod tests {
             let empty = new(py, 0)?.finish(py)?;
             let reserved = new(py, 256)?.finish(py)?;
             let mut output = new(py, 1)?;
-            output.push::<true>(b'7')?;
+            OutputBuffer::push::<true>(&mut output, b'7')?;
             let single = output.finish(py)?;
             assert_eq!(empty.bind(py).as_bytes(), b"");
             assert_eq!(reserved.bind(py).as_bytes(), b"");
