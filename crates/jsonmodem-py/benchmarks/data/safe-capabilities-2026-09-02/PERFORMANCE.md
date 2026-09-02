@@ -3,8 +3,9 @@
 These results measure complete loads() and dumps() calls. Bold marks every exact row minimum, including ties.
 
 PR #6 is the previous jsonmodem build. Rebuilt uses the same runtime source
-compiled again. Earlier is an intermediate build; Selected is the build in
-this PR. Their runtime revisions and binary hashes are in results.json.
+compiled again. Earlier is an intermediate build. Selected is runtime revision
+`7b7e21c`, measured before the later decimal, Unicode, tuple, and NumPy changes.
+Their runtime revisions and binary hashes are in results.json.
 A later publication revision is recorded separately from the measured revision.
 
 Each suite and jsonmodem build ran in five fresh Python processes. Each process recorded three samples for jsonmodem and orjson. Each jsonmodem cell uses the median of five process medians. The displayed orjson cell uses all twenty reference process medians, five per jsonmodem build. All raw samples and paired comparisons remain in results.json.

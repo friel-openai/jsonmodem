@@ -164,6 +164,12 @@ Applications must set those limits.
 `finish()` completes valid root numbers without requiring trailing whitespace.
 Python number events preserve integer tokens as `int` and reject non-finite floats.
 
+Rust backends and Python streaming share the long-decimal conversion.
+`loads()` keeps its lexical parser for ordinary numbers and uses the shared
+conversion for very long tokens. Python still rejects non-finite decoded
+floats, and the integer rules are unchanged. Bounded conversion storage does
+not impose an input-size or CPU-time limit.
+
 When a synchronous source already has many tiny fragments available, pass the
 fragment iterable to `feed()` instead of calling `feed()` once per fragment.
 This avoids repeated Python-to-Rust calls:
@@ -280,9 +286,22 @@ and owning byte snapshot. Date arrays can reuse one validated calendar-day
 prefix within a single serialization; clock and fractional digits are still
 computed for every value. No date prefix persists between `dumps()` calls.
 
-Wheels are interpreter-specific rather than `abi3-py39`. This lets PyO3 use
-CPython's public UTF-8 string access without an encoded copy on Python 3.9.
-Build a wheel separately for each supported CPython version.
+On eligible CPython 3.12 builds, root lists, tuples, and dictionaries containing
+supported exact NumPy numeric scalars can use a dedicated Rust output buffer.
+It supports `OPT_SERIALIZE_NUMPY` alone or with `OPT_APPEND_NEWLINE`. It retains
+the container entries, checks helper identities, and copies each scalar's
+primitive bits before formatting. Dictionary keys must be exact built-in
+strings with existing compact ASCII storage; other keys use the regular
+serializer without conversion during the attempted shortcut.
+
+The writer finishes the Rust buffer before allocating the returned Python
+bytes. It does not restart serialization after that allocation succeeds or
+fails. Other options, types, and interpreter builds keep the regular serializer.
+
+Wheels are interpreter-specific rather than `abi3-py39`. They use CPython's
+UTF-8 access API and the binding's local validation instead of requiring an
+encoded copy on Python 3.9. Build a wheel separately for each supported
+CPython version.
 
 The native extension requires a GIL-enabled Python build. Free-threaded builds
 are rejected at compile time, even if their GIL could be enabled at runtime.
@@ -295,8 +314,13 @@ publishing it. `owned_list::append` can transfer an owned value into a list's
 spare storage. It initializes the entry before increasing the list length;
 CPython still handles allocation and growth.
 
-During `dumps()`, `copy_integer` reads selected exact Python integers directly,
-and `string_text` borrows immutable ASCII text from an owned Python string.
+During `dumps()`, `copy_integer` reads selected exact Python integers directly.
+`text::compact_ascii_text` borrows existing ASCII storage from an owned Python
+string. Other explicit text conversions check the Unicode cache's UTF-8 bytes
+before Rust borrows them. PyO3-generated argument handling and error formatting
+still contain unchecked text conversions, so these local checks do not cover
+every Python entry point.
+
 `borrowed_dict::DictScalarCursor` handles primitive entries without temporary
 Python owners. It permits no Python call or reference release while entry
 storage is borrowed. Other entries gain owning references before general
@@ -345,10 +369,12 @@ remaining tests.
 See the [Python performance report](benchmarks/PERFORMANCE.md) for streaming
 comparisons, complete-document comparisons with orjson, and CPU and allocation
 profiles. The [large-document and worst-case report](benchmarks/PERFORMANCE_24H.md)
-records the latest measured optimizations, allocations, RSS and remaining
+records its measured optimizations, allocations, RSS and remaining
 regressions. The [public-document and date/time report](benchmarks/PERFORMANCE_36H.md)
-covers the preceding builds. Benchmark results apply to the builds recorded
-in each report.
+covers the preceding builds. The [safer-storage report](benchmarks/PERFORMANCE_SAFE_CAPABILITIES.md)
+measures runtime revision `7b7e21c`, before the later decimal, Unicode, tuple,
+and NumPy changes. Published results apply only to the runtime revisions
+recorded in each report. They do not measure subsequent source changes.
 The [earlier report](benchmarks/PROFILE.md) covers performance after
 PR #74 and the SIMD build experiments from that revision.
 

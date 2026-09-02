@@ -163,11 +163,17 @@ callback during Python 3.9 parsing. Ordinary buffer input is now copied unless
 its storage is known to be immutable. `scripts/gc_buffer_regression.py` runs in a
 subprocess and requires actual callbacks inside `feed` on Python 3.9-3.11.
 
-Path conversion, slicing, no-copy byte events, and minimal events prepare every tuple element
-before allocating the outer tuple. `tuple_from_owned_items` accepts owned
-objects in a concrete collection; it cannot call an arbitrary iterator while
-filling slots. The helper checks the allocation and length, then transfers each
-reference once without calling Python or allocating Python objects.
+Path conversion, slicing, no-copy byte events, and minimal events use
+`tuple_from_owned_items`. It prepares and owns every element before allocating
+the outer tuple, then checks the length and allocation result. On full-API
+CPython, it fills the new tuple with `PyTuple_SET_ITEM`. This unchecked setter
+is valid here because the tuple is private, its slots are empty, every index
+is in bounds, and each owned reference is transferred once. No Python callback,
+Python allocation, or GIL release occurs during filling.
+
+Limited-API builds, PyPy, and GraalPy retain the checked `PyTuple_SetItem`
+operation. Allocation or setter failure releases the tuple and any remaining
+prepared owners. A GIL-enabled interpreter remains required.
 
 This ordering matters on Python 3.9: allocating an element can run a garbage
 collection callback, and `gc.get_objects()` can expose an incomplete outer
@@ -175,6 +181,11 @@ tuple. `test_path_tuple_gc.py` observes this on the old implementation without
 dereferencing NULL slots. The same test checks conversion, slicing, and byte
 events after the fix. The tests also retain nested events and exercise slicing
 with large positive and negative steps.
+
+`tuple_tests.rs` checks empty and larger tuples, repeated owners, and element
+lifetimes. A native allocation-failure test checks that failed tuple allocation
+releases the prepared references and that a later call succeeds. This is
+selected failure coverage, not failure injection at every construction step.
 
 The buffer operations are exercised through `with_buffer_text`, `with_readonly_byte_text`,
 `supports_buffer_protocol`, and `BufferExport::drop`. `buffer::with_export`
@@ -247,10 +258,22 @@ checked separately from valid boundary values. `test_number_conversion.py`
 and `test_encode_integer64.py` cover bounds, strict-integer options, converted
 keys, subclasses, callbacks and recovery.
 
-`string_text` borrows compact ASCII from an exact owned string. The owner
-outlives the borrow; other strings use PyO3's UTF-8 conversion.
-`test_encode_string_text.py` checks ASCII bytes, lengths around buffer and
-cache boundaries, Unicode fallback, subclasses and callback mutation.
+`text::compact_ascii_text` borrows existing ASCII storage from an exact Python
+string on supported builds. It cannot invoke a codec or create a UTF-8 cache.
+The owner remains alive for the borrow. `text::string_text` obtains other
+Unicode cache bytes through the CPython API and checks them with
+`std::str::from_utf8` before returning Rust text. Invalid UTF-8 becomes a Python
+error. An owning reference alone does not establish valid UTF-8.
+
+These checks cover jsonmodem's explicit text conversions. PyO3 0.25.1 still
+contains unchecked conversions in generated argument handling and error
+formatting. Those conversions are not covered by this local change. This is
+not a complete fix for every Python entry point.
+
+`test_encode_string_text.py` exercises ordinary text and callback behavior.
+`test_unicode_cache.py` adds isolated invalid-cache regressions for the checked
+local conversions. The tests do not exercise the known unresolved dependency
+conversions with invalid text.
 
 `borrowed_dict::primitive_keys_valid` checks supported primitive keys without
 conversion, Python allocation or output. Refusal starts owning validation.
@@ -280,7 +303,7 @@ conditions differ by helper:
 
 - `strings::new_ascii_string` uses PyO3's Unicode accessors without an additional
   platform or debug-build restriction.
-- `string_text` and generic borrowed dictionary operations have no further
+- `text::compact_ascii_text` and generic borrowed dictionary operations have no further
   debug-build exclusion.
 - `copy_integer` excludes `Py_REF_DEBUG`.
 - Dense dictionary reads, primitive-key checks and direct list append exclude
@@ -308,7 +331,37 @@ one validated calendar-day prefix within a snapshot serialization. It checks
 each tick conversion, recomputes clock and fractional digits, and discards the
 prefix after that call. This reuse adds no unsafe operation.
 
+The dedicated root-container writer requires GIL-enabled, full-API CPython
+3.12 on 64-bit, little-endian Linux x86_64. It excludes `Py_DEBUG`,
+`Py_REF_DEBUG`, and `Py_TRACE_REFS` builds. It owns all admitted entries before
+writing, uses only existing ASCII key storage, and checks helper dictionaries
+before performing callback-free lookups. Scoped numeric exports retain the
+requirements for valid immutable NumPy storage.
+
+The writer grows Rust storage until the final Python bytes allocation. It must
+not invoke Python callbacks or release the GIL between checking the helpers
+and completing the buffer. Any unsupported case declines before publication;
+a publication error is returned rather than retried with earlier helper checks.
+
+`test_numpy_root_vec.py` and `test_numpy_root_dict_vec.py` include output,
+admission, helper replacement, and callback-order cases. Separate native tests
+exercise writer admission and output-allocation failure followed by recovery.
+Those NumPy-dependent native tests are ignored by default and require explicit
+execution; an ordinary test-suite exit code does not establish their coverage.
+
 ### Other Python calls
+
+`number.rs` normalizes very long JSON decimals before converting them to `f64`.
+The normalization uses safe Rust and fixed-size temporary storage. It preserves
+floating-point rounding and negative zero while accounting for the exponent
+and decimal-point position together. The shared helper may return infinity;
+Python and finite-only backends reject that result.
+
+The direct tests in `number.rs` exercise rounding midpoints, discarded nonzero
+digits, exponent cancellation, and the overflow policies of the Rust backends.
+`test_streaming_numbers.py` includes long-number cases completed by a delimiter,
+by `finish()`, and by feeds split into 4,096-byte chunks. These tests describe
+the intended coverage; results must identify the revision that ran them.
 
 Streaming `load_number` uses `PyFloat_FromDouble`, `PyLong_FromLongLong`, and
 `PyLong_FromUnsignedLongLong` after checking the number's range. Each call runs

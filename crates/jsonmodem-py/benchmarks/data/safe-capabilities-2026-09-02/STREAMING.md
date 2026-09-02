@@ -6,9 +6,9 @@ the results as described below. The whole-document reference parses one complete
 
 PR #6 is the previous jsonmodem implementation. Rebuilt uses the same source
 compiled again. Earlier is the first intermediate implementation measured
-during this change. Selected is the implementation in this PR. Runtime
-revisions and binary hashes are in streaming.json. Other libraries are named
-explicitly in each table.
+during this change. Selected is runtime revision `7b7e21c`, measured before the
+later decimal, Unicode, tuple, and NumPy changes. Runtime revisions and binary
+hashes are in streaming.json. Other libraries are named explicitly in each table.
 
 ## How the numbers are summarized
 

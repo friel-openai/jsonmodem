@@ -1,12 +1,15 @@
 # Safer storage, optional event paths, and performance
 
-The selected jsonmodem build takes 6.6% less time than the PR #6 baseline
+The measured `7b7e21c` build takes 6.6% less time than the PR #6 baseline
 across 275 comparable complete-call cases, using the geometric mean.
 It still takes 19.2% more time than orjson 3.11.9. It wins 69 cases and loses
 206. These changes do not surpass orjson across the suite.
 
-The selected runtime is `7b7e21c3bd49d22c0964c4a30be16b5367160caf`.
-Later documentation commits do not change the measured implementation.
+This report measures runtime revision
+`7b7e21c3bd49d22c0964c4a30be16b5367160caf`. It predates the shared long-decimal
+correction, checked local Unicode conversions, revised tuple setter, and
+dedicated NumPy container writer. Its timings, memory measurements, and
+validation counts do not describe those later changes.
 The reference is **orjson 3.11.9; version 3.12.0 was not measured**.
 
 ## Complete calls
@@ -110,11 +113,11 @@ inside the captures; there is no result-retained RSS reading. MiB means
 
 ## Safety and validation
 
-The parser replaces manual initialization and unchecked text conversions with
-ordinary ownership and checked string boundaries. Python buffer exports stay
-alive at stable addresses until release. The tuple helper prepares owned
-elements before allocating the outer tuple, and fills it without callbacks.
-Fallible numeric constructors preserve Python allocation errors.
+In the measured build, the Rust scanner uses safe ownership and checked string
+boundaries. This does not cover all Python Unicode conversions. Buffer exports
+retain stable owners until release. The tuple helper prepares elements before
+allocating the tuple, and fallible numeric constructors preserve Python
+allocation errors.
 
 `PythonOutput` keeps writable storage private, checks capacity, and advances
 its length only after bytes are initialized. It uses Python-owned storage only

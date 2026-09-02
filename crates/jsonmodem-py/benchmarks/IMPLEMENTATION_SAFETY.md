@@ -5,6 +5,9 @@ and [orjson 3.11.9](https://github.com/ijl/orjson/tree/705515d77b28429d0b7c30c3d
 on GIL-enabled CPython. jsonmodem makes some ownership rules easier to inspect;
 that does not establish that it is more secure overall.
 
+This is a historical source comparison. For the current ownership rules and
+known limits, see the [memory-safety documentation](../../../docs/memory-safety-testing.md).
+
 ## Ownership and complexity
 
 jsonmodem's [complete-document decoder](https://github.com/friel-openai/jsonmodem/blob/b0f3190fb72af0396d9d25256f8d0174efd7ae23/crates/jsonmodem-py/src/compat.rs#L142)

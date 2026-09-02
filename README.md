@@ -47,7 +47,7 @@ revision and disable default features:
 
 ```toml
 [dependencies]
-jsonmodem = { git = "https://github.com/friel-openai/jsonmodem", rev = "7b7e21c3bd49d22c0964c4a30be16b5367160caf", default-features = false }
+jsonmodem = { git = "https://github.com/friel-openai/jsonmodem", rev = "53aaa2dc3e7c4f0d83ec9a1a38a0c5cad3341482", default-features = false }
 ```
 
 Without `cached-zipper`, the core crate uses `forbid(unsafe_code)`. The public
@@ -61,6 +61,18 @@ uses the cache. `default-features = false` is not a veto. Check the resolved
 features with `cargo tree -e features -i jsonmodem` in your application.
 
 The independent `serde` feature can be enabled with or without `cached-zipper`.
+
+### Number conversion
+
+`parse_number_f64` converts numeric text to `f64`. For very long JSON decimals,
+it combines the exponent with the decimal-point position before rounding.
+This avoids incorrect zero, finite, or infinite results caused by truncating
+the exponent too early. The conversion uses fixed-size temporary storage.
+
+This function converts numbers; it does not validate JSON syntax. It preserves
+Rust's accepted non-JSON float spellings and returns infinity on overflow.
+Callers requiring finite numbers must check the result. The parser's syntax
+checks and each backend's number policy remain separate.
 
 ### Events without paths
 
