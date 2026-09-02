@@ -38,6 +38,7 @@ class PathView:
     def endswith(self, value: Union[str, Path]) -> bool: ...
 
 Event: TypeAlias = Tuple[EventKind, PathView, Payload]
+EventWithoutPath: TypeAlias = Tuple[EventKind, None, Payload]
 
 class ByteViewStringPayload(TypedDict):
     fragment: Union[memoryview, str]
@@ -119,6 +120,22 @@ class JsonModem(Generic[_ByteViews]):
     def finish(self: "JsonModem[Literal[False]]") -> Iterator[Event]: ...
     @overload
     def finish(self: "JsonModem[Literal[True]]") -> Iterator[ByteViewEvent]: ...
+
+class JsonModemEvents:
+    def __init__(
+        self,
+        options: Optional[ParserOptions] = ...,
+        *,
+        track_paths: bool = ...,
+    ) -> None: ...
+    @property
+    def is_finished(self) -> bool: ...
+    @property
+    def track_paths(self) -> bool: ...
+    def feed(
+        self, chunk_or_chunks: Union[JSONInput, Iterable[JSONInput]],
+    ) -> Iterator[Union[Event, EventWithoutPath]]: ...
+    def finish(self) -> Iterator[Union[Event, EventWithoutPath]]: ...
 
 class JsonModemValueView:
     @property

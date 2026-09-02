@@ -1,11 +1,20 @@
+#[cfg(Py_GIL_DISABLED)]
+compile_error!(
+    "jsonmodem requires a GIL-enabled Python build; free-threaded builds are not supported"
+);
+
+mod buffer;
 mod compat;
+mod events;
 mod numpy;
+mod text;
+#[cfg(test)]
+mod tuple_tests;
 
 use std::{
     borrow::Cow,
     cell::RefCell,
     collections::BTreeMap,
-    os::raw::{c_int, c_void},
     rc::Rc,
     sync::{Arc, Mutex},
 };
@@ -20,14 +29,15 @@ use ::jsonmodem::{
 use pyo3::{
     class::basic::CompareOp,
     create_exception,
-    exceptions::{PyException, PyIndexError, PyTypeError},
+    exceptions::{PyException, PyIndexError, PyOverflowError, PyTypeError},
     ffi,
     prelude::*,
     types::{
-        PyAny, PyBool, PyBytes, PyDict, PyInt, PyList, PyMemoryView, PySlice, PyString,
-        PyStringMethods, PyTuple,
+        PyAny, PyBool, PyBytes, PyDict, PyInt, PyList, PyMemoryView, PySlice, PyString, PyTuple,
     },
 };
+use smallvec::SmallVec;
+use text::string_text;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum DecodeMode {
@@ -68,13 +78,37 @@ fn json_decode_error(py: Python<'_>, message: &str, doc: &str, pos: usize) -> Py
     }
 }
 
+/// Preserve CPython allocation errors when constructing decoded numbers.
+#[inline]
+fn python_signed_integer(py: Python<'_>, value: i64) -> PyResult<PyObject> {
+    // SAFETY: The GIL is held. The constructor returns a new reference or NULL,
+    // which is checked before taking ownership.
+    unsafe { Bound::from_owned_ptr_or_err(py, ffi::PyLong_FromLongLong(value)).map(Bound::unbind) }
+}
+
+#[inline]
+fn python_unsigned_integer(py: Python<'_>, value: u64) -> PyResult<PyObject> {
+    // SAFETY: The GIL is held. The constructor returns a new reference or NULL,
+    // which is checked before taking ownership.
+    unsafe {
+        Bound::from_owned_ptr_or_err(py, ffi::PyLong_FromUnsignedLongLong(value)).map(Bound::unbind)
+    }
+}
+
+#[inline]
+fn python_float(py: Python<'_>, value: f64) -> PyResult<PyObject> {
+    // SAFETY: The GIL is held. The constructor returns a new reference or NULL,
+    // which is checked before taking ownership.
+    unsafe { Bound::from_owned_ptr_or_err(py, ffi::PyFloat_FromDouble(value)).map(Bound::unbind) }
+}
+
 fn load_number(py: Python<'_>, lexeme: &str) -> PyResult<PyObject> {
     let is_float = lexeme
         .as_bytes()
         .iter()
         .any(|byte| matches!(byte, b'.' | b'e' | b'E'));
     if is_float {
-        let number = match lexeme.parse::<f64>() {
+        let number = match ::jsonmodem::parse_number_f64(lexeme) {
             Ok(number) if number.is_finite() => number,
             _ => {
                 return Err(PyTypeError::new_err(
@@ -82,29 +116,15 @@ fn load_number(py: Python<'_>, lexeme: &str) -> PyResult<PyObject> {
                 ));
             }
         };
-        // SAFETY: Python is attached. The constructor returns a new reference
-        // or NULL, which the fallible wrapper checks before taking ownership.
-        return unsafe {
-            Bound::from_owned_ptr_or_err(py, ffi::PyFloat_FromDouble(number)).map(Bound::unbind)
-        };
+        return python_float(py, number);
     }
     // Valid JSON integers longer than twenty bytes cannot fit either type.
     if lexeme.len() <= 20 {
         if let Ok(number) = lexeme.parse::<i64>() {
-            // SAFETY: Python is attached. The constructor returns a new
-            // reference or NULL, which is checked before taking ownership.
-            return unsafe {
-                Bound::from_owned_ptr_or_err(py, ffi::PyLong_FromLongLong(number))
-                    .map(Bound::unbind)
-            };
+            return python_signed_integer(py, number);
         }
         if let Ok(number) = lexeme.parse::<u64>() {
-            // SAFETY: Python is attached. The constructor returns a new
-            // reference or NULL, which is checked before taking ownership.
-            return unsafe {
-                Bound::from_owned_ptr_or_err(py, ffi::PyLong_FromUnsignedLongLong(number))
-                    .map(Bound::unbind)
-            };
+            return python_unsigned_integer(py, number);
         }
     }
     let number = py.get_type::<PyInt>().call1((lexeme,))?;
@@ -372,6 +392,40 @@ fn build_byte_view_payload_with_interns<'py>(
     }
 }
 
+/// Build a tuple from prepared owners without running Python during filling.
+/// An arbitrary iterator is not accepted: producing an item could allocate and
+/// let a GC callback observe the outer tuple's uninitialized slots.
+fn tuple_from_owned_items<'py>(
+    py: Python<'py>,
+    items: SmallVec<[Bound<'py, PyAny>; 8]>,
+) -> PyResult<Bound<'py, PyTuple>> {
+    let length = ffi::Py_ssize_t::try_from(items.len())
+        .map_err(|_| PyOverflowError::new_err("tuple is too large"))?;
+    // SAFETY: The GIL is held, and a NULL allocation becomes MemoryError.
+    let tuple = unsafe { Bound::from_owned_ptr_or_err(py, ffi::PyTuple_New(length))? };
+    for (index, item) in items.into_iter().enumerate() {
+        // SAFETY: all owners were prepared before allocating the tuple. Moving
+        // them into NULL slots cannot allocate, release the GIL, or call Python.
+        // Thus the tuple remains uniquely owned and every index is in bounds.
+        // Both setters take ownership; PyTuple_SetItem also consumes on failure.
+        #[cfg(not(any(Py_LIMITED_API, PyPy, GraalPy)))]
+        let status = unsafe {
+            ffi::PyTuple_SET_ITEM(tuple.as_ptr(), index as ffi::Py_ssize_t, item.into_ptr());
+            0
+        };
+        #[cfg(any(Py_LIMITED_API, PyPy, GraalPy))]
+        let status = unsafe {
+            ffi::PyTuple_SetItem(tuple.as_ptr(), index as ffi::Py_ssize_t, item.into_ptr())
+        };
+        if status != 0 {
+            drop(tuple);
+            return Err(PyErr::fetch(py));
+        }
+    }
+    // SAFETY: PyTuple_New returned this exact tuple, now fully initialized.
+    Ok(unsafe { tuple.downcast_into_unchecked() })
+}
+
 fn build_path_tuple<'py>(
     py: Python<'py>,
     path: &[OwnedPathComponent],
@@ -381,35 +435,11 @@ fn build_path_tuple<'py>(
         return Ok(PyTuple::empty(py));
     }
 
-    // SAFETY: each index belongs to the newly allocated, private tuple. Each
-    // pair is transferred exactly once; DECREF handles incomplete initialization.
-    unsafe {
-        let tuple_ptr = ffi::PyTuple_New(path.len() as ffi::Py_ssize_t);
-        if tuple_ptr.is_null() {
-            return Err(PyErr::fetch(py));
-        }
-
-        for (index, component) in path.iter().enumerate() {
-            let pair = match build_path_component_tuple(py, component, interns) {
-                Ok(pair) => pair,
-                Err(err) => {
-                    ffi::Py_DECREF(tuple_ptr);
-                    return Err(err);
-                }
-            };
-            let status = ffi::PyTuple_SetItem(
-                tuple_ptr,
-                index as ffi::Py_ssize_t,
-                pair.into_any().unbind().into_ptr(),
-            );
-            if status != 0 {
-                ffi::Py_DECREF(tuple_ptr);
-                return Err(PyErr::fetch(py));
-            }
-        }
-
-        Ok(Bound::from_owned_ptr(py, tuple_ptr).downcast_into_unchecked())
+    let mut items = SmallVec::with_capacity(path.len());
+    for component in path {
+        items.push(build_path_component_tuple(py, component, interns)?.into_any());
     }
+    tuple_from_owned_items(py, items)
 }
 
 fn build_path_component_tuple<'py>(
@@ -440,35 +470,11 @@ fn build_path_tuple_for_event(py: Python<'_>, path: &[OwnedPathComponent]) -> Py
         return Ok(PyTuple::empty(py).into_any().unbind());
     }
 
-    // SAFETY: SetItem receives an in-bounds index and an owned reference in a
-    // private tuple. Failure releases the tuple and all initialized elements.
-    unsafe {
-        let tuple_ptr = ffi::PyTuple_New(path.len() as ffi::Py_ssize_t);
-        if tuple_ptr.is_null() {
-            return Err(PyErr::fetch(py));
-        }
-
-        for (index, component) in path.iter().enumerate() {
-            let pair = match build_path_component_tuple_for_event(py, component) {
-                Ok(pair) => pair,
-                Err(err) => {
-                    ffi::Py_DECREF(tuple_ptr);
-                    return Err(err);
-                }
-            };
-            let status = ffi::PyTuple_SetItem(
-                tuple_ptr,
-                index as ffi::Py_ssize_t,
-                pair.into_any().unbind().into_ptr(),
-            );
-            if status != 0 {
-                ffi::Py_DECREF(tuple_ptr);
-                return Err(PyErr::fetch(py));
-            }
-        }
-
-        Ok(Bound::from_owned_ptr(py, tuple_ptr).into_any().unbind())
+    let mut items = SmallVec::with_capacity(path.len());
+    for component in path {
+        items.push(build_path_component_tuple_for_event(py, component)?.into_any());
     }
+    Ok(tuple_from_owned_items(py, items)?.into_any().unbind())
 }
 
 fn build_path_component_tuple_for_event<'py>(
@@ -670,7 +676,16 @@ impl PyDecodeMode {
 impl PyDecodeMode {
     #[new]
     #[pyo3(signature=(name=None))]
-    fn new(name: Option<&str>) -> PyResult<Self> {
+    fn new(name: Option<Bound<'_, PyAny>>) -> PyResult<Self> {
+        let name = name
+            .as_ref()
+            .map(|name| {
+                let text = name
+                    .downcast::<PyString>()
+                    .map_err(|_| PyTypeError::new_err("name must be str"))?;
+                string_text(text)
+            })
+            .transpose()?;
         let mode = match name {
             None => DecodeMode::StrictUnicode,
             Some("StrictUnicode") => DecodeMode::StrictUnicode,
@@ -867,44 +882,21 @@ impl PyPathView {
             return Ok(PyTuple::empty(py).into_any().unbind());
         }
 
-        // SAFETY: the slice indices are checked against self.path, and every
-        // target index is within the private tuple allocated here.
-        unsafe {
-            let tuple_ptr = ffi::PyTuple_New(length as ffi::Py_ssize_t);
-            if tuple_ptr.is_null() {
-                return Err(PyErr::fetch(py));
+        let mut items = SmallVec::with_capacity(length);
+        let mut source_index = start;
+        for target_index in 0..length {
+            let component = usize::try_from(source_index)
+                .ok()
+                .and_then(|index| self.path.get(index))
+                .ok_or_else(|| PyIndexError::new_err("PathView index out of range"))?;
+            items.push(build_path_component_tuple_for_event(py, component)?.into_any());
+            if target_index + 1 < length {
+                source_index = source_index
+                    .checked_add(step)
+                    .ok_or_else(|| PyIndexError::new_err("PathView index out of range"))?;
             }
-
-            let mut source_index = start;
-            for target_index in 0..length {
-                let Some(component) = usize::try_from(source_index)
-                    .ok()
-                    .and_then(|index| self.path.get(index))
-                else {
-                    ffi::Py_DECREF(tuple_ptr);
-                    return Err(PyIndexError::new_err("PathView index out of range"));
-                };
-                let pair = match build_path_component_tuple_for_event(py, component) {
-                    Ok(pair) => pair,
-                    Err(err) => {
-                        ffi::Py_DECREF(tuple_ptr);
-                        return Err(err);
-                    }
-                };
-                let status = ffi::PyTuple_SetItem(
-                    tuple_ptr,
-                    target_index as ffi::Py_ssize_t,
-                    pair.into_any().unbind().into_ptr(),
-                );
-                if status != 0 {
-                    ffi::Py_DECREF(tuple_ptr);
-                    return Err(PyErr::fetch(py));
-                }
-                source_index += step;
-            }
-
-            Ok(Bound::from_owned_ptr(py, tuple_ptr).into_any().unbind())
         }
+        Ok(tuple_from_owned_items(py, items)?.into_any().unbind())
     }
 
     fn item_at(&self, py: Python<'_>, index: isize) -> PyResult<PyObject> {
@@ -983,10 +975,10 @@ impl PyPathView {
 
     fn endswith(&self, value: Bound<'_, PyAny>) -> PyResult<bool> {
         if let Ok(text) = value.downcast::<PyString>() {
-            let text = <Bound<'_, PyString> as PyStringMethods<'_>>::to_cow(text)?;
+            let text = string_text(text)?;
             return Ok(matches!(
                 self.path.last(),
-                Some(OwnedPathComponent::Key(key)) if key.as_ref() == text.as_ref()
+                Some(OwnedPathComponent::Key(key)) if key.as_ref() == text
             ));
         }
 
@@ -999,8 +991,8 @@ impl PyPathView {
         self.tuple_matches_at(items, self.path.len() - items.len())
     }
 
-    fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
-        Ok(self.tuple_object(py)?.bind(py).repr()?.to_string())
+    fn __repr__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyString>> {
+        self.tuple_object(py)?.bind(py).repr()
     }
 
     fn __richcmp__(&self, other: Bound<'_, PyAny>, op: CompareOp) -> PyResult<PyObject> {
@@ -1055,7 +1047,11 @@ impl PyStringPayload {
         Ok(dict)
     }
 
-    fn __getitem__(&self, key: &str) -> PyResult<PyObject> {
+    fn __getitem__(&self, key: Bound<'_, PyAny>) -> PyResult<PyObject> {
+        let key = key
+            .downcast::<PyString>()
+            .map_err(|_| PyTypeError::new_err("key must be str"))?;
+        let key = string_text(key)?;
         Python::with_gil(|py| match key {
             "fragment" => Ok(PyString::new(py, &self.fragment).into_any().unbind()),
             "is_initial" => Ok(PyBool::new(py, self.is_initial)
@@ -1072,8 +1068,8 @@ impl PyStringPayload {
         })
     }
 
-    fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
-        Ok(self.as_dict(py)?.repr()?.to_string())
+    fn __repr__<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyString>> {
+        self.as_dict(py)?.repr()
     }
 
     fn __richcmp__(&self, other: Bound<'_, PyAny>, op: CompareOp) -> PyResult<PyObject> {
@@ -1695,8 +1691,11 @@ impl PyJsonModemValueView {
                 .ok_or_else(|| PyIndexError::new_err("value view is empty"))?;
             match value {
                 CoreValue::Object(map) => {
-                    let key: String = key.extract()?;
-                    if !map.contains_key(key.as_str()) {
+                    let key = key
+                        .downcast::<PyString>()
+                        .map_err(|_| PyTypeError::new_err("object key must be str"))?;
+                    let key = string_text(key)?;
+                    if !map.contains_key(key) {
                         return Err(PyIndexError::new_err(format!("missing object key {key:?}")));
                     }
                     path.push(OwnedPathComponent::Key(key.into()));
@@ -1759,7 +1758,11 @@ impl PyJsonModemValueView {
 
     fn __repr__(&self, py: Python<'_>) -> PyResult<String> {
         let snapshot = self.snapshot(py)?;
-        Ok(format!("JsonModemValueView({})", snapshot.bind(py).repr()?))
+        let representation = snapshot.bind(py).repr()?;
+        Ok(format!(
+            "JsonModemValueView({})",
+            string_text(&representation)?
+        ))
     }
 }
 
@@ -3031,7 +3034,14 @@ fn mutable_apply_event(
                 )?;
             } else {
                 let mut text = py_value_at_path(py, root, &path)?
-                    .and_then(|value| value.extract::<String>(py).ok())
+                    .and_then(|value| {
+                        value
+                            .bind(py)
+                            .downcast::<PyString>()
+                            .ok()
+                            .and_then(|text| string_text(text).ok())
+                            .map(str::to_owned)
+                    })
                     .unwrap_or_default();
                 text.push_str(fragment.as_ref());
                 py_assign_at_path(
@@ -3603,17 +3613,19 @@ fn byte_view_fragment(
 
 fn read_path_patterns(value: &Bound<'_, PyAny>) -> PyResult<Vec<PathPattern>> {
     if let Ok(text) = value.downcast::<PyString>() {
-        let text = <Bound<'_, PyString> as PyStringMethods<'_>>::to_cow(text)?;
-        return Ok(vec![parse_path_pattern(text.as_ref())?]);
+        return Ok(vec![parse_path_pattern(string_text(text)?)?]);
     }
 
     let mut patterns = Vec::new();
     for item in value.try_iter()? {
         let item = item?;
-        let text: String = item.extract().map_err(|_| {
+        let text = item.downcast::<PyString>().map_err(|_| {
             PyTypeError::new_err("paths must be a path string or an iterable of path strings")
         })?;
-        patterns.push(parse_path_pattern(&text)?);
+        let text = string_text(text).map_err(|_| {
+            PyTypeError::new_err("paths must be a path string or an iterable of path strings")
+        })?;
+        patterns.push(parse_path_pattern(text)?);
     }
 
     if patterns.is_empty() {
@@ -3676,9 +3688,10 @@ fn extract_decode_mode(value: &Bound<'_, PyAny>) -> PyResult<DecodeMode> {
     if let Ok(handle) = value.extract::<Py<PyDecodeMode>>() {
         Ok(handle.borrow(value.py()).mode)
     } else {
+        let name = value.get_type().name()?;
         Err(PyTypeError::new_err(format!(
             "decode_mode must be a DecodeMode, got {}",
-            value.get_type().name()?
+            string_text(&name)?
         )))
     }
 }
@@ -3722,8 +3735,7 @@ fn with_input_text<T>(
     f: impl FnOnce(&str) -> PyResult<T>,
 ) -> PyResult<T> {
     if let Ok(text) = data.downcast::<PyString>() {
-        let text = <Bound<'_, PyString> as PyStringMethods<'_>>::to_cow(text)?;
-        return f(text.as_ref());
+        return f(string_text(text)?);
     }
 
     if let Ok(bytes) = data.downcast::<PyBytes>() {
@@ -3737,9 +3749,10 @@ fn with_input_text<T>(
         return result;
     }
 
+    let name = data.get_type().name()?;
     Err(PyTypeError::new_err(format!(
         "{caller} expected str, bytes, bytearray, or contiguous memoryview, got {}",
-        data.get_type().name()?
+        string_text(&name)?
     )))
 }
 
@@ -3756,67 +3769,7 @@ fn is_single_byte_view_input(data: &Bound<'_, PyAny>) -> bool {
 }
 
 fn supports_buffer_protocol(data: &Bound<'_, PyAny>) -> bool {
-    const PYBUF_SIMPLE: c_int = 0;
-
-    let mut view = PyBufferView::new();
-    let status = unsafe { PyObject_GetBuffer(data.as_ptr(), &mut view, PYBUF_SIMPLE) };
-    if status != 0 {
-        unsafe { ffi::PyErr_Clear() };
-        return false;
-    }
-    let guard = PyBufferGuard { view };
-    drop(guard);
-    true
-}
-
-struct PyBufferGuard {
-    view: PyBufferView,
-}
-
-impl Drop for PyBufferGuard {
-    fn drop(&mut self) {
-        if !self.view.obj.is_null() {
-            unsafe { PyBuffer_Release(&mut self.view) };
-        }
-    }
-}
-
-#[repr(C)]
-struct PyBufferView {
-    buf: *mut c_void,
-    obj: *mut ffi::PyObject,
-    len: isize,
-    itemsize: isize,
-    readonly: c_int,
-    ndim: c_int,
-    format: *mut std::os::raw::c_char,
-    shape: *mut isize,
-    strides: *mut isize,
-    suboffsets: *mut isize,
-    internal: *mut c_void,
-}
-
-impl PyBufferView {
-    const fn new() -> Self {
-        Self {
-            buf: std::ptr::null_mut(),
-            obj: std::ptr::null_mut(),
-            len: 0,
-            itemsize: 0,
-            readonly: 0,
-            ndim: 0,
-            format: std::ptr::null_mut(),
-            shape: std::ptr::null_mut(),
-            strides: std::ptr::null_mut(),
-            suboffsets: std::ptr::null_mut(),
-            internal: std::ptr::null_mut(),
-        }
-    }
-}
-
-unsafe extern "C" {
-    fn PyObject_GetBuffer(obj: *mut ffi::PyObject, view: *mut PyBufferView, flags: c_int) -> c_int;
-    fn PyBuffer_Release(view: *mut PyBufferView);
+    buffer::with_export(data, |_| Ok(())).is_ok_and(|export| export.is_some())
 }
 
 fn with_buffer_text<T>(
@@ -3825,47 +3778,32 @@ fn with_buffer_text<T>(
     caller: &str,
     f: impl FnOnce(&str) -> PyResult<T>,
 ) -> PyResult<Option<PyResult<T>>> {
-    const PYBUF_SIMPLE: c_int = 0;
-
-    let mut view = PyBufferView::new();
-    let status = unsafe { PyObject_GetBuffer(data.as_ptr(), &mut view, PYBUF_SIMPLE) };
-    if status != 0 {
-        unsafe { ffi::PyErr_Clear() };
-        return Ok(None);
-    }
-
-    let guard = PyBufferGuard { view };
-    if guard.view.len < 0 {
-        return Ok(Some(Err(PyTypeError::new_err(format!(
-            "{caller} received a negative buffer length"
-        )))));
-    }
-
-    let immutable = if let Ok(memoryview) = data.downcast::<PyMemoryView>() {
-        memoryview
-            .getattr(pyo3::intern!(py, "obj"))?
-            .is_exact_instance_of::<PyBytes>()
-    } else {
-        false
-    };
-    let bytes = if guard.view.len == 0 {
-        &[]
-    } else {
-        // SAFETY: the exporter supplies readable storage and the guard holds
-        // its export. No Python callback occurs before the copy below.
-        unsafe { std::slice::from_raw_parts(guard.view.buf.cast::<u8>(), guard.view.len as usize) }
-    };
-    // f can allocate Python objects and run GC callbacks on older interpreters.
-    // A read-only export alone does not make its backing storage immutable.
-    let bytes = if immutable {
-        Cow::Borrowed(bytes)
-    } else {
-        Cow::Owned(bytes.to_vec())
-    };
-    let text = core::str::from_utf8(&bytes).map_err(|err| {
-        PyTypeError::new_err(format!("{caller} input bytes are not valid UTF-8: {err}"))
-    });
-    Ok(Some(text.and_then(f)))
+    buffer::with_export(data, |export| {
+        if export.len() < 0 {
+            return Ok(Err(PyTypeError::new_err(format!(
+                "{caller} received a negative buffer length"
+            ))));
+        }
+        let owner = if let Ok(memoryview) = data.downcast::<PyMemoryView>() {
+            Some(memoryview.getattr(pyo3::intern!(py, "obj"))?)
+        } else {
+            None
+        };
+        // A read-only export alone does not make its storage immutable.
+        // Parser callbacks may allocate Python objects and invoke GC callbacks.
+        let bytes = if let Some(owner) = owner
+            .as_ref()
+            .filter(|owner| owner.is_exact_instance_of::<PyBytes>())
+        {
+            Cow::Borrowed(export.owner_bytes(owner.downcast::<PyBytes>()?, caller)?)
+        } else {
+            Cow::Owned(export.snapshot(caller)?)
+        };
+        let text = core::str::from_utf8(&bytes).map_err(|err| {
+            PyTypeError::new_err(format!("{caller} input bytes are not valid UTF-8: {err}"))
+        });
+        Ok(text.and_then(f))
+    })
 }
 
 fn with_readonly_byte_text<T>(
@@ -3884,8 +3822,6 @@ fn with_readonly_byte_text<T>(
             "byte views require exact bytes or a read-only buffer",
         ));
     }
-    const PYBUF_SIMPLE: c_int = 0;
-
     // Acquire the retained export before validating or borrowing any text.
     // Asking data for another export afterward could call Python and return
     // different storage, or mutate the bytes we have already validated.
@@ -3903,64 +3839,57 @@ fn with_readonly_byte_text<T>(
             "byte views require one-dimensional input",
         ));
     }
-    let mut view = PyBufferView::new();
-    // SAFETY: source is a built-in memoryview retaining the acquired export.
-    let status = unsafe { PyObject_GetBuffer(source.as_ptr(), &mut view, PYBUF_SIMPLE) };
-    if status != 0 {
-        unsafe { ffi::PyErr_Clear() };
-        return Err(PyTypeError::new_err(format!(
-            "{caller} expected bytes or a read-only contiguous memoryview, got {}",
-            data.get_type().name()?
-        )));
-    }
+    let result = buffer::with_export(source.as_any(), |export| {
+        if !export.readonly() {
+            return Err(PyTypeError::new_err(format!(
+                "{caller} requires read-only bytes-like input for no-copy payload views"
+            )));
+        }
+        if export.len() < 0 {
+            return Err(PyTypeError::new_err(format!(
+                "{caller} received a negative buffer length"
+            )));
+        }
+        if export.itemsize() != 1 {
+            return Err(PyTypeError::new_err(format!(
+                "{caller} requires a bytes-like input with itemsize 1 for no-copy payload views"
+            )));
+        }
+        let owner = source.getattr(pyo3::intern!(py, "obj"))?;
+        if data.is_instance_of::<PyMemoryView>() && owner.downcast::<PyBytes>().is_err() {
+            return Err(PyTypeError::new_err(format!(
+                "{caller} requires memoryview input backed by bytes for stable no-copy payload views"
+            )));
+        }
 
-    let guard = PyBufferGuard { view };
-    if guard.view.readonly == 0 {
-        return Err(PyTypeError::new_err(format!(
-            "{caller} requires read-only bytes-like input for no-copy payload views"
-        )));
-    }
-    if guard.view.len < 0 {
-        return Err(PyTypeError::new_err(format!(
-            "{caller} received a negative buffer length"
-        )));
-    }
-    if guard.view.itemsize != 1 {
-        return Err(PyTypeError::new_err(format!(
-            "{caller} requires a bytes-like input with itemsize 1 for no-copy payload views"
-        )));
-    }
-    let owner = source.getattr(pyo3::intern!(py, "obj"))?;
-    if data.is_instance_of::<PyMemoryView>() && owner.downcast::<PyBytes>().is_err() {
-        return Err(PyTypeError::new_err(format!(
-            "{caller} requires memoryview input backed by bytes for stable no-copy payload views"
-        )));
-    }
+        if !owner.is_exact_instance_of::<PyBytes>() {
+            // Copy the retained export, never request a second export from data.
+            let snapshot = source
+                .call_method0(pyo3::intern!(py, "tobytes"))?
+                .downcast_into::<PyBytes>()?;
+            let source = PyMemoryView::from(snapshot.as_any())?;
+            let text = core::str::from_utf8(snapshot.as_bytes()).map_err(|err| {
+                PyTypeError::new_err(format!("{caller} input bytes are not valid UTF-8: {err}"))
+            })?;
+            return f(text, &source);
+        }
 
-    if !owner.is_exact_instance_of::<PyBytes>() {
-        // Copy through the built-in memoryview before creating a Rust borrow.
-        // Unknown exporters may expose mutable storage as read-only.
-        let snapshot = source
-            .call_method0(pyo3::intern!(py, "tobytes"))?
-            .downcast_into::<PyBytes>()?;
-        let source = PyMemoryView::from(snapshot.as_any())?;
-        let text = core::str::from_utf8(snapshot.as_bytes()).map_err(|err| {
+        let bytes = export.owner_bytes(owner.downcast::<PyBytes>()?, caller)?;
+        let text = core::str::from_utf8(bytes).map_err(|err| {
             PyTypeError::new_err(format!("{caller} input bytes are not valid UTF-8: {err}"))
         })?;
-        return f(text, &source);
-    }
-
-    let bytes = if guard.view.len == 0 {
-        &[]
-    } else {
-        // SAFETY: this exact export is backed by immutable bytes. The guard
-        // and source keep it alive, including while f allocates Python objects.
-        unsafe { std::slice::from_raw_parts(guard.view.buf.cast::<u8>(), guard.view.len as usize) }
-    };
-    let text = core::str::from_utf8(bytes).map_err(|err| {
-        PyTypeError::new_err(format!("{caller} input bytes are not valid UTF-8: {err}"))
+        f(text, &source)
     })?;
-    f(text, &source)
+    match result {
+        Some(result) => Ok(result),
+        None => {
+            let name = data.get_type().name()?;
+            Err(PyTypeError::new_err(format!(
+                "{caller} expected bytes or a read-only contiguous memoryview, got {}",
+                string_text(&name)?
+            )))
+        }
+    }
 }
 
 fn memoryview_range(
@@ -4023,6 +3952,7 @@ fn jsonmodem(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(compat::_dumps_objects, m)?)?;
     m.add_class::<compat::Fragment>()?;
     m.add_function(wrap_pyfunction!(numpy::_numpy_dumps, m)?)?;
+    m.add_class::<numpy::NumericScalarTypes>()?;
     let json_decode_error = py.import("json")?.getattr("JSONDecodeError")?;
     m.add("JSONDecodeError", json_decode_error)?;
     m.add("JSONEncodeError", py.get_type::<PyTypeError>())?;
@@ -4030,6 +3960,7 @@ fn jsonmodem(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     register_decode_mode_constants(py)?;
     m.add_class::<PyParserOptions>()?;
     m.add_class::<PyJsonModem>()?;
+    m.add_class::<events::PyJsonModemEvents>()?;
     m.add_class::<PyEventIter>()?;
     m.add_class::<PyPathView>()?;
     m.add_class::<PyStringPayload>()?;

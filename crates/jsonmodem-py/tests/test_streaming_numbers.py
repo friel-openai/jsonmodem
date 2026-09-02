@@ -95,6 +95,58 @@ def test_nonfinite_streaming_numbers_are_rejected(text):
             list(parser.finish())
 
 
+@pytest.mark.parametrize("parser_type,options", [
+    pytest.param(jsonmodem.JsonModem, {}, id="JsonModem"),
+    pytest.param(jsonmodem.JsonModem, {"byte_views": True}, id="JsonModem-byte-views"),
+    pytest.param(jsonmodem.JsonModemEvents, {}, id="JsonModemEvents"),
+    pytest.param(jsonmodem.JsonModemValues, {}, id="JsonModemValues"),
+])
+@pytest.mark.parametrize("chunk_mode", ["delimited", "finish", "4096-bytes"])
+@pytest.mark.parametrize("negative", [False, True], ids=["positive", "negative"])
+@pytest.mark.parametrize("prefix,zero_count,suffix,expected", [
+    pytest.param(b"1", 65_536, b"e-655360", 0.0, id="underflow"),
+    pytest.param(b"0.", 65_535, b"1e655360", None, id="overflow"),
+    pytest.param(b"0.", 655_360, b"1e655361", 1.0, id="finite-cancellation"),
+])
+def test_long_exponent_cancellation(
+    parser_type, options, chunk_mode, negative, prefix, zero_count, suffix, expected,
+):
+    """Use 65,545- or 655,370-byte tokens, plus one byte for a minus sign.
+
+    A trailing space completes a borrowed token in one feed. The other modes
+    complete an owned token at finish(), after one feed or 4,096-byte chunks.
+    """
+    document = (b"-" if negative else b"") + prefix + b"0" * zero_count + suffix
+    if chunk_mode == "delimited":
+        chunks = [document + b" "]
+    elif chunk_mode == "finish":
+        chunks = [document]
+    else:
+        chunks = [document[index:index + 4096] for index in range(0, len(document), 4096)]
+    parser = parser_type(**options)
+
+    def read_number():
+        events = []
+        for chunk in chunks:
+            events.extend(parser.feed(chunk))
+        events.extend(parser.finish())
+        if isinstance(parser, jsonmodem.JsonModemValues):
+            return parser.view().snapshot()
+        numbers = [value for kind, _, value in events if kind == "number"]
+        assert len(numbers) == 1
+        return numbers[0]
+
+    if expected is None:
+        with pytest.raises(jsonmodem.JsonModemSyntaxError):
+            read_number()
+        with pytest.raises(jsonmodem.JSONDecodeError, match="infinity"):
+            jsonmodem.loads(document)
+    else:
+        expected = -expected if negative else expected
+        same_number(read_number(), expected)
+        same_number(jsonmodem.loads(document), expected)
+
+
 @pytest.mark.skipif(not hasattr(sys, "set_int_max_str_digits"), reason="Python has no integer digit limit")
 @pytest.mark.parametrize("byte_views", [False, True])
 def test_large_streaming_integers_keep_python_digit_limits(byte_views):

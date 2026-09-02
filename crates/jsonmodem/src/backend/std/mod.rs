@@ -163,7 +163,7 @@ impl EventCtx for LexemeBackend {
     }
     fn new_number<'src>(&mut self, value: &'src str) -> Result<Self::Num<'src>, Self::Error> {
         if value.bytes().any(|byte| matches!(byte, b'.' | b'e' | b'E'))
-            && !value.parse::<f64>().is_ok_and(f64::is_finite)
+            && !crate::parse_number_f64(value).is_ok_and(f64::is_finite)
         {
             return Err(LexemeNumberError);
         }
@@ -273,12 +273,12 @@ impl EventCtx for StdBackend {
 
     #[inline]
     fn new_number<'src>(&mut self, n: &'src str) -> Result<Self::Num<'src>, Self::Error> {
-        n.parse()
+        crate::parse_number_f64(n)
     }
 
     #[inline]
     fn new_number_owned<'a>(&mut self, n: String) -> Result<Self::Num<'a>, Self::Error> {
-        n.parse()
+        crate::parse_number_f64(&n)
     }
 
     #[inline]

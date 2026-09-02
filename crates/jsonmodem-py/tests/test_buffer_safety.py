@@ -84,6 +84,40 @@ def test_sliced_readonly_buffer_and_payload_outlive_input(byte_views):
         assert payload.fragment == "value"
 
 
+@pytest.mark.parametrize("byte_views", [False, True])
+@pytest.mark.parametrize("offset", [0, 1, 7, 16, 63, 127])
+@pytest.mark.parametrize("length", [0, 1, 31, 128])
+def test_bytes_owner_slices_at_varied_offsets(byte_views, offset, length):
+    document = b'["' + b"x" * length + b'"]'
+    owner = b"p" * offset + document + b"suffix"
+    view = memoryview(owner)[offset : offset + len(document)]
+    parser = JsonModem(byte_views=byte_views)
+    events = list(parser.feed(view)) + list(parser.finish())
+    view.release()
+    del owner, view, parser
+    gc.collect()
+    fragments = []
+    for kind, path, payload in events:
+        if kind == "string":
+            fragment = payload["fragment"] if byte_views else payload.fragment
+            if isinstance(fragment, memoryview):
+                fragment = fragment.tobytes().decode()
+            fragments.append(fragment)
+    assert "".join(fragments) == "x" * length
+
+
+@pytest.mark.parametrize("byte_views", [False, True])
+@pytest.mark.parametrize("offset", [0, 1, 8])
+def test_empty_bytes_owner_slices(byte_views, offset):
+    owner = b"01234567"
+    view = memoryview(owner)[offset:offset]
+    parser = JsonModem(byte_views=byte_views)
+    assert list(parser.feed(view)) == []
+    view.release()
+    list(parser.feed(b"true"))
+    list(parser.finish())
+
+
 def test_owned_events_do_not_change_after_bytearray_mutation():
     source = bytearray(b'{"text":"original"}')
     parser = JsonModem()

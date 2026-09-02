@@ -1,3 +1,4 @@
+mod events;
 pub mod raw;
 mod std;
 
@@ -33,6 +34,7 @@ mod transition_debug {
 
 mod zipper_transition;
 
+pub use events::EventBackend;
 pub use raw::RawContext;
 pub(crate) use zipper_transition::{ParserCursor, RootTransition};
 

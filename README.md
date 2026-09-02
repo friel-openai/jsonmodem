@@ -15,13 +15,14 @@ Parse → filter → act **while the bytes are still in flight**.
 
 ## ✨ Why jsonmodem?
 
-* **Linear performance, bounded memory** – work grows with bytes received; peak usage is limited to
-  the largest in‑flight fragment when default options are used.
+* **Incremental parsing** - consumes new chunks without reparsing the whole
+  document. Paths, buffered strings, values and retained events still require
+  storage. Applications must set input and output limits.
 * **LLM‑ready** – handles multi‑kilobyte tool calls without the quadratic “buffer, patch, re‑parse”
   dance.
 * **First‑class moderation hooks** – inspect or cancel as soon as a sentinel field appears.
-* **Hardened core** – QuickCheck property tests, `cargo‑fuzz` (via `libafl_libfuzzer`), and Miri
-  runs to verify safety.
+* **Safety tests** - QuickCheck, `cargo-fuzz` (via `libafl_libfuzzer`), and Miri
+  check selected executions. Passing them is not a proof of memory safety.
 
 ---
 
@@ -31,7 +32,57 @@ Parse → filter → act **while the bytes are still in flight**.
 cargo add jsonmodem
 ````
 
-*(Python, Node‑API, and WASM bindings are on the roadmap.)*
+The [Python binding](crates/jsonmodem-py/README.md) supports streaming and
+complete-document operations. Node-API and WASM bindings remain on the roadmap.
+
+### Rust features
+
+`cached-zipper` is enabled by default. It lets value-building adapters cache
+pointers along the current branch instead of walking from the root for each
+access. Its unsafe implementation has safe interfaces tied to the tree's owner;
+enabling it does not permit unchecked JSON or overlapping mutable references.
+
+To use safe tree traversal in this unreleased implementation, pin its Git
+revision and disable default features:
+
+```toml
+[dependencies]
+jsonmodem = { git = "https://github.com/friel-openai/jsonmodem", rev = "53aaa2dc3e7c4f0d83ec9a1a38a0c5cad3341482", default-features = false }
+```
+
+Without `cached-zipper`, the core crate uses `forbid(unsafe_code)`. The public
+parsing and value APIs stay the same, but value building can be slower,
+especially for deeply nested documents. This guarantee covers the core crate's
+source, not its dependencies or the Python extension.
+
+Cargo combines dependency features. If any other dependency enables
+`cached-zipper`, including through jsonmodem's defaults, your application also
+uses the cache. `default-features = false` is not a veto. Check the resolved
+features with `cargo tree -e features -i jsonmodem` in your application.
+
+The independent `serde` feature can be enabled with or without `cached-zipper`.
+
+### Number conversion
+
+`parse_number_f64` converts numeric text to `f64`. For very long JSON decimals,
+it combines the exponent with the decimal-point position before rounding.
+This avoids incorrect zero, finite, or infinite results caused by truncating
+the exponent too early. The conversion uses fixed-size temporary storage.
+
+This function converts numbers; it does not validate JSON syntax. It preserves
+Rust's accepted non-JSON float spellings and returns infinity on overflow.
+Callers requiring finite numbers must check the result. The parser's syntax
+checks and each backend's number policy remain separate.
+
+### Events without paths
+
+Use `JsonModem<EventBackend>` when you need events but not their locations.
+`EventBackend` keeps the parent container kinds needed to validate JSON, but
+does not store event paths. Choose `LexemeBackend` when paths are needed.
+The shared lexer can still buffer property-name text, especially across feeds.
+This choice belongs to each parser, not to Cargo features; another dependency
+cannot turn path tracking on for that parser. The Python equivalent is
+[`JsonModemEvents`](crates/jsonmodem-py/README.md#streaming-usage).
 
 ---
 
@@ -108,7 +159,7 @@ _Benchmarks recorded on an AMD Ryzen Threadripper PRO 5975WX (64 cores @ 4.56 
 | Target              | Status      | Notes                       |
 | ------------------- | ----------- | --------------------------- |
 | Rust crate          | ✅ released |                             |
-| **Python** bindings | 🛠 next      | `pyo3`, published to PyPI  |
+| **Python** bindings | Available in source | PyO3; see the Python README |
 | **Node‑API** module | ⏩ queued   | Native addon for TS/JS      |
 | **WASM** build      | ⏩ queued   | For browsers and more       |
 

@@ -52,6 +52,9 @@ run_step "clippy (cfg=miri)" \
          env "${FAST_ENV[@]}" cargo clippy --workspace --all-targets "${EXCLUDE_ARGS[@]}" \
            -- -D warnings
 
+run_step "core feature combinations" \
+         env "${FAST_ENV[@]}" bash "$REPO_ROOT/.agent/check-features.sh"
+
 ###############################################################################
 # 3. Optional Miri (cfg via env var)
 ###############################################################################

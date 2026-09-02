@@ -2,6 +2,21 @@
 
 mod datetime;
 
+#[cfg(all(
+    Py_3_12,
+    not(any(Py_3_13, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+    not(any(
+        py_sys_config = "Py_DEBUG",
+        py_sys_config = "Py_REF_DEBUG",
+        py_sys_config = "Py_TRACE_REFS",
+    )),
+    target_os = "linux",
+    target_arch = "x86_64",
+    target_pointer_width = "64",
+    target_endian = "little",
+))]
+mod numpy_root;
+
 use pyo3::{
     Borrowed,
     exceptions::{PyOverflowError, PyTypeError, PyUnicodeEncodeError, PyValueError},
@@ -13,7 +28,7 @@ use smallvec::SmallVec;
 
 use super::{
     APPEND_NEWLINE, Encoder, INITIAL_OUTPUT_CAPACITY, MAX_ENCODE_DEPTH, NON_STR_KEYS, SORT_KEYS,
-    allocation_error, key_utf8_error,
+    allocation_error, key_utf8_error, output, string_text,
 };
 
 const PASSTHROUGH_SUBCLASS: i32 = 256;
@@ -64,7 +79,7 @@ fn array_items<'py>(values: impl Iterator<Item = Bound<'py, PyAny>>) -> PyResult
 
 /// Uncommon Python operations share the native output buffer and depth counter.
 struct ObjectEncoder<'helpers, 'py> {
-    encoder: Encoder<true>,
+    encoder: Encoder<true, output::Output<'py>>,
     default: Bound<'py, PyAny>,
     default_provided: bool,
     // The caller retains the immutable helper tuple until encoding finishes.
@@ -73,12 +88,20 @@ struct ObjectEncoder<'helpers, 'py> {
     key_text: Borrowed<'helpers, 'py, PyAny>,
     special: Borrowed<'helpers, 'py, PyAny>,
     datetime_types: [Borrowed<'helpers, 'py, PyAny>; 3],
+    // A successful builtin write establishes helper and Enum priority for this
+    // immutable type. The retained helper tuple cannot change during callbacks.
+    last_datetime_type: Option<Bound<'py, PyType>>,
     uuid_type: Borrowed<'helpers, 'py, PyAny>,
     str_base: Borrowed<'helpers, 'py, PyAny>,
     int_base: Borrowed<'helpers, 'py, PyAny>,
     get_attribute: Borrowed<'helpers, 'py, PyAny>,
     type_dict: Borrowed<'helpers, 'py, PyAny>,
     classes: SmallVec<[ClassAttributes<'py>; 4]>,
+    // The helper tuple owns types and default helper identities for this encode.
+    numpy_types: Option<(
+        Bound<'py, crate::numpy::NumericScalarTypes>,
+        Bound<'py, PyTuple>,
+    )>,
     // Completed root output stays owned until finish returns it.
     root_bytes: Option<Bound<'py, PyBytes>>,
 }
@@ -91,11 +114,21 @@ struct ClassAttributes<'py> {
 
 impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
     fn new(
-        encoder: Encoder<true>,
+        encoder: Encoder<true, output::Output<'py>>,
         default: Bound<'py, PyAny>,
         default_provided: bool,
         helpers: &'helpers Bound<'py, PyTuple>,
     ) -> PyResult<Self> {
+        let numpy_types = if encoder.option & SERIALIZE_NUMPY != 0 && helpers.len() > 13 {
+            helpers
+                .get_item(12)?
+                .downcast_into()
+                .ok()
+                .zip(helpers.get_item(13)?.downcast_into::<PyTuple>().ok())
+                .filter(|(_, defaults)| defaults.len() == 8)
+        } else {
+            None
+        };
         Ok(Self {
             encoder,
             default,
@@ -109,12 +142,14 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                 helpers.get_borrowed_item(5)?,
                 helpers.get_borrowed_item(6)?,
             ],
+            last_datetime_type: None,
             uuid_type: helpers.get_borrowed_item(7)?,
             str_base: helpers.get_borrowed_item(8)?,
             int_base: helpers.get_borrowed_item(9)?,
             get_attribute: helpers.get_borrowed_item(10)?,
             type_dict: helpers.get_borrowed_item(11)?,
             classes: SmallVec::new(),
+            numpy_types,
             root_bytes: None,
         })
     }
@@ -163,10 +198,10 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                 if option & NON_STR_KEYS != 0 && !key.is_exact_instance_of::<PyString>() {
                     *key = self.key_text.call1((&*key, option))?;
                 }
-                key.downcast_exact::<PyString>()
-                    .map_err(|_| PyTypeError::new_err("Dict key must be str"))?
-                    .to_str()
-                    .map_err(|cause| key_utf8_error(key.py(), cause))?;
+                let text = key
+                    .downcast_exact::<PyString>()
+                    .map_err(|_| PyTypeError::new_err("Dict key must be str"))?;
+                string_text(text).map_err(|cause| key_utf8_error(key.py(), cause))?;
             }
         }
         if option & SORT_KEYS != 0 {
@@ -178,20 +213,9 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                 .map_err(|_| allocation_error())?;
             order.extend(0..items.len());
             order.sort_unstable_by(|&left, &right| {
-                items[left]
-                    .0
-                    .downcast::<PyString>()
+                string_text(items[left].0.downcast::<PyString>().unwrap())
                     .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .cmp(
-                        items[right]
-                            .0
-                            .downcast::<PyString>()
-                            .unwrap()
-                            .to_str()
-                            .unwrap(),
-                    )
+                    .cmp(string_text(items[right].0.downcast::<PyString>().unwrap()).unwrap())
                     .then_with(|| left.cmp(&right))
             });
             for start in 0..order.len() {
@@ -222,7 +246,7 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                 let mut items = ObjectItems::new();
                 for (key, item) in attributes.iter() {
                     if let Ok(text) = key.downcast_exact::<PyString>() {
-                        match text.to_str() {
+                        match string_text(text) {
                             Ok(text) if text.starts_with('_') => continue,
                             Ok(_) => (),
                             // Invalid names fail at key emission, after earlier callbacks.
@@ -241,12 +265,13 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                 let mut items = ObjectItems::new();
                 for field in fields.iter_borrowed() {
                     let name = field.getattr(intern!(py, "name"))?;
-                    let text = name
-                        .downcast::<PyString>()?
-                        .to_str()
+                    let name_text = name
+                        .downcast::<PyString>()
+                        .map_err(|_| PyTypeError::new_err("dataclass field name must be str"))?;
+                    let text = string_text(name_text)
                         .map_err(|_| PyTypeError::new_err("str is not valid UTF-8"))?;
                     if !text.starts_with('_') {
-                        let item = value.getattr(name.downcast::<PyString>()?)?;
+                        let item = value.getattr(name_text)?;
                         push_field(&mut items, name, item)?;
                     }
                 }
@@ -314,6 +339,54 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
         Ok(())
     }
 
+    fn numpy_scalar(&mut self, value: &Bound<'py, PyAny>, depth: usize) -> PyResult<bool> {
+        use crate::numpy::ScalarValue;
+
+        let Some((types, defaults)) = &self.numpy_types else {
+            return Ok(false);
+        };
+        let Some(number) = types.get().read(value, defaults, &self.special)? else {
+            return Ok(false);
+        };
+        if depth > 254 {
+            return Err(PyTypeError::new_err("invalid numpy snapshot metadata"));
+        }
+        // read() has released the export. Only owned primitives remain while
+        // formatting and output growth may allocate Python bytes.
+        match number {
+            ScalarValue::Bool(value) => {
+                self.encoder
+                    .extend(if value { b"true" } else { b"false" })?;
+            }
+            ScalarValue::Signed(value) => {
+                // NumPy integers do not use OPT_STRICT_INTEGER's 53-bit limit.
+                self.encoder
+                    .extend(itoa::Buffer::new().format(value).as_bytes())?;
+            }
+            ScalarValue::Unsigned(value) => {
+                self.encoder
+                    .extend(itoa::Buffer::new().format(value).as_bytes())?;
+            }
+            ScalarValue::Float32(value) => {
+                let mut buffer = zmij::Buffer::new();
+                self.encoder.extend(if value.is_finite() {
+                    buffer.format_finite(value).as_bytes()
+                } else {
+                    b"null"
+                })?;
+            }
+            ScalarValue::Float64(value) => {
+                let mut buffer = zmij::Buffer::new();
+                self.encoder.extend(if value.is_finite() {
+                    buffer.format_finite(value).as_bytes()
+                } else {
+                    b"null"
+                })?;
+            }
+        }
+        Ok(true)
+    }
+
     fn value(&mut self, value: Bound<'py, PyAny>) -> PyResult<()> {
         let py = value.py();
         let option = self.encoder.option;
@@ -324,25 +397,40 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
             let depth = stack.len();
             let mut container = None;
             let mut limit = MAX_ENCODE_DEPTH;
-            if self.encoder.scalar(&value)? {
+            let cached_datetime = self
+                .last_datetime_type
+                .as_ref()
+                .is_some_and(|kind| value.get_type_ptr() == kind.as_type_ptr());
+            if !cached_datetime
+                && (self.encoder.scalar(&value)?
+                    || (option & SERIALIZE_NUMPY != 0 && self.numpy_scalar(&value, depth)?))
+            {
                 // Scalars include empty lists and tuples at any depth.
-            } else if value
-                .get_type()
-                .mro()
-                .iter_borrowed()
-                .any(|base| base.is(self.enum_type))
+            } else if !cached_datetime
+                && value
+                    .get_type()
+                    .mro()
+                    .iter_borrowed()
+                    .any(|base| base.is(self.enum_type))
             {
                 value = value.getattr(intern!(py, "value"))?;
                 continue;
-            } else if option & PASSTHROUGH_SUBCLASS == 0 && value.is_instance_of::<PyString>() {
+            } else if !cached_datetime
+                && option & PASSTHROUGH_SUBCLASS == 0
+                && value.is_instance_of::<PyString>()
+            {
                 value = self.str_base.call1((&value,))?;
                 continue;
-            } else if option & PASSTHROUGH_SUBCLASS == 0 && value.is_instance_of::<PyInt>() {
+            } else if !cached_datetime
+                && option & PASSTHROUGH_SUBCLASS == 0
+                && value.is_instance_of::<PyInt>()
+            {
                 value = self.int_base.call1((&value,))?;
                 continue;
-            } else if value.is_exact_instance_of::<PyTuple>() {
+            } else if !cached_datetime && value.is_exact_instance_of::<PyTuple>() {
                 container = Some(array_items(value.downcast::<PyTuple>()?.iter())?);
-            } else if (option & PASSTHROUGH_SUBCLASS == 0 || value.is_exact_instance_of::<PyList>())
+            } else if !cached_datetime
+                && (option & PASSTHROUGH_SUBCLASS == 0 || value.is_exact_instance_of::<PyList>())
                 && value.is_instance_of::<PyList>()
             {
                 let list = value.downcast::<PyList>()?;
@@ -351,17 +439,23 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                 } else {
                     container = Some(array_items(list.iter())?);
                 }
-            } else if (option & PASSTHROUGH_SUBCLASS == 0 || value.is_exact_instance_of::<PyDict>())
+            } else if !cached_datetime
+                && (option & PASSTHROUGH_SUBCLASS == 0 || value.is_exact_instance_of::<PyDict>())
                 && value.is_instance_of::<PyDict>()
             {
                 container = Some(self.dict_items(value.downcast::<PyDict>()?)?);
             } else {
                 let value_type = value.get_type();
-                let is_datetime = self.datetime_types.iter().any(|kind| value_type.is(kind));
+                let is_datetime =
+                    cached_datetime || self.datetime_types.iter().any(|kind| value_type.is(kind));
                 // Aliased helper types must keep the datetime fallback behavior.
                 if !is_datetime && value_type.is(self.uuid_type) {
                     self.uuid(&value)?;
-                } else if !(is_datetime && datetime::write(&mut self.encoder, &value)?) {
+                } else if is_datetime && datetime::write(&mut self.encoder, &value)? {
+                    if !cached_datetime {
+                        self.last_datetime_type = Some(value_type);
+                    }
+                } else {
                     let attributes = self.class_attributes(&value_type)?;
                     if !is_datetime
                         && attributes.contains(intern!(py, "__dataclass_fields__"))?
@@ -462,12 +556,13 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
     }
 }
 
-/// The first traversal cannot invoke callbacks, so its storage can be reused.
-pub(super) fn dumps(
-    py: Python<'_>,
+/// Callback-free traversal uses Rust allocation; callbacks write into owned
+/// bytes.
+pub(super) fn dumps<'py>(
+    py: Python<'py>,
     mut encoder: Encoder,
-    obj: Bound<'_, PyAny>,
-    default: Option<Bound<'_, PyAny>>,
+    obj: Bound<'py, PyAny>,
+    default: Option<Bound<'py, PyAny>>,
 ) -> PyResult<PyObject> {
     encoder.output.clear();
     encoder.keys.clear();
@@ -477,8 +572,24 @@ pub(super) fn dumps(
         .getattr(intern!(py, "_ENCODER_HELPERS"))?;
     let default_provided = default.is_some();
     let default = default.unwrap_or_else(|| py.None().into_bound(py));
+    #[cfg(all(
+        Py_3_12,
+        not(any(Py_3_13, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+        not(any(
+            py_sys_config = "Py_DEBUG",
+            py_sys_config = "Py_REF_DEBUG",
+            py_sys_config = "Py_TRACE_REFS",
+        )),
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64",
+        target_endian = "little",
+    ))]
+    if let Some(bytes) = numpy_root::try_dumps(&obj, encoder.option, &helpers)? {
+        return Ok(bytes.into_any());
+    }
     Ok(ObjectEncoder::new(
-        encoder.into_checked(),
+        encoder.into_checked(py)?,
         default,
         default_provided,
         helpers.downcast::<PyTuple>()?,
@@ -498,8 +609,24 @@ pub fn _dumps_objects(
     default_provided: bool,
     helpers: Bound<'_, PyTuple>,
 ) -> PyResult<Py<PyBytes>> {
-    let mut encoder = Encoder {
-        output: Vec::new(),
+    #[cfg(all(
+        Py_3_12,
+        not(any(Py_3_13, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
+        not(any(
+            py_sys_config = "Py_DEBUG",
+            py_sys_config = "Py_REF_DEBUG",
+            py_sys_config = "Py_TRACE_REFS",
+        )),
+        target_os = "linux",
+        target_arch = "x86_64",
+        target_pointer_width = "64",
+        target_endian = "little",
+    ))]
+    if let Some(bytes) = numpy_root::try_dumps(&obj, option, helpers.as_any())? {
+        return Ok(bytes);
+    }
+    let encoder = Encoder {
+        output: output::new(py, INITIAL_OUTPUT_CAPACITY)?,
         option,
         base_depth: 0,
         dataclass_root: false,
@@ -516,6 +643,5 @@ pub fn _dumps_objects(
         keys: Vec::new(),
         key_mask: 0,
     };
-    encoder.reserve(INITIAL_OUTPUT_CAPACITY)?;
     ObjectEncoder::new(encoder, default, default_provided, &helpers)?.finish(py, obj)
 }

@@ -113,12 +113,12 @@ impl EventCtx for RawContext {
 
     #[inline]
     fn new_number<'src>(&mut self, n: &'src str) -> Result<Self::Num<'src>, Self::Error> {
-        n.parse()
+        crate::parse_number_f64(n)
     }
 
     #[inline]
     fn new_number_owned<'a>(&mut self, n: String) -> Result<Self::Num<'a>, Self::Error> {
-        n.parse()
+        crate::parse_number_f64(&n)
     }
 
     #[inline]

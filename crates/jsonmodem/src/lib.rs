@@ -10,8 +10,15 @@
 //!
 //! Most users only need these three types plus `ParseEvent`, `Path`, and
 //! `Value`.
+//!
+//! The default `cached-zipper` feature enables an internally unsafe pointer
+//! cache for value building. Without it, value building uses safe tree
+//! traversal, and this crate forbids unsafe code. Other dependencies can
+//! enable the feature through Cargo feature unification; see the README.
 
 #![no_std]
+#![deny(unsafe_code)]
+#![cfg_attr(not(feature = "cached-zipper"), forbid(unsafe_code))]
 extern crate alloc;
 
 #[cfg(any(test, fuzzing))]
@@ -25,6 +32,7 @@ mod event;
 mod jsonmodem_buffers;
 mod jsonmodem_values;
 pub mod lending_iterator;
+mod number;
 mod parser;
 mod path;
 mod value;
@@ -32,7 +40,7 @@ mod value_tree;
 
 #[doc(hidden)]
 pub use backend::raw::RawBufferAssembler;
-pub use backend::{LexemeBackend, RawContext, StdBackend};
+pub use backend::{EventBackend, LexemeBackend, RawContext, StdBackend};
 pub use buffer_options::BufferOptions;
 // Expose core parser types publicly for users building custom adapters, while
 // keeping the low-level `JsonModem` constructor out of the docs surface.
@@ -42,6 +50,7 @@ pub use event::ParseEvent;
 pub use event::test_util;
 pub use jsonmodem_buffers::{BufferedEvent, JsonModemBuffers};
 pub use jsonmodem_values::{JsonModemValues, StreamingValue, ValuesError, ValuesOptions};
+pub use number::parse_number_f64;
 #[doc(hidden)]
 pub use parser::JsonModem;
 pub use parser::{DecodeMode, ParserError, ParserOptions};

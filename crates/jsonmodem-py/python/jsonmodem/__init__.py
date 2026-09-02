@@ -6,6 +6,7 @@ from . import _jsonmodem as _native
 from ._compat import dumps as _dumps_fallback
 
 JsonModem = _native.JsonModem
+JsonModemEvents = _native.JsonModemEvents
 PathView = _native.PathView
 StringPayload = _native.StringPayload
 JsonModemValues = _native.JsonModemValues
@@ -35,7 +36,7 @@ OPT_SERIALIZE_DATACLASS = 0
 OPT_SERIALIZE_UUID = 0
 
 __all__ = [
-    "JsonModem", "PathView", "StringPayload", "JsonModemValues",
+    "JsonModem", "JsonModemEvents", "PathView", "StringPayload", "JsonModemValues",
     "JsonModemValueView", "ParserOptions", "DecodeMode", "JsonModemSyntaxError",
     "JsonModemStateError", "JSONDecodeError", "JSONEncodeError", "Fragment",
     "loads", "dumps", "OPT_APPEND_NEWLINE", "OPT_INDENT_2", "OPT_NAIVE_UTC",

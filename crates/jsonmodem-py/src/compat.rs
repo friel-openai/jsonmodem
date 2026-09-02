@@ -16,6 +16,7 @@ mod escape_mask;
 )]
 mod integer;
 mod objects;
+mod output;
 mod owned_list;
 #[cfg(all(
     Py_3_12,
@@ -42,16 +43,18 @@ mod validate;
 ))]
 mod borrowed_dict;
 
-use std::{borrow::Cow, collections::HashMap, ops::Range};
+use std::ops::Range;
 
 use integer::Integer;
 use jsonmodem::document::{DocumentError, DocumentReader, IntegerToken, plain_string_prefix};
 use lexical_parse_float::FromLexical;
 pub use objects::_dumps_objects;
+use output::OutputBuffer;
 use pyo3::{
     PyTraverseError, PyVisit,
     exceptions::{PyMemoryError, PyTypeError, PyValueError},
     prelude::*,
+    pybacked::PyBackedStr,
     types::{
         PyBool, PyByteArray, PyBytes, PyDict, PyFloat, PyInt, PyList, PyMemoryView, PyString,
         PyTuple,
@@ -59,6 +62,8 @@ use pyo3::{
     },
 };
 use smallvec::SmallVec;
+
+use crate::text::string_text;
 
 const MAX_DECODE_DEPTH: usize = 1024;
 const MAX_ENCODE_DEPTH: usize = 254;
@@ -70,45 +75,28 @@ const APPEND_NEWLINE: i32 = 1024;
 const INITIAL_OUTPUT_CAPACITY: usize = 256;
 const MAX_RETAINED_STRING_CAPACITY: usize = 64 * 1024;
 
+// PyO3's direct empty-container constructors panic when allocation fails.
+#[inline]
+fn empty_list(py: Python<'_>) -> PyResult<Bound<'_, PyList>> {
+    Ok(py.get_type::<PyList>().call0()?.downcast_into::<PyList>()?)
+}
+
+#[inline]
+fn empty_dict(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
+    Ok(py.get_type::<PyDict>().call0()?.downcast_into::<PyDict>()?)
+}
+
 // Keep the float parser out of the container loop's instruction footprint.
 #[inline(never)]
 fn parse_double(text: &str) -> Result<f64, lexical_parse_float::Error> {
     // DocumentReader already checked JSON syntax; only decimal conversion remains.
-    f64::from_lexical(text.as_bytes())
-}
-
-/// Borrow text from an owned string, using inline ASCII storage on supported
-/// builds.
-#[inline]
-fn string_text<'value>(value: &'value Bound<'_, PyString>) -> PyResult<&'value str> {
-    #[cfg(all(
-        Py_3_12,
-        not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
-        not(py_sys_config = "Py_TRACE_REFS"),
-        target_os = "linux",
-        target_arch = "x86_64",
-        target_pointer_width = "64",
-        target_endian = "little",
-    ))]
-    if value.is_exact_instance_of::<PyString>() {
-        // SAFETY: value owns an exact CPython str while the GIL is held. In the
-        // selected ABI, compact ASCII has initialized, immutable ASCII data of
-        // GET_LENGTH bytes. PyO3 computes its address for that ABI, including
-        // empty strings. The returned view cannot outlive the owning reference.
-        unsafe {
-            let pointer = value.as_ptr();
-            if pyo3::ffi::PyUnicode_IS_COMPACT_ASCII(pointer) != 0 {
-                if let Ok(length) = usize::try_from(pyo3::ffi::PyUnicode_GET_LENGTH(pointer)) {
-                    let bytes = std::slice::from_raw_parts(
-                        pyo3::ffi::PyUnicode_1BYTE_DATA(pointer),
-                        length,
-                    );
-                    return Ok(std::str::from_utf8_unchecked(bytes));
-                }
-            }
-        }
+    // lexical-parse-float 1.0.5 stops accumulating exponents at 0x10000000.
+    // Shorter coefficients cannot cancel that cutoff back into binary64 range.
+    if text.len() >= 0x10000000 - 1024 {
+        jsonmodem::parse_number_f64(text).map_err(|_| lexical_parse_float::Error::InvalidDigit(0))
+    } else {
+        f64::from_lexical(text.as_bytes())
     }
-    value.to_str()
 }
 
 /// Explicit raw output, retaining its owner without parsing or placeholder
@@ -138,8 +126,31 @@ struct Decoder<'py, 'src> {
     reader: DocumentReader<'src>,
     // Python strings and cached escaped keys own their text before this is reused.
     string_buffer: String,
-    keys: Option<HashMap<Cow<'src, str>, Py<PyString>>>,
+    keys: Option<DecodeKeyCache>,
     cache_keys: bool,
+}
+
+/// A collision replaces one entry; lookup never scans a collision chain.
+struct DecodeKeyCache {
+    // Text retains the Python string's immutable storage instead of copying it.
+    entries: Vec<Option<PyBackedStr>>,
+}
+
+impl DecodeKeyCache {
+    fn new() -> Self {
+        Self {
+            entries: std::iter::repeat_with(|| None).take(512).collect(),
+        }
+    }
+
+    #[inline]
+    fn index(text: &str) -> usize {
+        let mut hash = 0xcbf29ce484222325_u64;
+        for byte in text.bytes() {
+            hash = (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3);
+        }
+        (hash ^ (hash >> 32)) as usize & 511
+    }
 }
 
 /// Unfinished containers use bounded inline storage, spilling to the heap
@@ -153,6 +164,16 @@ impl<'py, 'src> Decoder<'py, 'src> {
     #[cold]
     #[inline(never)]
     fn error(&self, error: DocumentError) -> PyErr {
+        let message = match error.message {
+            "expected comma or closing bracket" | "expected comma or closing brace" => {
+                if error.offset == self.input.len() {
+                    "unexpected end of data"
+                } else {
+                    "unexpected character"
+                }
+            }
+            message => message,
+        };
         let position = match self.input.get(..error.offset) {
             Some(prefix) => prefix.chars().count(),
             // Preserve the count for offsets that split a character or exceed the input.
@@ -162,7 +183,7 @@ impl<'py, 'src> Decoder<'py, 'src> {
                 .take_while(|(i, _)| *i < error.offset)
                 .count(),
         };
-        super::json_decode_error(self.py, error.message, self.input, position)
+        super::json_decode_error(self.py, message, self.input, position)
     }
 
     fn fail(&self, message: &'static str) -> PyErr {
@@ -213,10 +234,14 @@ impl<'py, 'src> Decoder<'py, 'src> {
         )))]
         let text = borrowed.unwrap_or(&self.string_buffer);
         let key = if self.cache_keys && text.len() <= 64 {
-            let keys = self.keys.get_or_insert_with(HashMap::new);
-            match keys.get(text) {
-                Some(key) => key.clone_ref(self.py),
-                None => {
+            let keys = self.keys.get_or_insert_with(DecodeKeyCache::new);
+            let entry = &mut keys.entries[DecodeKeyCache::index(text)];
+            match entry {
+                Some(cached) if &**cached == text => (&*cached)
+                    .into_pyobject(self.py)?
+                    .downcast_into::<PyString>()?
+                    .unbind(),
+                _ => {
                     #[cfg(all(
                         Py_3_12,
                         not(Py_3_14),
@@ -229,13 +254,11 @@ impl<'py, 'src> Decoder<'py, 'src> {
                         not(any(PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED))
                     )))]
                     let key = PyString::new(self.py, text).unbind();
-                    if keys.len() < 512 {
-                        let text = match borrowed {
-                            Some(text) => Cow::Borrowed(text),
-                            None => Cow::Owned(text.to_owned()),
-                        };
-                        keys.insert(text, key.clone_ref(self.py));
-                    }
+                    // The decoder validated this text, and the newly created
+                    // key has not been exposed to caller code. Its UTF-8 cache
+                    // cannot have come from a caller-supplied codec replacement.
+                    let text = PyBackedStr::try_from(key.bind(self.py).clone())?;
+                    *entry = Some(text);
                     key
                 }
             }
@@ -271,7 +294,7 @@ impl<'py, 'src> Decoder<'py, 'src> {
                         return Err(self.fail("recursion depth exceeded"));
                     }
                     self.expect(b'[')?;
-                    let list = PyList::empty(py);
+                    let list = empty_list(py)?;
                     if self.reader.peek() != Some(b']') {
                         stack.push(DecodeContainer::Array(list));
                         continue;
@@ -284,7 +307,7 @@ impl<'py, 'src> Decoder<'py, 'src> {
                         return Err(self.fail("recursion depth exceeded"));
                     }
                     self.expect(b'{')?;
-                    let dict = PyDict::new(py);
+                    let dict = empty_dict(py)?;
                     if self.reader.peek() != Some(b'}') {
                         let key = self.key()?;
                         stack.push(DecodeContainer::Object(dict, key));
@@ -359,10 +382,10 @@ impl<'py, 'src> Decoder<'py, 'src> {
                     let number = self.reader.number().map_err(|error| self.error(error))?;
                     match number.integer {
                         Some(IntegerToken::Signed(value)) => {
-                            value.into_pyobject(py)?.into_any().unbind()
+                            super::python_signed_integer(py, value)?
                         }
                         Some(IntegerToken::Unsigned(value)) => {
-                            value.into_pyobject(py)?.into_any().unbind()
+                            super::python_unsigned_integer(py, value)?
                         }
                         None => {
                             let value = parse_double(number.text)
@@ -370,7 +393,7 @@ impl<'py, 'src> Decoder<'py, 'src> {
                             if !value.is_finite() {
                                 return Err(self.fail("number is infinity when parsed as double"));
                             }
-                            value.into_pyobject(py)?.into_any().unbind()
+                            super::python_float(py, value)?
                         }
                     }
                 }
@@ -445,8 +468,7 @@ fn decode(py: Python<'_>, input: &str) -> PyResult<PyObject> {
 #[pyo3(signature = (input, /))]
 pub fn loads(py: Python<'_>, input: Bound<'_, PyAny>) -> PyResult<PyObject> {
     if let Ok(text) = input.downcast_exact::<PyString>() {
-        let text = text
-            .to_str()
+        let text = string_text(text)
             .map_err(|_| super::json_decode_error(py, "str is not valid UTF-8", "", 0))?;
         return decode(py, text);
     }
@@ -619,10 +641,10 @@ fn unsigned_integer(value: &Bound<'_, PyInt>) -> PyResult<u64> {
 }
 
 /// Single output buffer and bounded cache of encoded dictionary keys.
-/// Callback serialization checks output growth; the callback-free encoder
-/// retains its existing write operations.
-struct Encoder<const CHECKED: bool = false> {
-    output: Vec<u8>,
+/// Output ownership is independent of container traversal and callback
+/// handling.
+struct Encoder<const CHECKED: bool = false, B = Vec<u8>> {
+    output: B,
     option: i32,
     // The Python serializer may already have unfinished parent containers.
     base_depth: usize,
@@ -664,7 +686,10 @@ enum EncodeIterator<'py> {
 
 impl<'py> EncodeIterator<'py> {
     /// The caller has already selected the sorted-dictionary branch, if needed.
-    fn dict<const CHECKED: bool>(dict: &Bound<'py, PyDict>, dataclass_root: bool) -> Self {
+    fn dict<const CHECKED: bool, B: OutputBuffer>(
+        dict: &Bound<'py, PyDict>,
+        dataclass_root: bool,
+    ) -> Self {
         #[cfg(all(
             Py_3_12,
             not(any(Py_3_14, PyPy, GraalPy, Py_LIMITED_API, Py_GIL_DISABLED)),
@@ -674,7 +699,7 @@ impl<'py> EncodeIterator<'py> {
             target_pointer_width = "64",
             target_endian = "little",
         ))]
-        if !CHECKED && !dataclass_root {
+        if !CHECKED && !dataclass_root && !B::PYTHON_ALLOCATION {
             return Self::ScalarDict(borrowed_dict::DictScalarCursor::new(dict.clone()));
         }
         let _ = dataclass_root;
@@ -727,10 +752,10 @@ impl From<OutputAllocationError> for PyErr {
     }
 }
 
-impl<const CHECKED: bool> Encoder<CHECKED> {
-    fn into_checked(self) -> Encoder<true> {
-        Encoder {
-            output: self.output,
+impl Encoder {
+    fn into_checked(self, py: Python<'_>) -> PyResult<Encoder<true, output::Output<'_>>> {
+        Ok(Encoder {
+            output: output::from_vec(py, self.output)?,
             option: self.option,
             base_depth: self.base_depth,
             dataclass_root: self.dataclass_root,
@@ -746,60 +771,29 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
             integer_layout: self.integer_layout,
             keys: self.keys,
             key_mask: self.key_mask,
-        }
+        })
     }
+}
 
+impl<const CHECKED: bool, B: OutputBuffer> Encoder<CHECKED, B> {
     #[inline]
     fn reserve(&mut self, additional: usize) -> Result<(), OutputAllocationError> {
-        if CHECKED {
-            if additional > self.output.capacity() - self.output.len() {
-                self.grow(additional)?;
-            }
-        } else {
-            self.output.reserve(additional);
-        }
-        Ok(())
-    }
-
-    #[cold]
-    fn grow(&mut self, additional: usize) -> Result<(), OutputAllocationError> {
-        self.output
-            .try_reserve(additional)
-            .map_err(|_| OutputAllocationError)
+        self.output.reserve::<CHECKED>(additional)
     }
 
     #[inline]
     fn push(&mut self, byte: u8) -> Result<(), OutputAllocationError> {
-        if CHECKED {
-            self.reserve(1)?;
-        }
-        self.output.push(byte);
-        Ok(())
+        self.output.push::<CHECKED>(byte)
     }
 
     #[inline]
     fn extend(&mut self, bytes: &[u8]) -> Result<(), OutputAllocationError> {
-        if CHECKED {
-            self.reserve(bytes.len())?;
-        }
-        self.output.extend_from_slice(bytes);
-        Ok(())
+        self.output.extend::<CHECKED>(bytes)
     }
 
     #[inline]
-    fn bytes(&self, py: Python<'_>) -> PyResult<Py<PyBytes>> {
-        let output = self.output.as_slice();
-        let len = pyo3::ffi::Py_ssize_t::try_from(output.len()).map_err(|_| allocation_error())?;
-        // SAFETY: output retains len initialized bytes for the synchronous copy.
-        // Python is attached, and the API returns a new reference or a null
-        // pointer with an exception. PyO3 takes ownership or returns that error.
-        let bytes = unsafe {
-            Bound::from_owned_ptr_or_err(
-                py,
-                pyo3::ffi::PyBytes_FromStringAndSize(output.as_ptr().cast(), len),
-            )
-        }?;
-        Ok(bytes.downcast_into::<PyBytes>()?.unbind())
+    fn bytes(self, py: Python<'_>) -> PyResult<Py<PyBytes>> {
+        self.output.finish(py)
     }
 
     #[inline(always)]
@@ -847,8 +841,7 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
         // errors and their order before any value is serialized.
         for (key, _) in dict.iter() {
             if let Ok(key) = key.downcast_exact::<PyString>() {
-                key.to_str()
-                    .map_err(|cause| key_utf8_error(key.py(), cause))?;
+                string_text(key).map_err(|cause| key_utf8_error(key.py(), cause))?;
             } else if let Ok(key) = key.downcast_exact::<PyInt>() {
                 self.integer(key)
                     .map_err(|error| integer_key_error(key, error))?;
@@ -875,10 +868,7 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                 .find(|(owner, _)| owner.as_ptr() == key.as_ptr())
             {
                 let encoded = encoded.clone();
-                if CHECKED {
-                    self.reserve(encoded.len())?;
-                }
-                self.output.extend_from_within(encoded);
+                self.output.duplicate::<CHECKED>(encoded)?;
                 return Ok(());
             }
         }
@@ -971,9 +961,9 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
             if CHECKED {
                 self.reserve(1 + (depth + self.base_depth) * 2)?;
             }
-            self.output.push(b'\n');
+            self.push(b'\n')?;
             self.output
-                .resize(self.output.len() + (depth + self.base_depth) * 2, b' ');
+                .repeat::<CHECKED>((depth + self.base_depth) * 2, b' ')?;
         }
         Ok(())
     }
@@ -1055,7 +1045,7 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                 self.extend(bytes.as_bytes())?;
             } else if let Ok(text) = contents.downcast_exact::<PyString>() {
                 self.extend(
-                    text.to_str()
+                    string_text(text)
                         .map_err(|_| {
                             PyTypeError::new_err("str is not valid UTF-8: surrogates not allowed")
                         })?
@@ -1110,20 +1100,17 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
                         let Ok(key) = key.downcast_exact::<PyString>() else {
                             return Ok(false);
                         };
-                        key.to_str()
-                            .map_err(|cause| key_utf8_error(key.py(), cause))?;
+                        string_text(key).map_err(|cause| key_utf8_error(key.py(), cause))?;
                     }
                     items.sort_unstable_by(|(left, _), (right, _)| {
-                        left.downcast::<PyString>()
+                        string_text(left.downcast::<PyString>().unwrap())
                             .unwrap()
-                            .to_str()
-                            .unwrap()
-                            .cmp(right.downcast::<PyString>().unwrap().to_str().unwrap())
+                            .cmp(string_text(right.downcast::<PyString>().unwrap()).unwrap())
                     });
                     (EncodeIterator::Sorted(items.into_iter()), b'{', b'}')
                 } else {
                     (
-                        EncodeIterator::dict::<CHECKED>(dict, self.dataclass_root),
+                        EncodeIterator::dict::<CHECKED, B>(dict, self.dataclass_root),
                         b'{',
                         b'}',
                     )
@@ -1224,6 +1211,11 @@ impl<const CHECKED: bool> Encoder<CHECKED> {
 #[inline]
 fn key_identity_bit(identity: usize) -> u64 {
     1 << (((identity >> 4) ^ (identity >> 10)) & 63)
+}
+
+/// Publish initialized output while returning Python allocation failures.
+pub(crate) fn bytes_from_vec(py: Python<'_>, output: Vec<u8>) -> PyResult<Py<PyBytes>> {
+    output.finish(py)
 }
 
 fn supplied_default<'py>(value: &Bound<'py, PyAny>) -> PyResult<Option<Bound<'py, PyAny>>> {

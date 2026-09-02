@@ -85,10 +85,13 @@ def special(value, option, default_provided, depth):
 
 # Keep standard types and operations alive without importing modules for each call.
 # The tuple order matches ObjectEncoder::new in compat/objects.rs.
+# Capture defaults before a caller can replace helpers ahead of NumPy's import.
+_NUMPY_DEFAULT_HELPERS = (special, native._numpy_dumps)
+# NumPy's lazy helper supplies its type table and owned helper references.
 _ENCODER_HELPERS = (
     enum.Enum, dataclasses.fields, key_text, special,
     datetime.datetime, datetime.date, datetime.time, uuid.UUID,
-    str.__str__, int.__int__, getattr, type.__dict__["__dict__"].__get__,
+    str.__str__, int.__int__, getattr, type.__dict__["__dict__"].__get__, None, None,
 )
 
 

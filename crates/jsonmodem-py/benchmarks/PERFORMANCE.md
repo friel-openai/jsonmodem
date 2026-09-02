@@ -10,12 +10,19 @@ against this report's jsonmodem build and orjson.
 The later [public-document and date/time report](PERFORMANCE_36H.md) adds
 external parser benchmarks and compares the subsequent changes with orjson.
 The [large-document and worst-case report](PERFORMANCE_24H.md) records the
-latest measured optimizations, CPU profiles, allocations and RSS.
+next optimizations, CPU profiles, allocations and RSS.
+The [safer-storage and optional-path report](PERFORMANCE_SAFE_CAPABILITIES.md)
+measures runtime revision `7b7e21c`, including its complete calls, streaming,
+allocations, RSS and regressions. It predates the later decimal, Unicode,
+tuple, and NumPy changes.
+The [corrected-build report](PERFORMANCE_SAFE_CAPABILITIES_CORRECTED.md)
+measures those changes at runtime revision `96318df`, with new timing and
+memory results. It includes the long non-ASCII string and streaming regressions.
 
 The measured jsonmodem runtime is
 [`9285795`](https://github.com/friel-openai/jsonmodem/commit/9285795ca2ca10570e47a48564d29e12160c2d4d).
 The later closing-quote experiment was reverted. The final runtime sources
-and rebuilt extension match this measured revision exactly.
+and rebuilt extension for this historical comparison match that measured revision.
 
 ## What changed
 
