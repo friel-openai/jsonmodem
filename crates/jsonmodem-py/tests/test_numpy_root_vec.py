@@ -83,10 +83,13 @@ scalar_types = _numpy.SCALAR_TYPES
 armed = False
 calls = []
 events = []
+_numpy._callback_test_generation = 0
 
 def replacement(*args):
     calls.append(args[0])
     events.append(["encode", args[0].hex()])
+    # Invalidate cached global lookups so every value exercises key equality.
+    _numpy._callback_test_generation = len(calls)
     return b"123"
 
 def matches(other):
