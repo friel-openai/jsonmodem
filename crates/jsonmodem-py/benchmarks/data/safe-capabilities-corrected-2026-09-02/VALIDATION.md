@@ -81,6 +81,14 @@ Long-number tests now have a sixty-minute Miri limit; the other limits are
 unchanged. CI allows two hours for the full suite and targeted checks.
 Miri does not execute the live CPython extension.
 
+[CI](https://github.com/friel-openai/jsonmodem/actions/runs/33613493067/job/100193897555)
+subsequently passed 280 workspace tests but timed out on the combined
+finite-cancellation test after one hour. The positive and negative cases now
+run as separate tests, retaining the same 655,370-byte and 655,371-byte inputs
+and exact floating-point assertions. The one-hour per-test and two-hour job
+limits are unchanged. This test-only split changes neither the measured
+runtime nor the earlier local results above.
+
 ## Numeric regressions and limits
 
 The corrected build passes the long-number underflow, overflow and exponent

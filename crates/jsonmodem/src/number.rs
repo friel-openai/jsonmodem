@@ -293,18 +293,30 @@ mod tests {
         );
     }
 
-    #[test]
-    fn dispatch_finite_cancellation() {
+    fn finite_cancellation_text() -> String {
         // 655,370 bytes: all 655,361 decimal places cancel exactly. Truncating
         // the exponent incorrectly underflows this value to zero.
         let text = format!("0.{}1e655361", "0".repeat(655_360));
         assert_eq!(text.len(), 655_370);
+        text
+    }
+
+    // Each sign gets its own Miri timeout without shortening either input.
+    #[test]
+    fn dispatch_finite_cancellation_positive() {
+        let text = finite_cancellation_text();
         assert_eq!(
             parse_number_f64(&text).unwrap().to_bits(),
             1.0_f64.to_bits()
         );
+    }
+
+    #[test]
+    fn dispatch_finite_cancellation_negative() {
+        let text = format!("-{}", finite_cancellation_text());
+        assert_eq!(text.len(), 655_371);
         assert_eq!(
-            parse_number_f64(&format!("-{text}")).unwrap().to_bits(),
+            parse_number_f64(&text).unwrap().to_bits(),
             (-1.0_f64).to_bits()
         );
     }
