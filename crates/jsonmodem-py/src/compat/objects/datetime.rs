@@ -9,11 +9,47 @@ use pyo3::types::{
 
 use super::{Encoder, output};
 
+/// Owns fixed-timezone cache entries until this serialization call finishes.
+pub(super) struct State<'py> {
+    #[cfg(all(
+        feature = "python-acceleration",
+        not(any(Py_LIMITED_API, Py_GIL_DISABLED, PyPy, GraalPy))
+    ))]
+    offsets: super::super::fixed_offsets::FixedOffsets<Bound<'py, PyAny>>,
+    #[cfg(not(all(
+        feature = "python-acceleration",
+        not(any(Py_LIMITED_API, Py_GIL_DISABLED, PyPy, GraalPy))
+    )))]
+    python: std::marker::PhantomData<Python<'py>>,
+}
+
+impl State<'_> {
+    pub(super) fn new(enabled: bool) -> Self {
+        let _ = enabled;
+        Self {
+            #[cfg(all(
+                feature = "python-acceleration",
+                not(any(Py_LIMITED_API, Py_GIL_DISABLED, PyPy, GraalPy))
+            ))]
+            offsets: super::super::fixed_offsets::FixedOffsets::new(enabled),
+            #[cfg(not(all(
+                feature = "python-acceleration",
+                not(any(Py_LIMITED_API, Py_GIL_DISABLED, PyPy, GraalPy))
+            )))]
+            python: std::marker::PhantomData,
+        }
+    }
+}
+
 #[cfg(not(any(Py_LIMITED_API, Py_GIL_DISABLED, PyPy, GraalPy)))]
-pub(super) fn write(
-    encoder: &mut Encoder<true, output::Output<'_>>,
-    value: &Bound<'_, PyAny>,
+pub(super) fn write<'py>(
+    encoder: &mut Encoder<true, output::Output<'py>>,
+    value: &Bound<'py, PyAny>,
+    state: &mut State<'py>,
+    cache_offsets: bool,
 ) -> PyResult<bool> {
+    let _ = &state;
+    let _ = cache_offsets;
     const NAIVE_UTC: i32 = 2;
     const OMIT_MICROSECONDS: i32 = 8;
     const UTC_Z: i32 = 128;
@@ -33,16 +69,45 @@ pub(super) fn write(
         let offset_seconds = match datetime.get_tzinfo() {
             Some(timezone) if timezone.is(utc) => Some(0),
             Some(timezone) if timezone.get_type().is(utc.get_type()) => {
-                let offset =
-                    timezone.call_method1(pyo3::intern!(value.py(), "utcoffset"), (datetime,))?;
-                // A timedelta subclass can override the fields used by the
-                // Python formatter. Keep that behavior instead of reading its
-                // native fields. The builtin method returns its stored offset.
-                if !offset.is_exact_instance_of::<PyDelta>() {
-                    return Ok(false);
+                // A root datetime has no later value that could reuse this offset.
+                #[cfg(feature = "python-acceleration")]
+                let cached = if cache_offsets {
+                    state.offsets.get(|owner| owner.is(&timezone))
+                } else {
+                    None
+                };
+                #[cfg(not(feature = "python-acceleration"))]
+                let cached = None;
+                if let Some(seconds) = cached {
+                    Some(seconds)
+                } else {
+                    let offset = timezone
+                        .call_method1(pyo3::intern!(value.py(), "utcoffset"), (datetime,))?;
+                    // A timedelta subclass can override the fields used by the
+                    // Python formatter. Keep that behavior instead of reading its
+                    // native fields. The builtin method returns its stored offset.
+                    if !offset.is_exact_instance_of::<PyDelta>() {
+                        return Ok(false);
+                    }
+                    let offset = offset.downcast::<PyDelta>()?;
+                    let seconds =
+                        i64::from(offset.get_days()) * 86_400 + i64::from(offset.get_seconds());
+                    #[cfg(feature = "python-acceleration")]
+                    if cache_offsets && state.offsets.enabled() {
+                        let name = timezone.call_method1(
+                            pyo3::intern!(value.py(), "tzname"),
+                            (value.py().None(),),
+                        )?;
+                        // Exact timezones can own a str-subclass name. Keeping
+                        // one alive could delay its finalizer past a callback.
+                        if name.is_exact_instance_of::<pyo3::types::PyString>() {
+                            state
+                                .offsets
+                                .insert(|| (timezone.clone().into_any(), seconds));
+                        }
+                    }
+                    Some(seconds)
                 }
-                let offset = offset.downcast::<PyDelta>()?;
-                Some(i64::from(offset.get_days()) * 86_400 + i64::from(offset.get_seconds()))
             }
             Some(_) => return Ok(false),
             None => (encoder.option & NAIVE_UTC != 0).then_some(0),
@@ -86,9 +151,11 @@ pub(super) fn write(
 }
 
 #[cfg(any(Py_LIMITED_API, Py_GIL_DISABLED, PyPy, GraalPy))]
-pub(super) fn write(
-    _: &mut Encoder<true, output::Output<'_>>,
-    _: &Bound<'_, PyAny>,
+pub(super) fn write<'py>(
+    _: &mut Encoder<true, output::Output<'py>>,
+    _: &Bound<'py, PyAny>,
+    _: &mut State<'py>,
+    _: bool,
 ) -> PyResult<bool> {
     Ok(false)
 }

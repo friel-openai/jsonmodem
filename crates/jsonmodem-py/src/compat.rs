@@ -2,6 +2,11 @@
 //! preprocessing.
 
 mod escape_mask;
+#[cfg(all(
+    feature = "python-acceleration",
+    not(any(Py_LIMITED_API, Py_GIL_DISABLED, PyPy, GraalPy))
+))]
+mod fixed_offsets;
 #[cfg_attr(
     not(all(
         Py_3_12,
@@ -1282,6 +1287,34 @@ pub fn dumps(
     #[pyo3(from_py_with = supplied_default)] default: Option<Bound<'_, PyAny>>,
     option: Option<Bound<'_, PyAny>>,
 ) -> PyResult<PyObject> {
+    dumps_impl(
+        py,
+        obj,
+        default,
+        option,
+        cfg!(feature = "python-acceleration"),
+    )
+}
+
+/// Retain ordinary serialization without the optional Python accelerations.
+#[pyfunction(name = "dumps")]
+#[pyo3(signature=(obj, /, default=None, option=None))]
+pub fn dumps_portable(
+    py: Python<'_>,
+    obj: Bound<'_, PyAny>,
+    #[pyo3(from_py_with = supplied_default)] default: Option<Bound<'_, PyAny>>,
+    option: Option<Bound<'_, PyAny>>,
+) -> PyResult<PyObject> {
+    dumps_impl(py, obj, default, option, false)
+}
+
+fn dumps_impl(
+    py: Python<'_>,
+    obj: Bound<'_, PyAny>,
+    default: Option<Bound<'_, PyAny>>,
+    option: Option<Bound<'_, PyAny>>,
+    accelerated: bool,
+) -> PyResult<PyObject> {
     let flags = match &option {
         None => 0,
         Some(value) if value.is_none() => 0,
@@ -1333,7 +1366,7 @@ pub fn dumps(
         }
         return Ok(PyBytes::new(py, &encoder.output).into_any().unbind());
     }
-    objects::dumps(py, encoder, obj, default)
+    objects::dumps(py, encoder, obj, default, accelerated)
 }
 
 /// Try an owning dataclass field snapshot without invoking any user callback.

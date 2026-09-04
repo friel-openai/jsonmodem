@@ -91,6 +91,7 @@ struct ObjectEncoder<'helpers, 'py> {
     // A successful builtin write establishes helper and Enum priority for this
     // immutable type. The retained helper tuple cannot change during callbacks.
     last_datetime_type: Option<Bound<'py, PyType>>,
+    datetime_state: datetime::State<'py>,
     uuid_type: Borrowed<'helpers, 'py, PyAny>,
     str_base: Borrowed<'helpers, 'py, PyAny>,
     int_base: Borrowed<'helpers, 'py, PyAny>,
@@ -118,6 +119,7 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
         default: Bound<'py, PyAny>,
         default_provided: bool,
         helpers: &'helpers Bound<'py, PyTuple>,
+        accelerated: bool,
     ) -> PyResult<Self> {
         let numpy_types = if encoder.option & SERIALIZE_NUMPY != 0 && helpers.len() > 13 {
             helpers
@@ -143,6 +145,7 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                 helpers.get_borrowed_item(6)?,
             ],
             last_datetime_type: None,
+            datetime_state: datetime::State::new(accelerated),
             uuid_type: helpers.get_borrowed_item(7)?,
             str_base: helpers.get_borrowed_item(8)?,
             int_base: helpers.get_borrowed_item(9)?,
@@ -451,7 +454,14 @@ impl<'helpers, 'py> ObjectEncoder<'helpers, 'py> {
                 // Aliased helper types must keep the datetime fallback behavior.
                 if !is_datetime && value_type.is(self.uuid_type) {
                     self.uuid(&value)?;
-                } else if is_datetime && datetime::write(&mut self.encoder, &value)? {
+                } else if is_datetime
+                    && datetime::write(
+                        &mut self.encoder,
+                        &value,
+                        &mut self.datetime_state,
+                        !stack.is_empty(),
+                    )?
+                {
                     if !cached_datetime {
                         self.last_datetime_type = Some(value_type);
                     }
@@ -563,13 +573,18 @@ pub(super) fn dumps<'py>(
     mut encoder: Encoder,
     obj: Bound<'py, PyAny>,
     default: Option<Bound<'py, PyAny>>,
+    accelerated: bool,
 ) -> PyResult<PyObject> {
     encoder.output.clear();
     encoder.keys.clear();
     encoder.key_mask = 0;
-    let helpers = py
-        .import(intern!(py, "jsonmodem._compat"))?
-        .getattr(intern!(py, "_ENCODER_HELPERS"))?;
+    let compat = py.import(intern!(py, "jsonmodem._compat"))?;
+    let mut helpers = compat.getattr(intern!(py, "_ENCODER_HELPERS"))?;
+    if cfg!(feature = "python-acceleration") && !accelerated && encoder.option & NON_STR_KEYS != 0 {
+        helpers = compat
+            .getattr(intern!(py, "_portable_helpers"))?
+            .call1((helpers,))?;
+    }
     let default_provided = default.is_some();
     let default = default.unwrap_or_else(|| py.None().into_bound(py));
     #[cfg(all(
@@ -593,6 +608,7 @@ pub(super) fn dumps<'py>(
         default,
         default_provided,
         helpers.downcast::<PyTuple>()?,
+        accelerated,
     )?
     .finish(py, obj)?
     .into_any())
@@ -643,5 +659,12 @@ pub fn _dumps_objects(
         keys: Vec::new(),
         key_mask: 0,
     };
-    ObjectEncoder::new(encoder, default, default_provided, &helpers)?.finish(py, obj)
+    ObjectEncoder::new(
+        encoder,
+        default,
+        default_provided,
+        &helpers,
+        cfg!(feature = "python-acceleration"),
+    )?
+    .finish(py, obj)
 }

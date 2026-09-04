@@ -364,7 +364,55 @@ only four assertions about the package's name or version. Tests that compare
 both libraries use orjson 3.11.9 on Python 3.10 or later. Python 3.9 runs the
 remaining tests.
 
+## Optional Python acceleration
+
+The Python crate enables its `python-acceleration` Cargo feature by default.
+It caches up to eight validated fixed-timezone offsets for one `dumps()` call.
+Only datetimes inside containers use the cache. A root datetime cannot reuse
+an offset later in the call. After sixteen consecutive misses, the cache stops
+looking up and adding entries, but keeps existing owners until the call ends.
+Custom timezones, timedelta subclasses, and timezone names that are string
+subclasses are not cached.
+
+The cache contains only safe Rust and owns each retained timezone reference.
+It compares object identity without calling Python equality or hashing. Only
+exact built-in timezones with exact `timedelta` offsets and string names are
+admitted, so reuse cannot skip a custom offset callback or delay a custom
+name's finalizer. The cache never stores a borrowed pointer to a container item.
+Miri can check the cache's actual Rust source; it cannot verify PyO3 or CPython.
+
+To select the ordinary implementation for a caller, use:
+
+```python
+import jsonmodem.portable as jsonmodem
+
+encoded = jsonmodem.dumps({"value": 42})
+```
+
+`jsonmodem.portable` exports the same API and option constants. Only `dumps()`
+selects a different implementation. The choice is per call and does not change
+other clients. Package-owned nested key conversion preserves the choice;
+callbacks and replaced helpers can make their own explicit library calls.
+
+To omit the additional implementations when building the extension:
+
+```sh
+maturin build -m crates/jsonmodem-py/Cargo.toml --release --no-default-features
+```
+
+Cargo combines features requested by dependencies, so another dependency may
+enable a feature omitted by one declaration. Portable calls remain available
+and effective in a feature-enabled build. Neither choice disables existing
+native code in PyO3, CPython or jsonmodem, and neither changes the core Rust
+crate's `cached-zipper` feature. Both implementations preserve input validation
+and supported JSON behavior. Internal allocation and reference counts can differ.
+
 ## Benchmark
+
+The [fixed-timezone cache report](benchmarks/PYTHON_ACCELERATION.md) compares
+this change with PR #7 and orjson 3.11.9. Repeated fixed timezones improve;
+cache misses and some unrelated cases regress. It includes absolute times,
+the 275-case mean, streaming controls, Memray and separate process RSS.
 
 The [corrected-build report](benchmarks/PERFORMANCE_SAFE_CAPABILITIES_CORRECTED.md)
 measures runtime `96318df` against PR #6 and orjson 3.11.9. It includes

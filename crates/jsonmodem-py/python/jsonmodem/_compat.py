@@ -39,7 +39,7 @@ def datetime_text(value, option):
     return text
 
 
-def key_text(value, option):
+def key_text(value, option, *, _primitive_dumps=None):
     if type(value) is str:
         return value
     if not option & 4:
@@ -55,16 +55,40 @@ def key_text(value, option):
                 value.to_bytes(8, "little")
             except OverflowError as cause:
                 raise TypeError("Dict integer key must be within 64-bit range") from cause
-        return native.dumps(value).decode("ascii")
+        dumps = native.dumps if _primitive_dumps is None else _primitive_dumps
+        return dumps(value).decode("ascii")
     if isinstance(value, enum.Enum):
-        return key_text(value.value, option)
+        child = key_text
+        if _primitive_dumps is not None and child is _DEFAULT_KEY_TEXT:
+            child = _portable_key_text
+        return child(value.value, option)
     if isinstance(value, int):
-        return key_text(int.__int__(value), option)
+        child = key_text
+        if _primitive_dumps is not None and child is _DEFAULT_KEY_TEXT:
+            child = _portable_key_text
+        return child(int.__int__(value), option)
     if type(value) in (datetime.datetime, datetime.date, datetime.time):
         return datetime_text(value, option)
     if type(value) is uuid.UUID:
         return str(value)
     raise TypeError("Dict key must a type serializable with OPT_NON_STR_KEYS")
+
+
+_DEFAULT_KEY_TEXT = key_text
+_DEFAULT_DUMPS = native.dumps
+
+
+def _portable_key_text(value, option):
+    # The captured helper still runs before any replaced recursive helper.
+    if native.dumps is not _DEFAULT_DUMPS:
+        return _DEFAULT_KEY_TEXT(value, option)
+    return _DEFAULT_KEY_TEXT(value, option, _primitive_dumps=native._dumps_portable)
+
+
+def _portable_helpers(helpers):
+    if type(helpers) is tuple and len(helpers) > 2 and helpers[2] is _DEFAULT_KEY_TEXT:
+        return (*helpers[:2], _portable_key_text, *helpers[3:])
+    return helpers
 
 
 def special(value, option, default_provided, depth):

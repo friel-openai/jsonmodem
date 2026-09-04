@@ -3948,6 +3948,14 @@ fn jsonmodem(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     m.add_function(wrap_pyfunction!(compat::loads, m)?)?;
     m.add_function(wrap_pyfunction!(compat::dumps, m)?)?;
+    m.add(
+        "_dumps_portable",
+        wrap_pyfunction!(compat::dumps_portable, m)?,
+    )?;
+    m.add(
+        "_has_python_acceleration",
+        cfg!(feature = "python-acceleration"),
+    )?;
     m.add_function(wrap_pyfunction!(compat::_dumps_fields, m)?)?;
     m.add_function(wrap_pyfunction!(compat::_dumps_objects, m)?)?;
     m.add_class::<compat::Fragment>()?;
