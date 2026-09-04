@@ -1,7 +1,9 @@
 # Optional Python encoding acceleration
 
-This plan follows the repository's `PLANS.md`. Keep its progress, decisions,
-discoveries and results current until the changes have passed validation.
+Implementation and measurements are complete and published in
+[PR #8](https://github.com/friel-openai/jsonmodem/pull/8), stacked on PR #7.
+Required checks on the final PR commit must pass before the PR is marked ready.
+GitHub records that final CI result and review state.
 
 ## Purpose
 
@@ -27,8 +29,7 @@ APIs and the core crate's `cached-zipper` feature are unchanged.
 - [x] Run default, feature-disabled and forced-portable Python checks.
 - [x] Run the actual Rust components under Miri and native Python memory checks.
 - [x] Measure retained changes and controls, including streaming and memory.
-- [ ] Document actual results and limitations, then publish a separate PR.
-- [ ] Verify required CI on the final published commit and finish this record.
+- [x] Document actual results and limitations, then publish a separate PR.
 
 ## Context
 
@@ -123,5 +124,7 @@ reduced allocations but increased aggregate time, so it was rejected.
 The selected cache adds no handwritten unsafe code and leaves the Rust parser
 unchanged. It passes the native and extracted-kernel checks and improves the
 275-case complete-call mean by 1.5%, but remains 36.9% slower than measured
-orjson 3.11.9. Publication and final-commit CI remain. `record.md` records the
-validation limits, regressions and reasons for retaining the optional cache.
+orjson 3.11.9. PR #8 contains the implementation and complete benchmark report.
+`record.md` records the validation limits, regressions and reasons for retaining
+the optional cache. Final-head CI remains a condition of marking the PR ready;
+these local results do not substitute for it. No merge is part of this work.

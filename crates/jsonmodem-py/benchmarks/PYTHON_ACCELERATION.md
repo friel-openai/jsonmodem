@@ -52,7 +52,7 @@ for that call.
 | 1,024 dates, 64 owners | **136.195** | 139.902 | 139.299 | 174.404 |
 | 16 dates, one owner | 3.570 | **3.033** | 3.710 | 3.077 |
 | 16 dates, nine owners | 3.533 | 4.400 | 3.628 | **3.013** |
-| 16 dates, 64 owners | 3.517 | 4.492 | 3.626 | **3.145** |
+| 16 dates, all distinct owners | 3.517 | 4.492 | 3.626 | **3.145** |
 | Root datetime | 1.056 | 1.072 | 1.082 | **0.470** |
 | One date in a list | 1.207 | 1.293 | 1.378 | **0.486** |
 | Large integer list | 202.101 | 213.390 | 210.653 | **72.237** |
@@ -62,9 +62,11 @@ for that call.
 For 1,024 dates sharing one timezone, time falls by 29.0% from PR #7. The
 sixteen-miss limit reduces the initial cache's nine-owner result from 183.516
 to 140.407 us and its 64-owner result from 197.985 to 139.902 us. It cannot
-recover its setup cost in the short miss cases: 16 dates with 64 owners take
-27.7% longer than PR #7. The cache remains bounded and optional; it is not
-appropriate to claim that every date workload improves.
+recover its setup cost in the short miss cases: 16 dates with distinct owners
+take 27.7% longer than PR #7. The cache remains bounded and optional, but it
+does not improve every date workload. The last miss fixture is named
+`offsets_64_owners_16_dates` because its generator prepares 64 timezone objects;
+only the first sixteen are present in the encoded list.
 
 Some wider regressions are larger than the overall gain. Microseconds per call;
 **lower is better**.

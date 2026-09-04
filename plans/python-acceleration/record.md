@@ -4,7 +4,11 @@ The implementation starts from jsonmodem commit
 `70638485a81064da41167163681c5fcde265f4bc`. Retain the refined fixed-timezone
 cache with default-enabled, optional execution. Native tests, six actual-cache
 Miri configurations, timings, streaming controls and memory measurements are
-complete. Publication and final-commit CI remain outstanding.
+complete. The implementation and report are published in
+[PR #8](https://github.com/friel-openai/jsonmodem/pull/8), stacked on PR #7.
+Its required checks must pass on the final commit before it is marked ready.
+The test counts below describe the independently validated package; GitHub
+records CI results for each published commit.
 
 ## Implementation
 
@@ -58,8 +62,8 @@ over PR #7, with a 36.9% remaining time gap against orjson.
 Retain it for its repeated-timezone benefit: 1,024 dates with one owner take
 96.322 us instead of 135.731 us. Root datetime time is 1.072 us versus 1.056 us.
 The miss limit reduces the initial cache's longer-list regressions, but sixteen
-dates with 64 owners still take 4.492 us versus 3.517 us. Portable calls avoid
-caching, without promising identical machine code or timing to PR #7.
+dates with distinct owners still take 4.492 us versus 3.517 us. Portable calls
+avoid caching, without promising identical machine code or timing to PR #7.
 
 The wider regressions remain visible. `otfcc` encoding takes 12.5% longer and
 loses in all three process orders; its cause is unresolved. Unicode-escape
