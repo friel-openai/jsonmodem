@@ -29,6 +29,7 @@ for model in stacked tree; do
         echo "Miri model=$model execution_seed=$seed generated_cases=$CASES"
         cargo "+$TOOLCHAIN" miri test -p jsonmodem --lib memory_safety -- --nocapture
         cargo "+$TOOLCHAIN" miri test -p jsonmodem --test memory_safety -- --nocapture
+        cargo "+$TOOLCHAIN" miri test -p jsonmodem-py-validation fixed_offsets -- --nocapture
     done
     echo "Miri model=$model execution_seed=2 without cached-zipper"
     cargo "+$TOOLCHAIN" miri test -p jsonmodem --no-default-features \

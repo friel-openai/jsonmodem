@@ -11,6 +11,10 @@ description = "Python bindings for the jsonmodem Rust crate"
 name = "_jsonmodem"
 crate-type = ["cdylib"]
 
+[features]
+default = ["python-acceleration"]
+python-acceleration = []
+
 [dependencies]
 jsonmodem = { path = "../jsonmodem" }
 pyo3 = { version = "0.25", features = ["extension-module"] }

@@ -30,7 +30,17 @@ if [[ -d "$SITE_DIR/jsonmodem_py" && ! -e "$SITE_DIR/jsonmodem" ]]; then
     echo 'from .jsonmodem import *' > "$SITE_DIR/jsonmodem/__init__.py"
   fi
 fi
-run_step "python tests" python -m pytest -q crates/jsonmodem-py/tests
+run_step "python tests" env JSONMODEM_EXPECT_ACCELERATION=1 \
+  python -m pytest -q crates/jsonmodem-py/tests
+run_step "portable python tests" env JSONMODEM_TEST_PORTABLE=1 JSONMODEM_EXPECT_ACCELERATION=1 \
+  python -m pytest -q crates/jsonmodem-py/tests
+run_step "build without optional acceleration" maturin develop --uv \
+  -m crates/jsonmodem-py/Cargo.toml --release --no-default-features
+run_step "feature-disabled python tests" env JSONMODEM_EXPECT_ACCELERATION=0 \
+  python -m pytest -q crates/jsonmodem-py/tests
+run_step "restore default build" maturin develop --uv -m crates/jsonmodem-py/Cargo.toml --release
+run_step "verify restored features" python -c \
+  'import jsonmodem; assert jsonmodem._native._has_python_acceleration'
 
 DOC_ROOT="$REPO_ROOT/tmp/plans/python"
 PYDOC_DIR="$DOC_ROOT/pydoc"

@@ -185,3 +185,4 @@ OPT_SERIALIZE_DATACLASS: int
 OPT_SERIALIZE_UUID: int
 
 __version__: str
+__all__: list[str]

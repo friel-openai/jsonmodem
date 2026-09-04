@@ -13,7 +13,8 @@ BUILD="$ROOT/target/python-memory"
 VENV="$BUILD/venv"
 mkdir -p "$BUILD/wheels"
 uv venv --allow-existing --python "${JSONMODEM_MEMORY_PYTHON:-python3}" "$VENV"
-uv pip install --python "$VENV/bin/python" maturin pytest
+uv pip install --python "$VENV/bin/python" maturin pytest numpy \
+    'orjson==3.11.9; python_version >= "3.10"'
 
 rustc "+$TOOLCHAIN" -vV
 "$VENV/bin/python" -VV
@@ -52,3 +53,8 @@ echo "Instrumented extension: $EXTENSION"
 nm -D "$EXTENSION" | grep __asan_init
 export JSONMODEM_MEMORY_RUNNER="$BUILD/python-memory"
 "$BUILD/python-memory" "$VENV/bin/python" -m pytest -q crates/jsonmodem-py/tests
+JSONMODEM_TEST_PORTABLE=1 "$BUILD/python-memory" "$VENV/bin/python" -m pytest -q \
+    crates/jsonmodem-py/tests/test_python_acceleration.py \
+    crates/jsonmodem-py/tests/test_datetime_dispatch.py \
+    crates/jsonmodem-py/tests/test_datetime_fixed_offset.py \
+    crates/jsonmodem-py/tests/test_owned_output.py

@@ -1,5 +1,9 @@
 //! Tests Rust dependencies used by the Python bindings without linking Python.
 
+#[cfg(test)]
+#[path = "../../jsonmodem-py/src/compat/fixed_offsets.rs"]
+mod fixed_offsets;
+
 #[cfg(all(test, target_pointer_width = "64"))]
 #[path = "../../jsonmodem-py/src/compat/integer.rs"]
 mod integer;
