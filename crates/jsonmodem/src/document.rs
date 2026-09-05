@@ -503,6 +503,16 @@ pub fn plain_string_prefix(bytes: &[u8]) -> usize {
     string_prefix::<false>(bytes)
 }
 
+/// Return the exact positions of bytes requiring JSON string escaping.
+///
+/// The fixed-size reference supplies every byte read by the optional SIMD
+/// implementation. Non-ASCII bytes are not escape characters.
+#[must_use]
+#[inline]
+pub fn string_escape_mask(block: &[u8; 16]) -> u16 {
+    crate::string_block::mask::<false>(block)
+}
+
 // The incremental scanner counts non-ASCII characters separately from bytes.
 #[inline]
 pub(crate) fn ascii_string_prefix(bytes: &[u8]) -> usize {
@@ -537,15 +547,30 @@ fn string_prefix<const ASCII_ONLY: bool>(bytes: &[u8]) -> usize {
         index += 8;
     }
     while bytes.len() - index >= 32 {
-        let chunk: &[u8; 32] = bytes[index..index + 32].try_into().expect("32-byte slice");
-        let special = chunk.map(|byte| {
-            u8::from(byte < 0x20)
-                | u8::from(byte == b'"')
-                | u8::from(byte == b'\\')
-                | u8::from(ASCII_ONLY && !byte.is_ascii())
-        });
-        if special.into_iter().fold(0, |found, byte| found | byte) != 0 {
-            break;
+        #[cfg(feature = "simd")]
+        {
+            let first = bytes[index..index + 16].try_into().expect("16-byte slice");
+            let second = bytes[index + 16..index + 32]
+                .try_into()
+                .expect("16-byte slice");
+            let special = u32::from(crate::string_block::mask::<ASCII_ONLY>(first))
+                | (u32::from(crate::string_block::mask::<ASCII_ONLY>(second)) << 16);
+            if special != 0 {
+                return index + special.trailing_zeros() as usize;
+            }
+        }
+        #[cfg(not(feature = "simd"))]
+        {
+            let chunk: &[u8; 32] = bytes[index..index + 32].try_into().expect("32-byte slice");
+            let special = chunk.map(|byte| {
+                u8::from(byte < 0x20)
+                    | u8::from(byte == b'"')
+                    | u8::from(byte == b'\\')
+                    | u8::from(ASCII_ONLY && !byte.is_ascii())
+            });
+            if special.into_iter().fold(0, |found, byte| found | byte) != 0 {
+                break;
+            }
         }
         index += 32;
     }
@@ -733,6 +758,40 @@ mod tests {
                 assert!(parsed.is_ascii());
                 assert!(parsed.borrowed().is_none());
             }
+        }
+    }
+
+    #[test]
+    fn consecutive_short_escapes_preserve_errors_and_following_text() {
+        for count in 0..40 {
+            let prefix = "\\n".repeat(count);
+            for tail in ["plain", "\u{e9}", "\\uD83D\\uDE42", "\\t\\r"] {
+                let input = format!("\"{prefix}{tail}\"");
+                let mut reader = DocumentReader::new(&input);
+                let mut decoded = String::new();
+                let expected_tail = match tail {
+                    "\\uD83D\\uDE42" => "\u{1f642}",
+                    "\\t\\r" => "\t\r",
+                    _ => tail,
+                };
+                let expected = format!("{}{expected_tail}", "\n".repeat(count));
+                let value = reader.string_with_metadata(&mut decoded).unwrap();
+                assert_eq!(value.as_str(), expected);
+                assert_eq!(value.is_ascii(), expected.is_ascii());
+                assert_eq!(reader.offset(), input.len());
+            }
+            let input = format!("\"{prefix}\\q\"");
+            let mut reader = DocumentReader::new(&input);
+            let mut decoded = String::new();
+            assert_eq!(
+                reader.string_with_buffer(&mut decoded).unwrap_err(),
+                DocumentError {
+                    message: "invalid escaped character in string",
+                    offset: 2 + prefix.len(),
+                }
+            );
+            assert_eq!(reader.offset(), 3 + prefix.len());
+            assert_eq!(decoded, "\n".repeat(count));
         }
     }
 

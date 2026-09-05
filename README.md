@@ -50,7 +50,7 @@ revision and disable default features:
 jsonmodem = { git = "https://github.com/friel-openai/jsonmodem", rev = "53aaa2dc3e7c4f0d83ec9a1a38a0c5cad3341482", default-features = false }
 ```
 
-Without `cached-zipper`, the core crate uses `forbid(unsafe_code)`. The public
+Without either `cached-zipper` or `simd`, the core crate uses `forbid(unsafe_code)`. The public
 parsing and value APIs stay the same, but value building can be slower,
 especially for deeply nested documents. This guarantee covers the core crate's
 source, not its dependencies or the Python extension.
@@ -60,7 +60,12 @@ Cargo combines dependency features. If any other dependency enables
 uses the cache. `default-features = false` is not a veto. Check the resolved
 features with `cargo tree -e features -i jsonmodem` in your application.
 
-The independent `serde` feature can be enabled with or without `cached-zipper`.
+The independent `simd` feature enables bounded string classification and is
+enabled by default. On x86-64 with SSE2, it reads exactly one 16-byte block per
+load. Other targets use the portable classifier. Disabling `simd` does not
+disable `cached-zipper`, and Cargo feature unification applies to both.
+
+The independent `serde` feature can be enabled with either configuration.
 
 ### Number conversion
 

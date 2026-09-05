@@ -1,6 +1,9 @@
 /target
 /tmp
-/vendor
+/vendor/*
+!/vendor/pyo3-0.25.1/
+!/vendor/pyo3-macros-backend-0.25.1/
+!/vendor/README.md
 *.pending-snap
 actionlint
 

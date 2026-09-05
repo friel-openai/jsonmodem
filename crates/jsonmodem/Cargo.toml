@@ -13,8 +13,9 @@ autobins = false
 autotests = false
 
 [features]
-default = ["cached-zipper"]
+default = ["cached-zipper", "simd"]
 cached-zipper = []
+simd = []
 serde = ["dep:serde"]
 
 [dependencies]

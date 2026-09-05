@@ -13,12 +13,16 @@
 //!
 //! The default `cached-zipper` feature enables an internally unsafe pointer
 //! cache for value building. Without it, value building uses safe tree
-//! traversal, and this crate forbids unsafe code. Other dependencies can
-//! enable the feature through Cargo feature unification; see the README.
+//! traversal. The independent `simd` feature enables bounded string kernels.
+//! Without either feature, this crate forbids unsafe code. Other dependencies
+//! can enable features through Cargo feature unification; see the README.
 
 #![no_std]
 #![deny(unsafe_code)]
-#![cfg_attr(not(feature = "cached-zipper"), forbid(unsafe_code))]
+#![cfg_attr(
+    not(any(feature = "cached-zipper", feature = "simd")),
+    forbid(unsafe_code)
+)]
 extern crate alloc;
 
 #[cfg(any(test, fuzzing))]
@@ -35,6 +39,7 @@ pub mod lending_iterator;
 mod number;
 mod parser;
 mod path;
+mod string_block;
 mod value;
 mod value_tree;
 

@@ -31,6 +31,11 @@ run_step() {
 ###############################################################################
 run_step "rustfmt (apply)"  cargo +"$RUSTFMT_TOOLCHAIN" fmt --all
 run_step "rustfmt (check)"  cargo +"$RUSTFMT_TOOLCHAIN" fmt --all -- --check
+run_step "PyO3 patch formatting" rustfmt +"$RUSTFMT_TOOLCHAIN" --check \
+    vendor/pyo3-0.25.1/src/types/string.rs vendor/pyo3-0.25.1/src/pybacked.rs \
+    vendor/pyo3-0.25.1/src/types/dict.rs \
+    vendor/pyo3-0.25.1/src/impl_/extract_argument.rs \
+    vendor/pyo3-macros-backend-0.25.1/src/params.rs
 
 ###############################################################################
 # 2. Build, test, lint (skip fuzz crate)

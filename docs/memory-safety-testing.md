@@ -4,19 +4,24 @@ Run these commands from the repository root:
 
 ```sh
 bash .agent/check-miri.sh
+bash .agent/check-string-kernels.sh
 bash .agent/check-py-memory.sh
 ```
 
-The first command executes Rust tests under Miri. The second loads an
+The first two commands execute Rust tests under Miri. The third loads an
 AddressSanitizer-instrumented Python extension into CPython. They check different
 operations; neither proves that every possible use is safe.
 
-These two commands do not run the Rust tests in `jsonmodem-py`; those tests
+These commands do not run the Rust tests in `jsonmodem-py`; those tests
 need separately linked native executables. The default AddressSanitizer setup
-installs maturin and pytest, but not orjson or NumPy. Tests requiring either
-optional dependency skip when it is absent; inspect the reported skips.
+installs maturin, pytest and NumPy, plus orjson 3.11.9 on Python 3.10 or newer.
+Reference comparisons that require orjson skip on Python 3.9. Inspect the actual
+test and skip counts for each interpreter.
 
 ## Rust tests
+
+The [CPython adapter notes](cpython-adapters.md) describe the ownership rules,
+supported layouts, upstream changes, and limits of these checks.
 
 Miri needs a Rust nightly toolchain with `miri` and `rust-src`, plus
 `cargo-nextest`. `.agent/setup.sh` installs these tools. The script logs the
@@ -52,6 +57,12 @@ cargo test -p jsonmodem --test memory_safety
 
 ### Scanner
 
+`check-string-kernels.sh` runs the production string classifier with `simd`
+enabled and disabled. It uses both Miri borrow models and
+execution seeds 0, 1, and 2. Tests cover every byte at each position, adjacent
+matches, alignment, exact allocation ends, and parser errors after decoded
+escapes. The native implementation is not replaced under `cfg(miri)`.
+
 `parser/scanner/mod.rs` copies text through safe string slices. Rust checks the
 slice bounds and character boundaries in release builds as well as tests.
 The scanner no longer converts arbitrary bytes with unchecked UTF-8 casts.
@@ -84,7 +95,7 @@ can grow or be replaced. Its three pointer dereferences return references
 tied to the mutable borrow of the owning zipper. The path and value occupy
 disjoint fields, so returning both does not require an unsafe reborrow.
 Without that feature, `value_zipper.rs` walks the owned tree using safe Rust,
-and the core crate forbids unsafe code.
+and the core crate forbids unsafe code when `simd` is also disabled.
 
 The zipper's containing modules are private. No public API accepts arbitrary
 paths for these cached mutations. That restriction and the parser's event
