@@ -539,6 +539,7 @@ dependencies = [
  "lexical-parse-float",
  "pyo3",
  "pyo3-build-config",
+ "pyo3-macros-backend",
  "simdutf8",
  "smallvec",
  "zmij",
@@ -740,8 +741,6 @@ dependencies = [
 [[package]]
 name = "pyo3"
 version = "0.25.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8970a78afe0628a3e3430376fc5fd76b6b45c4d43360ffd6cdd40bdde72b682a"
 dependencies = [
  "indoc",
  "libc",
@@ -790,8 +789,6 @@ dependencies = [
 [[package]]
 name = "pyo3-macros-backend"
 version = "0.25.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4109984c22491085343c05b0dbc54ddc405c3cf7b4374fc533f5c3313a572ccc"
 dependencies = [
  "heck",
  "proc-macro2",

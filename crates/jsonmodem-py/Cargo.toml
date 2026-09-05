@@ -12,12 +12,14 @@ name = "_jsonmodem"
 crate-type = ["cdylib"]
 
 [features]
-default = ["python-acceleration"]
+default = ["python-acceleration", "simd", "cached-zipper"]
 python-acceleration = []
+simd = ["jsonmodem/simd"]
+cached-zipper = ["jsonmodem/cached-zipper"]
 
 [dependencies]
-jsonmodem = { path = "../jsonmodem" }
-pyo3 = { version = "0.25", features = ["extension-module"] }
+jsonmodem = { path = "../jsonmodem", default-features = false }
+pyo3 = { path = "../../vendor/pyo3-0.25.1", version = "=0.25.1", features = ["extension-module", "checked-unicode"] }
 itoa = "1"
 smallvec = "1.15"
 zmij = "=1.0.21"
@@ -28,3 +30,6 @@ simdutf8 = { workspace = true }
 
 [build-dependencies]
 pyo3-build-config = "0.25"
+# Maturin must include the matching argument code generator in source archives.
+# A workspace patch alone does not declare a path dependency for its collector.
+pyo3-macros-backend = { path = "../../vendor/pyo3-macros-backend-0.25.1", version = "=0.25.1" }

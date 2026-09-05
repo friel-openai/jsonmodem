@@ -317,9 +317,11 @@ CPython still handles allocation and growth.
 During `dumps()`, `copy_integer` reads selected exact Python integers directly.
 `text::compact_ascii_text` borrows existing ASCII storage from an owned Python
 string. Other explicit text conversions check the Unicode cache's UTF-8 bytes
-before Rust borrows them. PyO3-generated argument handling and error formatting
-still contain unchecked text conversions, so these local checks do not cover
-every Python entry point.
+before Rust borrows them. The [pinned PyO3 patch](../../vendor/README.md) also
+checks generated argument handling, which runs before the binding's own input
+checks. Its lossy error formatter reads canonical characters instead of invoking
+a replaceable codec handler. This closes those text-conversion gaps, not every
+possible safety issue in PyO3 or CPython.
 
 `borrowed_dict::DictScalarCursor` handles primitive entries without temporary
 Python owners. It permits no Python call or reference release while entry
@@ -366,8 +368,9 @@ remaining tests.
 
 ## Optional Python acceleration
 
-The Python crate enables its `python-acceleration` Cargo feature by default.
-It caches up to eight validated fixed-timezone offsets for one `dumps()` call.
+The Python crate enables `python-acceleration`, `simd`, and `cached-zipper` by
+default. `python-acceleration` caches up to eight validated fixed-timezone
+offsets for one `dumps()` call.
 Only datetimes inside containers use the cache. A root datetime cannot reuse
 an offset later in the call. After sixteen consecutive misses, the cache stops
 looking up and adding entries, but keeps existing owners until the call ends.
@@ -402,10 +405,17 @@ maturin build -m crates/jsonmodem-py/Cargo.toml --release --no-default-features
 
 Cargo combines features requested by dependencies, so another dependency may
 enable a feature omitted by one declaration. Portable calls remain available
-and effective in a feature-enabled build. Neither choice disables existing
-native code in PyO3, CPython or jsonmodem, and neither changes the core Rust
-crate's `cached-zipper` feature. Both implementations preserve input validation
-and supported JSON behavior. Internal allocation and reference counts can differ.
+and disable `python-acceleration` for that call. They do not change the independent
+Rust `simd` and `cached-zipper` features. The Python crate forwards those features
+explicitly instead of enabling its dependency's defaults. A standalone build
+with `--no-default-features` therefore omits all three optional implementations.
+It can select individual features with `--features`, for example
+`--no-default-features --features python-acceleration`.
+
+Disabling all three features forbids unsafe code in the core crate when no other
+dependency enables its features. It does not remove existing native code from
+PyO3, CPython, or the Python binding. Input validation and supported JSON behavior
+remain the same. Internal allocation and reference counts can differ.
 
 ## Benchmark
 
@@ -485,3 +495,8 @@ comparisons and a separate measurement of the whole process's resident memory
 the RSS comparison with
 `python crates/jsonmodem-py/benchmarks/bench_rss.py --output /tmp/rss-comparison.json`
 from the repository root.
+
+The [hardened acceleration report](benchmarks/HARDENED_ACCELERATION.md)
+compares checked argument conversion and shared string scanning with PR #8
+and orjson. It includes complete-call and incremental timing, regressions,
+allocation counts, and separate RSS measurements.

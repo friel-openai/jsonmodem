@@ -62,6 +62,8 @@ else:
 assert copied == b"\xff" and calls == 1
 
 expected = TypeError
+expected_message = None
+saved_surrogatepass = codecs.lookup_error("surrogatepass")
 if case == "root":
     operation = lambda: jsonmodem.dumps(text)
 elif case == "list":
@@ -131,6 +133,28 @@ elif case == "payload_key":
     assert isinstance(payload, jsonmodem.StringPayload)
     operation = lambda: payload[text]
     expected = UnicodeError
+elif case in {"keyword_function", "keyword_constructor", "keyword_method"}:
+    if case == "keyword_function":
+        operation = lambda: jsonmodem.dumps(None, **{text: 0})
+        callable_name = "dumps()"
+    elif case == "keyword_constructor":
+        operation = lambda: jsonmodem.JsonModem(**{text: 0})
+        callable_name = "JsonModem.__new__()"
+    else:
+        parser = jsonmodem.JsonModem()
+        operation = lambda: parser.feed(b"[]", **{text: 0})
+        callable_name = "JsonModem.feed()"
+    expected_message = callable_name + " got an unexpected keyword argument '" + "\ufffd" * 3 + "'"
+elif case in {"conversion_error", "conversion_error_handler"}:
+    class BadIndex:
+        def __index__(self):
+            raise TypeError(text)
+    if case == "conversion_error_handler":
+        def forbidden_handler(error):
+            raise AssertionError("error formatting called a replaceable codec handler")
+        codecs.register_error("surrogatepass", forbidden_handler)
+    operation = lambda: jsonmodem._native._numpy_dumps(b"", [0], "u", BadIndex(), "", 0, 0)
+    expected_message = "argument 'itemsize': " + "\ufffd" * 3
 elif case in {"path_suffix", "view_key"}:
     parser = jsonmodem.JsonModemValues()
     updates = list(parser.feed(b'{"ok":1}'))
@@ -146,11 +170,16 @@ else:
 
 try:
     operation()
-except expected:
+except expected as error:
+    if expected_message is not None:
+        assert str(error) == expected_message, repr(error)
     print("rejected invalid cached UTF-8")
 else:
     raise AssertionError("invalid cached UTF-8 was accepted")
+finally:
+    codecs.register_error("surrogatepass", saved_surrogatepass)
 assert codecs.lookup_error("strict") is original
+assert jsonmodem.dumps({"after": "\u00e9"}) == b'{"after":"\xc3\xa9"}'
 '''
 
 
@@ -163,6 +192,8 @@ assert codecs.lookup_error("strict") is original
         "dataclass_dict_name", "dataclass_slot_name", "events", "tracked_events", "minimal_events",
         "values", "pattern", "pattern_list", "decode_mode", "payload_key",
         "path_suffix", "view_key", "numpy_kind", "numpy_unit",
+        "keyword_function", "keyword_constructor", "keyword_method",
+        "conversion_error", "conversion_error_handler",
     ],
 )
 def test_invalid_utf8_cache_is_rejected_after_handler_restoration(case):
@@ -214,3 +245,67 @@ def test_checked_string_arguments_keep_valid_values_and_type_errors():
         jsonmodem._native._numpy_dumps(b"", [0], 1, 1, "", 0, 0)
     with pytest.raises(TypeError):
         jsonmodem._native._numpy_dumps(b"", [0], "u", 1, 1, 0, 0)
+
+
+@pytest.mark.skipif(sys.implementation.name != "cpython", reason="CPython codec reentry")
+def test_argument_error_formatting_allows_codec_and_finalizer_reentry():
+    script = r'''
+import codecs
+import gc
+import sys
+sys.path.insert(0, sys.argv[1])
+import jsonmodem
+
+calls = []
+text = "before\ud800after"
+
+class CodecFailure(Exception):
+    def __del__(self):
+        assert jsonmodem.dumps({"nested": 2}) == b'{"nested":2}'
+        calls.append("finalizer")
+
+def strict(error):
+    calls.append("strict")
+    assert error.object is text
+    assert jsonmodem.dumps({"nested": 1}) == b'{"nested":1}'
+    raise CodecFailure()
+
+def surrogatepass(error):
+    calls.append("surrogatepass")
+    raise AssertionError("lossy formatting invoked a codec handler")
+
+class BadIndex:
+    def __index__(self):
+        raise TypeError(text)
+
+original_strict = codecs.lookup_error("strict")
+original_pass = codecs.lookup_error("surrogatepass")
+try:
+    codecs.register_error("strict", strict)
+    codecs.register_error("surrogatepass", surrogatepass)
+    try:
+        jsonmodem._native._numpy_dumps(b"", [0], "u", BadIndex(), "", 0, 0)
+    except TypeError as error:
+        assert str(error) == "argument 'itemsize': before" + "\ufffd" * 3 + "after"
+    else:
+        raise AssertionError("invalid item size was accepted")
+    gc.collect()
+finally:
+    codecs.register_error("strict", original_strict)
+    codecs.register_error("surrogatepass", original_pass)
+assert calls == ["strict", "finalizer"], calls
+assert jsonmodem.dumps([1, 2, 3]) == b"[1,2,3]"
+print("codec and finalizer reentry passed")
+'''
+    package_root = Path(jsonmodem.__file__).resolve().parent.parent
+    runner = os.environ.get("JSONMODEM_MEMORY_RUNNER")
+    command = [runner] if runner else []
+    result = subprocess.run(
+        [*command, sys.executable, "-B", "-c", script, str(package_root)],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.strip() == "codec and finalizer reentry passed"
